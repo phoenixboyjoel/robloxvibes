@@ -1,0 +1,8 @@
+# Toolchain pinned per project. Install Rokit, then run `rokit install` here.
+# Only needed for the Rojo workflow and for lint/format/type-check. Script Sync
+# users can skip Rojo but should still use selene, StyLua, and luau-lsp.
+[tools]
+rojo = "rojo-rbx/rojo@7.7.0"
+selene = "Kampfkarren/selene@0.31.0"
+stylua = "JohnnyMorganz/StyLua@2.5.2"
+luau-lsp = "JohnnyMorganz/luau-lsp@1.70.1"

@@ -1,0 +1,15 @@
+{
+  "name": "phoenix-starter",
+  "emitLegacyScripts": false,
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$path": "ReplicatedStorage",
+      "$ignoreUnknownInstances": true
+    },
+    "ServerScriptService": {
+      "$path": "ServerScriptService",
+      "$ignoreUnknownInstances": true
+    }
+  }
+}

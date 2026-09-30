@@ -43,7 +43,8 @@ simulator (`tests/sim`), using a three.js approximation of Roblox's renderer.
    cd tools/preview/render
    npm install                   # three.js, fonts, Playwright
    npx playwright install chromium   # skip if Chromium is already installed for Playwright
-   python3 fetch_content.py      # Roblox's face, particle and chat-tail textures and its fonts (needs Pillow)
+   python3 fetch_content.py      # Roblox's face, particle and chat-tail textures and its fonts (needs Pillow);
+                                 # from pinned commits, each file checked against its SHA-256
    node shot.mjs ../../../preview/first.json ../../../preview/first.png
    ```
 
@@ -77,7 +78,10 @@ whether a tell can be seen from the booth. It is not Roblox's renderer.
   - Particles are a still frame replayed from the emitter's settings.
   - Text measured by the game (`TextBounds`) comes from the simulator, which
     adds up each character's width in the font (no kerning), so a line can
-    come out a pixel or two different from Roblox's.
+    come out a few percent wider or narrower than Roblox draws it. The
+    renderer then wraps the text with the browser's own measurements (breaking
+    a word too long for a line, as Roblox does), so a preview's line breaks
+    can differ from the simulator's.
   - Roblox's buttons in the top-left corner are a sketch of Roblox's. ScreenGuis
     with `TopbarSafeInsets` are drawn beside them, in the part of the row the
     simulator's `GuiService.TopbarInset` leaves, which is an estimate.

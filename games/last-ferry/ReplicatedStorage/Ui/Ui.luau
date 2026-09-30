@@ -30,6 +30,10 @@ export type TextProps = {
 	autoSize: Enum.AutomaticSize?,
 	order: number?,
 	lineHeight: number?,
+	-- Kept at `size` whatever the player's Text Size setting (see Ui.holdTextSize)? By
+	-- default, only if its box can't make room for bigger text: it doesn't wrap, and
+	-- doesn't grow to fit its text.
+	hold: boolean?,
 }
 
 local Ui = {}
@@ -135,25 +139,45 @@ function Ui.panel(parent: Instance, name: string, size: UDim2, position: UDim2?,
 	return panel
 end
 
+-- Players can have Roblox draw all text bigger (GuiService.PreferredTextSize, the Text Size
+-- setting): a few pixels bigger at each step, and wrapped or automatically sized text makes
+-- room for it. Text in a box that can't grow would spill out of it instead, so it's held
+-- at its size here, with a UITextSizeConstraint, which Roblox's docs say that setting never
+-- draws text past. (The text meant for reading wraps, or grows its box, and so gets bigger.)
+function Ui.holdTextSize(object: TextLabel | TextButton, size: number)
+	local constraint = Instance.new("UITextSizeConstraint")
+	constraint.MaxTextSize = size
+	constraint.Parent = object
+end
+
 -- Typed as TextLabel so every property below is checked. TextButton has the same text
 -- properties, so the tab buttons go through here too.
 local function applyText(label: TextLabel, props: TextProps)
+	local size = props.size or 18
+	local autoSize = props.autoSize or Enum.AutomaticSize.None
 	label.BackgroundTransparency = 1
 	label.BorderSizePixel = 0
 	label.Text = props.text or ""
 	label.FontFace = props.font or Theme.Fonts.body
-	label.TextSize = props.size or 18
+	label.TextSize = size
 	label.TextColor3 = props.color or C.text
 	label.TextXAlignment = props.xAlign or Enum.TextXAlignment.Left
 	label.TextYAlignment = props.yAlign or Enum.TextYAlignment.Center
 	label.TextWrapped = props.wrap == true
 	label.RichText = props.rich == true
-	label.Size = props.frameSize or UDim2.new(1, 0, 0, math.ceil((props.size or 18) * 1.3))
+	label.Size = props.frameSize or UDim2.new(1, 0, 0, math.ceil(size * 1.3))
 	label.Position = props.position or UDim2.new()
 	label.AnchorPoint = props.anchor or Vector2.zero
-	label.AutomaticSize = props.autoSize or Enum.AutomaticSize.None
+	label.AutomaticSize = autoSize
 	label.LayoutOrder = props.order or 0
 	label.LineHeight = props.lineHeight or 1
+	local hold = props.hold
+	if hold == nil then
+		hold = props.wrap ~= true and autoSize == Enum.AutomaticSize.None
+	end
+	if hold then
+		Ui.holdTextSize(label, size)
+	end
 end
 
 function Ui.label(parent: Instance, name: string, props: TextProps): TextLabel
@@ -290,6 +314,7 @@ function Ui.button(parent: Instance, name: string, text: string, size: UDim2, st
 		frameSize = UDim2.fromOffset(0, textSize + 6),
 		autoSize = Enum.AutomaticSize.X,
 		order = 2,
+		hold = true, -- the button doesn't grow with it
 	})
 	if textColor == C.text then
 		Ui.textStroke(label, 2)

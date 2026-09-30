@@ -148,6 +148,7 @@ function Ticket.new(parent: Instance, home: UDim2): Ticket
 	tab.ZIndex = 1
 	tab.Visible = false
 	tab.Selectable = true
+	Ui.holdTextSize(tab, 16)
 	Ui.padding(tab, 0, 0, 0, 28)
 	Ui.corner(tab, UDim.new(0, 4))
 	local tabStroke = Ui.stroke(tab, C.lamp, 2, 0.2)
@@ -201,7 +202,7 @@ function Ticket.new(parent: Instance, home: UDim2): Ticket
 	-- The rubber stamp slammed onto the ticket after a call.
 	local callStamp = Ui.label(paper, "CallStamp", {
 		font = Theme.Fonts.print,
-		size = 34,
+		size = 32, -- WINDOW CLOSED, the longest, with room to spare
 		xAlign = Enum.TextXAlignment.Center,
 		frameSize = UDim2.fromOffset(220, 52),
 		position = UDim2.fromScale(0.5, 0.5),

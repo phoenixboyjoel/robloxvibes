@@ -133,6 +133,13 @@ function Sim.new(
 		-- stand-in font's does.
 		fontsLoadAt = opts.fontsLoadAt or 0,
 		fontsLoaded = (opts.fontsLoadAt or 0) <= 0,
+		-- Whether ContentProvider:PreloadAsync waits for the fonts, as Roblox's docs say it
+		-- does; players report it doesn't always.
+		preloadWaitsForFonts = opts.preloadWaitsForFonts ~= false,
+		-- GuiService.ViewportDisplaySize, if not worked out from tenFoot and preferredInput.
+		displaySize = opts.displaySize,
+		-- The player's Text Size setting (GuiService.PreferredTextSize).
+		preferredTextSize = opts.preferredTextSize or Enum.PreferredTextSize.Medium,
 		stores = {},
 		badges = {},
 		coreCalls = {},
@@ -898,7 +905,7 @@ function Sim.new(
 			local insets = instance.ScreenInsets
 			if value and insets == Enum.ScreenInsets.CoreUISafeInsets then
 				instance.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets
-			elseif not value and insets == Enum.ScreenInsets.DeviceSafeInsets then
+			elseif not value then
 				instance.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
 			end
 		end
@@ -1332,10 +1339,14 @@ function Sim.new(
 		end,
 		-- A TV, a phone or tablet, or a computer's screen.
 		ViewportDisplaySize = function()
-			return if sim.tenFoot
-				then Enum.DisplaySize.Large
-				elseif sim.preferredInput == Enum.PreferredInput.Touch then Enum.DisplaySize.Small
-				else Enum.DisplaySize.Medium
+			return sim.displaySize
+				or if sim.tenFoot
+					then Enum.DisplaySize.Large
+					elseif sim.preferredInput == Enum.PreferredInput.Touch then Enum.DisplaySize.Small
+					else Enum.DisplaySize.Medium
+		end,
+		PreferredTextSize = function()
+			return sim.preferredTextSize
 		end,
 	}
 	-- Where a ScreenGui's area is, in GUI coordinates, and how big it is.
@@ -1378,12 +1389,17 @@ function Sim.new(
 				family = "Montserrat"
 			end
 			local weights = family and fontWidths[family]
-			local gap = math.huge
+			local wanted = font.Weight.Value
+			local gap, best = math.huge, nil
 			found = false
 			for weight, widths in weights or {} do
-				local off = math.abs(tonumber(weight) - font.Weight.Value)
-				if off < gap then
-					found, gap = widths, off
+				local value = tonumber(weight) :: number
+				local off = math.abs(value - wanted)
+				-- On a tie, the heavier for a bold weight and the lighter for a light one.
+				local better = off < gap
+					or (off == gap and best and (if wanted >= 500 then value > best else value < best))
+				if better then
+					found, gap, best = widths, off, value
 				end
 			end
 			faces[key] = found
@@ -1392,77 +1408,177 @@ function Sim.new(
 	end
 
 	local ENTITIES = { lt = "<", gt = ">", amp = "&", quot = '"', apos = "'" }
-
-	-- How much room text takes, as Roblox lays it out: each character as wide as it is in
-	-- its font (no kerning), a line for each line break, and, wrapped at `maxWidth` if
-	-- given, breaking lines between words and breaking a word wider than a line across
-	-- lines. While the fonts are loading, and for a font it doesn't know, every character
-	-- is about half the text size wide (a fifth less while loading, as a stand-in font's).
-	local function measureText(st, maxWidth: number?)
-		local text = st.props.Text or ""
-		if st.props.RichText then
-			text = string.gsub(string.gsub(text, "<[^>]*>", ""), "&(%a+);", ENTITIES)
-		end
-		if text == "" then
-			return roblox.Vector2.zero
-		end
-		local size = st.props.TextSize or 14
-		local widths = if sim.fontsLoaded then faceWidths(st.props.FontFace) else nil
-		local rough = if sim.fontsLoaded then 0.52 else 0.42
-		local function width(character: string): number
-			if widths then
-				return (widths[character] or widths["?"]) * size
-			end
-			return (if character == " " then rough * 0.55 else rough) * size
-		end
-		local limit = if maxWidth and maxWidth > 0 then maxWidth else math.huge
-		local space = width(" ")
-		local lines, widest = 0, 0
-		for line in string.gmatch(text .. "\n", "(.-)\n") do
-			lines += 1
-			local current = 0
-			local function breakLine()
-				widest = math.max(widest, current)
-				lines += 1
-				current = 0
-			end
-			for word in string.gmatch(line, "%S+") do
-				local wordWidth = 0
-				for _, code in utf8.codes(word) do
-					wordWidth += width(utf8.char(code))
-				end
-				if current > 0 and current + space + wordWidth <= limit then
-					current += space + wordWidth
-				else
-					if current > 0 then
-						breakLine()
-					end
-					if wordWidth <= limit then
-						current = wordWidth
-					else
-						for _, code in utf8.codes(word) do
-							local characterWidth = width(utf8.char(code))
-							if current > 0 and current + characterWidth > limit then
-								breakLine()
-							end
-							current += characterWidth
-						end
-					end
-				end
-			end
-			widest = math.max(widest, current)
-		end
-		return roblox.Vector2.new(math.ceil(widest), lines * size)
+	-- How much bigger the player's Text Size setting draws text, in pixels. Roblox adds a
+	-- fixed amount (TextService:GetTextSizeOffsetAsync) but doesn't publish it: these are
+	-- this simulator's guesses, generous at the top end.
+	local TEXT_SIZE_OFFSETS = { Medium = 0, Large = 2, Larger = 4, Largest = 8 }
+	local WEIGHTS = {}
+	for _, item in Enum.FontWeight:GetEnumItems() do
+		WEIGHTS[item.Value] = item
 	end
 
-	-- The fonts have loaded: all text is laid out again with them.
-	local function loadFonts()
-		sim.fontsLoaded = true
+	-- The size text of `size` in an object is drawn at: plus the player's Text Size setting
+	-- unless it's TextScaled, within any UITextSizeConstraint on it.
+	local function drawnSize(st, size: number): number
+		if not st.props.TextScaled then
+			size += TEXT_SIZE_OFFSETS[sim.preferredTextSize.Name] or 0
+		end
+		for _, child in st.children do
+			if state[child].className == "UITextSizeConstraint" then
+				size = math.clamp(size, child.MinTextSize, child.MaxTextSize)
+			end
+		end
+		return size
+	end
+
+	-- An object's text as runs in one font and size each: rich text's <b>, <font face,
+	-- family, weight or size> and <br /> change them, and its other tags draw nothing.
+	local function textRuns(st, size: number): { { text: string, font: any, size: number } }
+		local text = st.props.Text or ""
+		local font = st.props.FontFace
+		if not st.props.RichText then
+			return { { text = text, font = font, size = size } }
+		end
+		local runs = {}
+		local stack = { { font = font, size = size } }
+		local position = 1
+		while position <= #text do
+			local tagStart, tagEnd, closing, name, attributes = string.find(text, "<(/?)(%a+)(.-)>", position)
+			local chunk = string.sub(text, position, (tagStart or #text + 1) - 1)
+			local top = stack[#stack]
+			if chunk ~= "" then
+				table.insert(
+					runs,
+					{ text = (string.gsub(chunk, "&(%a+);", ENTITIES)), font = top.font, size = top.size }
+				)
+			end
+			if tagStart == nil then
+				break
+			end
+			position = tagEnd + 1
+			name = string.lower(name)
+			if name == "br" then
+				table.insert(runs, { text = "\n", font = top.font, size = top.size })
+			elseif closing == "/" then
+				if (name == "b" or name == "font") and #stack > 1 then
+					table.remove(stack)
+				end
+			elseif name == "b" or name == "font" then
+				local family = if top.font then top.font.Family else "rbxasset://fonts/families/LegacyArial.json"
+				local weight = if top.font then top.font.Weight else Enum.FontWeight.Regular
+				local style = if top.font then top.font.Style else Enum.FontStyle.Normal
+				local runSize = top.size
+				if name == "b" then
+					weight = Enum.FontWeight.Bold
+				else
+					local face = string.match(attributes, 'face%s*=%s*"([^"]*)"')
+					family = if face then `rbxasset://fonts/families/{face}.json` else family
+					family = string.match(attributes, 'family%s*=%s*"([^"]*)"') or family
+					local named = string.match(attributes, 'weight%s*=%s*"([^"]*)"')
+					if named then
+						weight = WEIGHTS[tonumber(named) or 0]
+							or (Enum.FontWeight :: any)[string.upper(string.sub(named, 1, 1)) .. string.sub(named, 2)]
+							or weight
+					end
+					runSize = tonumber(string.match(attributes, 'size%s*=%s*"([^"]*)"') or "") or runSize
+				end
+				table.insert(stack, { font = roblox.Font.new(family, weight, style), size = runSize })
+			end
+		end
+		return runs
+	end
+
+	-- How much room text takes, as Roblox lays it out, and each line's width: each character
+	-- as wide as it is in its font (no kerning), a line for each line break, and, wrapped at
+	-- `maxWidth` if given, lines broken at spaces and a word wider than a line broken across
+	-- lines. While the fonts are loading, and for a font it doesn't know, every character is
+	-- about half the text size wide (a fifth less while loading, as a stand-in font's).
+	local function measureText(st, maxWidth: number?): (any, { number })
+		local declared = st.props.TextSize or 14
+		local size = drawnSize(st, declared)
+		local rough = if sim.fontsLoaded then 0.52 else 0.42
+		-- Every character, with how wide it's drawn.
+		local characters = {}
+		for _, run in textRuns(st, declared) do
+			local runSize = drawnSize(st, run.size)
+			local widths = if sim.fontsLoaded then faceWidths(run.font) else nil
+			for _, code in utf8.codes(run.text) do
+				local character = utf8.char(code)
+				local width = if widths
+					then (widths[character] or widths["?"]) * runSize
+					else (if character == " " then rough * 0.55 else rough) * runSize
+				table.insert(characters, { character = character, width = width })
+			end
+		end
+		if #characters == 0 then
+			return roblox.Vector2.zero, {}
+		end
+		local limit = if maxWidth and maxWidth > 0 then maxWidth else math.huge
+		local lines: { number } = {}
+		local current, spaces, started = 0, 0, false
+		local word, wordWidth = {}, 0
+		local function endLine()
+			table.insert(lines, current)
+			current, spaces, started = 0, 0, false
+		end
+		local function placeWord()
+			if #word == 0 then
+				return
+			end
+			if started and current + spaces + wordWidth > limit then
+				endLine() -- the space it breaks at goes with it
+			end
+			current += spaces
+			spaces = 0
+			if current + wordWidth <= limit then
+				current += wordWidth
+			else
+				for _, width in word do
+					if current > 0 and current + width > limit then
+						endLine()
+					end
+					current += width
+				end
+			end
+			started = true
+			word, wordWidth = {}, 0
+		end
+		for _, entry in characters do
+			if entry.character == "\n" then
+				placeWord()
+				endLine()
+			elseif entry.character == " " then
+				placeWord()
+				spaces += entry.width
+			else
+				table.insert(word, entry.width)
+				wordWidth += entry.width
+			end
+		end
+		placeWord()
+		-- Spaces at the end of the text count, if they fit.
+		if current + spaces <= limit then
+			current += spaces
+		end
+		table.insert(lines, current)
+		local widest = 0
+		for _, width in lines do
+			widest = math.max(widest, width)
+		end
+		return roblox.Vector2.new(math.ceil(widest), #lines * size * (st.props.LineHeight or 1)), lines
+	end
+
+	-- All text is laid out again (the fonts have loaded, or the player's text size changed).
+	local function relayoutText()
 		for instance, st in state do
 			if isA(st.className, "TextLabel") or isA(st.className, "TextButton") or isA(st.className, "TextBox") then
 				touchGui(instance)
 			end
 		end
+	end
+	local function loadFonts()
+		sim.fontsLoaded = true
+		relayoutText()
 	end
 
 	-- GUI layout, for GuiObject.AbsolutePosition and AbsoluteSize, roughly as Roblox lays
@@ -1729,20 +1845,26 @@ function Sim.new(
 		local left, top, right, bottom = paddingOf(st)
 		local width = box.size.X / box.scale - left - right
 		local height = box.size.Y / box.scale - top - bottom
-		return measureText(st, if st.props.TextWrapped then width else nil), width, height
+		local bounds, lines = measureText(st, if st.props.TextWrapped then width else nil)
+		return bounds, lines, width, height
 	end
 	-- Wrapped text never measures taller than its object: as in Roblox, lines that don't fit
-	-- aren't drawn (and TextFits says so).
+	-- aren't drawn (and TextFits says so), and aren't measured.
 	local function textBounds(instance, st)
-		local bounds, _, height = textLayout(instance, st)
-		if st.props.TextWrapped and bounds.Y > height then
-			local size = st.props.TextSize or 14
-			return roblox.Vector2.new(bounds.X, math.max(0, math.floor(height / size)) * size)
+		local bounds, lines, _, height = textLayout(instance, st)
+		if st.props.TextWrapped and bounds.Y > height + 0.5 then
+			local lineHeight = bounds.Y / #lines
+			local drawn = math.max(0, math.floor((height + 0.5) / lineHeight))
+			local widest = 0
+			for i = 1, drawn do
+				widest = math.max(widest, lines[i])
+			end
+			return roblox.Vector2.new(math.ceil(widest), drawn * lineHeight)
 		end
 		return bounds
 	end
 	local function textFits(instance, st)
-		local bounds, width, height = textLayout(instance, st)
+		local bounds, _, width, height = textLayout(instance, st)
 		return bounds.X <= width + 0.5 and bounds.Y <= height + 0.5
 	end
 	for _, className in { "TextLabel", "TextButton", "TextBox" } do
@@ -2747,7 +2869,7 @@ function Sim.new(
 		-- Every asset is there from the start, except fonts, which load at sim.fontsLoadAt.
 		PreloadAsync = function(_self, contents, callback)
 			assert(type(contents) == "table", "PreloadAsync takes a list of instances or content ids")
-			while not sim.fontsLoaded do
+			while sim.preloadWaitsForFonts and not sim.fontsLoaded do
 				taskApi.wait(0.1)
 			end
 			if callback then
@@ -3253,6 +3375,42 @@ function Sim.new(
 			end
 		end
 		return on
+	end
+
+	-- How much room an object's text takes and how much it has, in its own pixels (before any
+	-- UIScale): its text's size as laid out, and the width and height inside its padding.
+	function sim:textRoom(object): (any, number, number)
+		local bounds, _, width, height = textLayout(object, state[object])
+		return bounds, width, height
+	end
+
+	-- The size an object's text is drawn at: its TextSize, bigger at the player's Text Size
+	-- setting (unless it's TextScaled), within any UITextSizeConstraint on it.
+	function sim:drawnTextSize(object): number
+		return drawnSize(state[object], object.TextSize)
+	end
+
+	-- A GuiService setting the player (or their device) changed, and what follows it.
+	local function guiServiceChanged(key: string)
+		local guiService = game:GetService("GuiService")
+		local signal = state[guiService].propertySignals[key]
+		if signal then
+			fire(signal, nil)
+		end
+		drain()
+	end
+
+	-- The display's size class changes (the window moved to a TV, say).
+	function sim:setDisplaySize(size: EnumItem)
+		sim.displaySize = size
+		guiServiceChanged("ViewportDisplaySize")
+	end
+
+	-- The player changes their Text Size setting: all text is drawn bigger or smaller.
+	function sim:setPreferredTextSize(size: EnumItem)
+		sim.preferredTextSize = size
+		relayoutText()
+		guiServiceChanged("PreferredTextSize")
 	end
 
 	-- Roblox's own top bar buttons take a different amount of room (its chat pill opening,

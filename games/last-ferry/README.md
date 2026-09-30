@@ -128,7 +128,7 @@ GitHub Actions runs all of these on every pull request
 same pinned versions. It keeps the built place file as a download on each run.
 
 At the time of this build every check comes back clean:
-- 98 tests pass.
+- 104 tests pass.
 - There are 0 selene findings.
 - There are 0 strict type errors.
 
@@ -210,15 +210,45 @@ The fourth review, of those fixes, found, and this build fixes:
   fonts are in, and whenever the player changes their text size.
 - **Real text sizes in the tests:** the simulator now measures text with the
   widths of Roblox's own fonts, where it used to estimate (a long name came out
-  half its real width). The tests now check that every piece of text on screen
-  fits its box, on every card, on an iPhone SE, a monitor and a TV. That found
-  the first night's keyboard hint running under the rules panel on a 16:9
-  monitor (you can see it in the old previews); it's now two short lines,
-  clear of it.
+  half its real width). The tests now check that the text on screen fits its
+  box, on the cards and the HUD, on an iPhone SE, a monitor and a TV (the next
+  review found the gaps in that). That found the first night's keyboard hint
+  running under the rules panel on a 16:9 monitor (you can see it in the old
+  previews); it's now two short lines, clear of it.
 - **Plus:** the bubble's tail kept clear of anything below it, bigger type
   decided by the display's size (as Roblox's docs advise) rather than by being
   a console, each clerk's stand checked in co-op and cleared at clock-out, and
   the previews drawn in Roblox's own fonts.
+
+The fifth review, of those fixes, found, and this build fixes:
+- **The player's Text Size setting:** players can have Roblox draw all text
+  bigger (Settings, Text Size), and nothing tested it. TURN AWAY and the WINDOW
+  CLOSED stamp would have spilled out of their boxes at the first step up. The
+  text meant for reading (the rules, the bubble, the radio, the manifest, the
+  ledger, the cards' words, the pills) now wraps or grows, so it gets bigger;
+  text in a box that can't grow (the ticket, the buttons, the tabs, the
+  headings) keeps its size, held by a `UITextSizeConstraint` as Roblox's docs
+  describe. On the smallest phones the longest lines are drawn a step smaller
+  only if they'd otherwise run off the screen. The simulator models the
+  setting, and the tests play a whole shift at the largest size on an iPhone
+  SE, checking every word each second.
+- **Gaps in the text checks:** labels that grow to fit their text (on the
+  buttons and pills) always "fit" themselves, so they're now checked against
+  the button or pill around them, with 4% to spare for kerning. The ending
+  card's words show only after its scene (7 seconds), after the check had run;
+  it now waits for them. The docs said which screens were checked more broadly
+  than they were; they now say exactly.
+- **Fonts that load late, again:** preloading a font isn't always enough, so
+  the bubble measures its line again whenever it doesn't fit after all.
+- **A window moved to a TV:** the bubble now follows the display's size as it
+  changes, as Roblox's docs advise.
+- **Plus:** the bubble has 2 px to spare so Roblox's rounding can't re-wrap its
+  last word; its placement checks every obstacle each time and prefers a spot
+  inside its room; the simulator measures bold and rich text, runs of spaces
+  and line breaks as Roblox does; the hint says "Right mouse button to look";
+  the previews break long words as Roblox does and download Roblox's files from
+  pinned commits with checksums; and the docs no longer overstate how close the
+  text measurements are (a few percent, not 1%).
 
 Smooth movement came out of the same research: nothing is tweened on the
 server any more. The server sends each move once and every client plays it
@@ -256,8 +286,10 @@ The tests have three layers:
      longest line clear of every piece of the HUD and above the passenger's
      head from every stand, on three screens, and with the view turned; the
      status fitting however much of the top bar Roblox's buttons leave, with a
-     page in the ledger too; every piece of text fitting its box, on every
-     card; every stand's view aimed at the passenger, respawns included.
+     page in the ledger too; every piece of text fitting its box, on the cards
+     and the HUD, at the default and the largest Text Size (ARCHITECTURE.md
+     lists exactly which screens); every stand's view aimed at the passenger,
+     respawns included.
    - Passengers walk a steady stride every frame on each client while the
      server sends each leg once (`sim:countWrites` counts who moved what), and
      glides survive late joiners, changes of course and late server moves.

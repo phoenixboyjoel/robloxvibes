@@ -107,7 +107,9 @@ rojo build -o LastFerry.rbxl
 ```
 
 All clean, every time. If a test fails, the code is wrong until proven
-otherwise. Don't weaken or skip a test to get green.
+otherwise. Don't weaken or skip a test to get green. While working on
+something, `lune run tests/run.luau some words` runs only the tests whose names
+contain those words; run the whole suite before you're done.
 
 ## Luau rules
 
@@ -131,9 +133,11 @@ otherwise. Don't weaken or skip a test to get green.
 - Never measure something hidden by its `AbsoluteSize`: Roblox doesn't keep
   what's hidden laid out. Measure text with a label in a disabled ScreenGui
   (`TextBounds`), as Roblox's own chat does and `Ui/TopBar` and `Ui/Speech` do,
-  and measure it again once its font has loaded (`ContentProvider:PreloadAsync`)
-  and when `GuiService.PreferredTextSize` changes: text measured before its font
-  loads comes out a stand-in font's size.
+  and measure it again once its font has loaded (`ContentProvider:PreloadAsync`,
+  which isn't always enough: measure again if it doesn't fit after all) and
+  when `GuiService.PreferredTextSize` changes: text measured before its font
+  loads comes out a stand-in font's size. A measuring label must draw its text
+  as big as what it measures, so don't hold it at a size (`hold = false`).
 - New Roblox API in game code? The simulator will say "isn't simulated". Add
   the class to `tests/sim/gen_reflection.py` and the behaviour to
   `tests/sim/Roblox.luau`, rather than working around the test.
@@ -161,9 +165,20 @@ otherwise. Don't weaken or skip a test to get green.
 - Every piece of text must fit its box on every screen: Roblox doesn't draw the
   lines of wrapped text that don't fit, and text that doesn't wrap spills out.
   The simulator measures text with Roblox's real font widths, and `Game.spec`
-  checks every label on screen (and every card) on phones, a monitor and a TV.
-  Only text meant to be cut short uses `TextTruncate`. Add any new font the game
-  uses to `tests/sim/gen_fonts.py`.
+  checks every label on screen on phones, a monitor and a TV, and every card
+  the bot sees (ARCHITECTURE's test list says which screens see which). Text
+  that doesn't wrap keeps 4% of its width to spare, for kerning. Only text
+  meant to be cut short uses `TextTruncate`. Add any new font the game uses to
+  `tests/sim/gen_fonts.py`.
+- Text must fit at every Text Size, too. Players can have Roblox draw all
+  text a few pixels bigger (`GuiService.PreferredTextSize`), except
+  `TextScaled` text and text a `UITextSizeConstraint` holds back. Text meant
+  for reading wraps or grows its box (AutomaticSize), so it can get bigger;
+  text in a box that can't grow is held at its size (`Ui.label` does this by
+  default, `Ui.holdTextSize` for anything else). `Game.spec` plays at the
+  largest size too: every word still fits, and the text meant for reading is
+  drawn bigger. Don't hold rich text that sets sizes (`<font size>`): a
+  UITextSizeConstraint overrides them.
 - Nothing may cover a passenger's face while they're at the window: breath is
   a rule from night 3. That's why the radio waits for an empty window,
   warnings show as a banner across the status in Roblox's top bar row, and

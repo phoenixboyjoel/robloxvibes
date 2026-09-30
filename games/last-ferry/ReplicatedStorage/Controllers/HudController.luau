@@ -278,6 +278,7 @@ function HudController.start()
 		wrap = true,
 		xAlign = Enum.TextXAlignment.Center,
 		frameSize = UDim2.fromOffset(DESK_WIDTH, 44),
+		autoSize = Enum.AutomaticSize.Y, -- down into the ticket's place, at a bigger Text Size
 		position = UDim2.fromOffset(0, 70),
 	})
 	Ui.textStroke(idle, 2)
@@ -313,7 +314,7 @@ function HudController.start()
 	local denyButton = Ui.button(desk, "Deny", "TURN AWAY", UDim2.fromOffset(half, 76), {
 		fill = C.deny,
 		deep = C.denyDeep,
-		textSize = 19,
+		textSize = 18, -- smaller than BOARD's, to fit the longer words with room to spare
 		icon = "cross",
 		stack = true,
 	})
@@ -635,7 +636,7 @@ function HudController.start()
 			hint.Text = "Right stick to look · Hold R2 to lean in\nA board · B turn away · X take a page"
 			boardKey, denyKey = "A", "B"
 		else
-			hint.Text = "Hold right-click to look around · Scroll to lean in\nB board · T turn away · P take a page"
+			hint.Text = "Right mouse button to look · Scroll to lean in\nB board · T turn away · P take a page"
 			boardKey, denyKey = "B", "T"
 		end
 		keyHints[boardButton].Text = boardKey
@@ -709,6 +710,9 @@ function HudController.start()
 						text = name,
 						font = F.ticket,
 						size = 17,
+						wrap = true,
+						frameSize = UDim2.new(1, 0, 0, 23),
+						autoSize = Enum.AutomaticSize.Y,
 						order = i,
 					})
 				end

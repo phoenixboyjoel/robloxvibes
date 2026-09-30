@@ -571,6 +571,70 @@ T.test("text is as wide as it is in Roblox's own fonts, and wraps as Roblox wrap
 	]])
 	T.equal(fits, false, "text too tall for its label doesn't fit")
 	T.equal(bounds.Y, 16, "and only the line that fits is measured")
+	local shown = sim:execute([[
+		local gui = Instance.new("ScreenGui")
+		local label = Instance.new("TextLabel")
+		label.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium)
+		label.TextSize = 16
+		label.TextWrapped = true
+		label.Text = "Hi\nand a much longer line that isn't drawn"
+		label.Size = UDim2.fromOffset(300, 20)
+		label.Parent = gui
+		gui.Parent = game:GetService("StarterGui")
+		return label.TextBounds
+	]])
+	T.equal(shown.X, textBounds(sim, GOTHAM, 16, "Hi").X, "as wide as the lines drawn, not those that aren't")
+
+	local oneSpace = textBounds(sim, BUILDER_BOLD, 18, "IN LINE")
+	local threeSpaces = textBounds(sim, BUILDER_BOLD, 18, "IN   LINE")
+	T.expect(threeSpaces.X > oneSpace.X + 5, "every space takes room")
+	T.equal(textBounds(sim, BUILDER_BOLD, 18, "NIGHT<br />1", nil, true).Y, 36, "rich text's <br /> starts a line")
+	local MEDIUM = "Font.fromEnum(Enum.Font.BuilderSansMedium)"
+	T.equal(
+		textBounds(sim, MEDIUM, 18, "<b>MANIFEST</b>", nil, true),
+		textBounds(sim, BUILDER_BOLD, 18, "MANIFEST"),
+		"rich text's <b> is drawn in the bold face"
+	)
+	T.equal(
+		textBounds(sim, MEDIUM, 16, '<font face="SpecialElite">Mabel Orr</font>', nil, true),
+		textBounds(sim, "Font.fromEnum(Enum.Font.SpecialElite)", 16, "Mabel Orr"),
+		"and <font face> in its face"
+	)
+	T.equal(#sim.errors, 0, table.concat(sim.errors, "\n"))
+end)
+
+T.test("the player's Text Size setting draws text bigger, except where it's held down", function()
+	local sim = Sim.new({ root = ".", preferredTextSize = roblox.Enum.PreferredTextSize.Largest })
+	local largest = textBounds(sim, BUILDER_BOLD, 18, "NIGHT 1 / 5")
+	local plain = Sim.new({ root = "." })
+	T.equal(largest, textBounds(plain, BUILDER_BOLD, 26, "NIGHT 1 / 5"), "18 px text is drawn 8 px bigger at Largest")
+	local held, scaled = sim:execute([[
+		local gui = Instance.new("ScreenGui")
+		local function label()
+			local made = Instance.new("TextLabel")
+			made.FontFace = Font.fromEnum(Enum.Font.BuilderSansBold)
+			made.TextSize = 18
+			made.Text = "NIGHT 1 / 5"
+			made.Parent = gui
+			return made
+		end
+		local held = label()
+		local cap = Instance.new("UITextSizeConstraint")
+		cap.MaxTextSize = 20
+		cap.Parent = held
+		local scaled = label()
+		scaled.TextScaled = true
+		gui.Parent = game:GetService("StarterGui")
+		return held.TextBounds, scaled.TextBounds
+	]])
+	T.equal(held, textBounds(plain, BUILDER_BOLD, 20, "NIGHT 1 / 5"), "no bigger than a UITextSizeConstraint allows")
+	T.equal(scaled, textBounds(plain, BUILDER_BOLD, 18, "NIGHT 1 / 5"), "and TextScaled text isn't changed")
+	sim:setPreferredTextSize(roblox.Enum.PreferredTextSize.Medium)
+	T.equal(
+		sim.game:GetService("GuiService").PreferredTextSize,
+		roblox.Enum.PreferredTextSize.Medium,
+		"the setting can change mid-game"
+	)
 	T.equal(#sim.errors, 0, table.concat(sim.errors, "\n"))
 end)
 
@@ -604,8 +668,32 @@ T.test("GuiService.ViewportDisplaySize: small on a phone, medium on a computer, 
 	local sizes = roblox.Enum.DisplaySize
 	local phone = Sim.new({ root = ".", preferredInput = roblox.Enum.PreferredInput.Touch })
 	T.equal(phone.game:GetService("GuiService").ViewportDisplaySize, sizes.Small)
-	T.equal(Sim.new({ root = "." }).game:GetService("GuiService").ViewportDisplaySize, sizes.Medium)
+	local computer = Sim.new({ root = "." })
+	local guiService = computer.game:GetService("GuiService")
+	T.equal(guiService.ViewportDisplaySize, sizes.Medium)
 	T.equal(Sim.new({ root = ".", tenFoot = true }).game:GetService("GuiService").ViewportDisplaySize, sizes.Large)
+	local heard = 0
+	guiService:GetPropertyChangedSignal("ViewportDisplaySize"):Connect(function()
+		heard += 1
+	end)
+	computer:setDisplaySize(sizes.Large)
+	T.equal(guiService.ViewportDisplaySize, sizes.Large, "a window moved to a TV")
+	T.equal(heard, 1, "and the change is signalled")
+end)
+
+T.test("ContentProvider:PreloadAsync can return before the fonts have loaded, as players report", function()
+	local sim = Sim.new({ root = ".", fontsLoadAt = 5, preloadWaitsForFonts = false })
+	local label = sim:execute([[
+		local label = Instance.new("TextLabel")
+		task.spawn(function()
+			game:GetService("ContentProvider"):PreloadAsync({ label })
+			label:SetAttribute("Loaded", true)
+		end)
+		return label
+	]])
+	sim:run(0.5)
+	T.equal(label:GetAttribute("Loaded"), true, "it has returned")
+	T.expect(not sim.fontsLoaded, "before the fonts have loaded")
 end)
 
 return nil

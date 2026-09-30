@@ -156,6 +156,24 @@ function layoutText(ctx, runs, font, px, lineHeight, width, wrap) {
         pushLine();
       }
       if (isSpace && lineWidth === 0 && lines.length > 1 && wrap) continue;
+      if (wrap && !isSpace && w > width + 0.5) {
+        // A word wider than a whole line: Roblox breaks it across lines wherever it has to
+        // ("should a long unbroken word exceed the width", TextWrapped's docs), as the
+        // simulator does. It starts on a line of its own (above).
+        let chunk = '';
+        for (const g of graphemes(piece)) {
+          if (chunk !== '' && ctx.measureText(chunk + g).width > width + 0.5) {
+            lines[lines.length - 1].push({ ...run, text: chunk, width: ctx.measureText(chunk).width, size });
+            pushLine();
+            chunk = '';
+          }
+          chunk += g;
+        }
+        const last = ctx.measureText(chunk).width;
+        lines[lines.length - 1].push({ ...run, text: chunk, width: last, size });
+        lineWidth += last;
+        continue;
+      }
       lines[lines.length - 1].push({ ...run, text: piece, width: w, size });
       lineWidth += w;
     }

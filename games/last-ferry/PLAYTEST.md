@@ -211,10 +211,25 @@ Disabled**.
       - On the Xbox (a TV screen) there's no Roblox chat at all, but the
         passenger's bubble still shows, in bigger type.
       - No text anywhere is cut off or spills out of its box: the pills, the
-        ticket, the rules, the buttons and every card (the ending too).
-      - In Roblox's Settings, set Text Size to the largest: the bubble and
-        the pills grow and still fit (the bubble wraps into more lines; the
-        pills drop the date first).
+        ticket, the rules, the buttons and every card, the ending's too. (The
+        tests check this with Roblox's own font widths, but without kerning,
+        which can make text a few percent wider or narrower; and on a TV they
+        see only the first night's card.)
+      - In Roblox's Settings (Esc, then Settings), set Text Size to the
+        largest, on a phone and on a PC:
+        - the rules, the passenger's bubble, the radio, the manifest, the
+          ledger, the hint, the status pills and the cards' words are all
+          bigger, and still fit. The bubble wraps into more lines; on small
+          phones the longest lines may sit over the top bar row, or be drawn
+          a little smaller so they stay on screen. The pills drop the date
+          first.
+        - The ticket, the buttons, the tabs, the card headings and the
+          countdown stay their usual size, by design (their boxes can't
+          grow). Say whether they're readable enough at that setting.
+        - Roblox doesn't publish how much bigger each setting draws text; the
+          tests guess 8 px at the largest. If it's more, look hardest at the
+          bubble on an iPhone SE and at "The next passenger is coming up the
+          dock..." on the desk.
       - Mara (the smallest passenger) has a normal-looking classic head.
 - [ ] **Test → Clients and Servers**, 2 players:
       - both see the same passenger;
@@ -240,6 +255,8 @@ Disabled**.
 | How far out the pier camera can zoom | `StarterPlayer.CameraMaxZoomDistance` (project file) | 25 studs |
 | The passenger's speech bubble (text size, width, height above the head) | `ReplicatedStorage/Ui/Speech.luau` | 16 px (24 on a TV), text up to 300 px wide (or the room between the ticket and the rules), 0.4 studs up |
 | The gap between the bubble and the HUD | `SPEECH_GAP` in `HudController` | 8 design px |
+| How much smaller the bubble's line may be drawn, at a big Text Size, to stay on screen | `limits` in `Speech.luau` (`applyDisplay`) | 2 px at a time, down to 16 px (24 on a TV) |
+| Which text grows with the player's Text Size | `hold` in `Ui.label` (`Ui.luau`) | all but text whose box can't grow, button labels and tags |
 | The status pills in Roblox's top bar row | `ReplicatedStorage/Ui/TopBar.luau` | 44 px pills, 12 px down, near-black at 8% see-through (Roblox's own numbers) |
 | Sound volumes and pitches | `ReplicatedStorage/Shared/Sounds.luau` | |
 | Queue sizes and difficulty per night | `Content.Nights` | 6 to 9 passengers |

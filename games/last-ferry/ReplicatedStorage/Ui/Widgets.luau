@@ -11,12 +11,17 @@ local F = Theme.Fonts
 
 local Widgets = {}
 
+-- A section's caption, over its lines in a list that grows to fit them. It wraps, and grows,
+-- if the player's Text Size needs it to.
 function Widgets.caption(parent: Instance, text: string, color: Color3, order: number): TextLabel
 	return Ui.label(parent, "Caption", {
 		text = text,
 		font = F.title,
 		size = 15,
 		color = color,
+		wrap = true,
+		frameSize = UDim2.new(1, 0, 0, 20),
+		autoSize = Enum.AutomaticSize.Y,
 		order = order,
 	})
 end
@@ -48,7 +53,8 @@ function Widgets.paragraph(parent: Instance, text: string, props: ParagraphProps
 	})
 end
 
--- A small rounded tag: "NEW", "2/5" and the like.
+-- A small rounded tag: "NEW", "2/5" and the like. It keeps its size whatever the player's
+-- Text Size, as a badge, since what's beside it leaves it only so much room.
 function Widgets.tag(parent: Instance, name: string, text: string, fill: Color3, ink: Color3, size: number): TextLabel
 	local tag = Ui.label(parent, name, {
 		text = text,
@@ -58,6 +64,7 @@ function Widgets.tag(parent: Instance, name: string, text: string, fill: Color3,
 		xAlign = Enum.TextXAlignment.Center,
 		frameSize = UDim2.fromOffset(0, size + 8),
 		autoSize = Enum.AutomaticSize.X,
+		hold = true,
 	})
 	tag.BackgroundTransparency = 0
 	tag.BackgroundColor3 = fill

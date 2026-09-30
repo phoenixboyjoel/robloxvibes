@@ -9,8 +9,9 @@ Usage:
     python3 tests/sim/gen_fonts.py path/to/content/fonts
 
 `content/fonts` is the folder of fonts that ships with the Roblox client and Studio;
-every face the game uses is in it. A mirror of Studio's:
-https://github.com/suscersal/roblox-studio-web/tree/main/content/fonts
+every face the game uses is in it. A mirror of Studio's, at the commit
+tools/preview/render/fetch_content.py downloads (and checks) them from:
+https://github.com/suscersal/roblox-studio-web/tree/b7285b9d773a8f952668d5353a5275248816c050/content/fonts
 Only the widths are kept, not the fonts. (Builder Sans is Roblox's, under its Builder
 Font License: for making experiences on Roblox, which this is.)
 """

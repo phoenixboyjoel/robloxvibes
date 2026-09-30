@@ -90,6 +90,9 @@ local function summaryRow(parent: Instance, index: number, row: View.SummaryRow)
 		font = F.title,
 		size = 17,
 		rich = true,
+		wrap = true,
+		frameSize = UDim2.new(1, 0, 0, 23),
+		autoSize = Enum.AutomaticSize.Y,
 		order = 1,
 	})
 	paragraph(lines, row.note, { size = 15, color = C.muted, order = 2 })

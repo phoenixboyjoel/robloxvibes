@@ -238,6 +238,7 @@ function TopBar.new(parent: Instance, fallback: GuiObject): TopBar
 		yAlign = Enum.TextYAlignment.Top,
 		frameSize = UDim2.new(1, 0, 0, 29),
 		position = UDim2.fromOffset(0, 15),
+		hold = true, -- its two lines, whole, in a banner the height of Roblox's row
 	})
 	paragraph.TextTruncate = Enum.TextTruncate.AtEnd
 
@@ -252,7 +253,9 @@ function TopBar.new(parent: Instance, fallback: GuiObject): TopBar
 	sizer.Enabled = false
 	sizer.ResetOnSpawn = false
 	sizer.Parent = parent
-	local measure = Ui.label(sizer, "Measure", { frameSize = UDim2.fromOffset(10000, PILL) })
+	-- Not held at a size, like the pills' text: it measures that text as big as the player's
+	-- Text Size setting draws it.
+	local measure = Ui.label(sizer, "Measure", { frameSize = UDim2.fromOffset(10000, PILL), hold = false })
 	local measured: { [TextLabel]: number } = {} -- this fitting's
 	local function textWidth(label: TextLabel): number
 		local width = measured[label]

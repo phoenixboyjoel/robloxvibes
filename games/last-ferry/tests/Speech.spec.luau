@@ -132,6 +132,30 @@ T.test("a bubble goes beside anything in the way lower down, or over it", functi
 	box = placeInRoom(sim, V2(280, 330), { 274, 0, 480, 600 }, { tab })
 	T.expect(clear(box, tab), "no room on either side: over it")
 	T.equal(box.bottom, 280, "just over it, tail and all")
+
+	-- Two things in the way: moving off one mustn't put it on the other, whichever is
+	-- listed first.
+	local a, b = { 250, 250, 290, 320 }, { 420, 250, 520, 320 }
+	for _, order in { { a, b }, { b, a } } do
+		box = placeInRoom(sim, V2(400, 330), wide, order)
+		T.expect(clear(box, a) and clear(box, b), `off both obstacles ({box.left}, {box.top})`)
+	end
+
+	-- No room beside the one in the way, and something else where going over it would put
+	-- the bubble: it goes over that too.
+	local low, higher = { 160, 260, 440, 600 }, { 180, 150, 420, 250 }
+	for _, order in { { low, higher }, { higher, low } } do
+		box = placeInRoom(sim, V2(300, 330), { 100, 0, 500, 600 }, order)
+		T.expect(clear(box, low) and clear(box, higher), `over both ({box.left}, {box.top})`)
+		T.equal(box.bottom, 150, "just over the higher one, tail and all")
+	end
+
+	-- A side just wide enough gives a narrow bubble, tall enough to stick out of the top of
+	-- the room: it goes where there's room for it instead.
+	local tall = { 160, 280, 460, 400 }
+	box = placeInRoom(sim, V2(170, 320), { 0, 250, 800, 600 }, { tall })
+	T.expect(clear(box, tall), "clear of the obstacle")
+	T.expect(box.top >= 250, `and inside the room (its top at {box.top})`)
 	T.equal(#sim.errors, 0, table.concat(sim.errors, "\n"))
 end)
 

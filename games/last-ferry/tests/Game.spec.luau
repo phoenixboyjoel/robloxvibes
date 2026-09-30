@@ -98,7 +98,7 @@ end
 local function lookAtPassenger(sim)
 	local folder = sim.workspace.World.Passengers
 	for _, model in folder:GetChildren() do
-		local rootPart = model:FindFirstChild("Root")
+		local rootPart = model:FindFirstChild("HumanoidRootPart")
 		if rootPart then
 			local position = rootPart.Position
 			if math.abs(position.X) < 0.5 and math.abs(position.Z + 3.2) < 0.5 then
@@ -107,7 +107,7 @@ local function lookAtPassenger(sim)
 				return {
 					breath = breath ~= nil and breath.Enabled,
 					wet = drips ~= nil and drips.Enabled,
-					shadow = model.Coat.CastShadow,
+					shadow = model.Torso.CastShadow,
 				}
 			end
 		end
@@ -329,6 +329,48 @@ T.test("a clerk playing from the HUD finishes five nights clean", function()
 	print(
 		`    (a clean run took {math.floor(sim.now / 60)} min {math.floor(sim.now % 60)} s of game time, {bot.calls} calls)`
 	)
+end)
+
+T.test("passengers are classic Robloxians who move like Roblox characters", function()
+	local sim = boot()
+	local alice = sim:addPlayer("Alice", 101)
+	local bot = newBot(sim, alice, { idle = true })
+	local model
+	sim:runUntil(
+		function()
+			for _, candidate in sim.workspace.World.Passengers:GetChildren() do
+				local root = candidate:FindFirstChild("HumanoidRootPart")
+				if root and math.abs(root.Position.Z + 3.2) < 0.5 then
+					model = candidate
+					return true
+				end
+			end
+			return false
+		end,
+		300,
+		1 / 20,
+		function()
+			tick(bot)
+		end
+	)
+	clean(sim, "crowd")
+	T.expect(model ~= nil, "a passenger reached the window")
+	-- Built like Roblox's own R6 dummy, with the built-in smile and no name tag.
+	for _, name in { "HumanoidRootPart", "Torso", "Head", "Left Arm", "Right Arm", "Left Leg", "Right Leg" } do
+		T.expect(model:FindFirstChild(name) ~= nil, `has a {name}`)
+	end
+	T.equal(model.Head.face.Texture, "rbxasset://textures/face.png", "the classic face")
+	T.equal(model.Head.Mesh.MeshType, roblox.Enum.MeshType.Head, "the classic head")
+	T.equal(model.Humanoid.DisplayDistanceType, roblox.Enum.HumanoidDisplayDistanceType.None, "no name tag")
+	for _, name in { "Neck", "Left Shoulder", "Right Shoulder", "Left Hip", "Right Hip" } do
+		T.expect(model.Torso:FindFirstChild(name) ~= nil, `joint {name}`)
+	end
+	-- The client animates them: standing, they sway and look about.
+	local neck = model.Torso.Neck
+	local before = neck.Transform
+	sim:run(1.5)
+	T.expect(neck.Transform ~= before, "the head turns while they wait")
+	T.expect(model.Torso["Right Shoulder"].Transform ~= roblox.CFrame.identity, "the arms sway")
 end)
 
 T.test("all five torn pages reach the ledger and the epilogue", function()

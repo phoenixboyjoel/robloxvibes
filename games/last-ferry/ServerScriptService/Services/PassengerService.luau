@@ -1,66 +1,43 @@
 --!strict
 --[[
-	PassengerService: builds passengers out of parts and walks them around.
+	PassengerService: dresses each passenger as a classic Robloxian (Robloxian.luau)
+	and walks them around.
 
-	The tells players check are built here from the passenger's facts, never
-	from their kind, so what you see always matches what the rules judge:
+	What someone wears comes from their Look, chosen from their name. The tells
+	players check are added here from the passenger's facts, never from their kind,
+	so what you see always matches what the rules judge:
 	- breath: fog puffs in front of the face (ParticleEmitter)
-	- wet: a darker, glossy coat; water dripping from the sleeve cuffs and the
-	  front of the hem; a wide puddle spreading out either side of them at the
-	  window; wet footprints where they walk. The window sill hides the planks
-	  closer than z ≈ -4.1, and a passenger's body hides the planks straight
-	  behind them, so these cues sit where the booth can see them.
+	- wet: soaked, darker, glossy clothes; water dripping from the cuffs and the
+	  hem; a wide puddle spreading either side of them at the window; wet
+	  footprints where they walk
 	- shadow: every visible part has CastShadow = passenger.shadow, plus a
 	  darkened patch on the planks where the lamp throws the shadow, so the tell
-	  survives phones that drop local-light shadows at low quality
+	  survives phones that turn shadows off at low graphics quality
+	- pale (the drowned on the first two nights): a grey-green skin, and seaweed
+	  if they're wet too
 
-	A figure is an anchored, invisible Root with the visible parts welded to it,
-	so tweening the Root moves the whole figure.
+	The HumanoidRootPart is anchored; every other part hangs off it on Roblox's
+	standard joints, so moving the root moves the whole figure, and clients swing
+	the limbs as they walk (CrowdController).
 ]]
 
 local TweenService = game:GetService("TweenService")
 
 local Types = require("../Shift/Types")
+local Robloxian = require("./Robloxian")
 
 local PassengerService = {}
 
-local COATS = {
-	Color3.fromRGB(44, 48, 56),
-	Color3.fromRGB(38, 52, 78),
-	Color3.fromRGB(72, 78, 52),
-	Color3.fromRGB(150, 122, 54),
-	Color3.fromRGB(96, 70, 50),
-	Color3.fromRGB(104, 108, 112),
-	Color3.fromRGB(40, 86, 90),
-	Color3.fromRGB(86, 46, 62),
-}
-local SKINS = {
-	Color3.fromRGB(255, 224, 196),
-	Color3.fromRGB(234, 192, 160),
-	Color3.fromRGB(198, 146, 110),
-	Color3.fromRGB(160, 110, 78),
-	Color3.fromRGB(120, 80, 56),
-	Color3.fromRGB(86, 58, 42),
-}
-local SCARVES = {
-	Color3.fromRGB(180, 160, 120),
-	Color3.fromRGB(70, 90, 120),
-	Color3.fromRGB(120, 60, 60),
-	Color3.fromRGB(200, 200, 190),
-	Color3.fromRGB(60, 110, 80),
-}
-local LEGS = Color3.fromRGB(34, 36, 40)
-local MARA_COAT = Color3.fromRGB(196, 30, 36)
-local MARA_SCARF = Color3.fromRGB(236, 196, 60)
-local PALE = Color3.fromRGB(168, 184, 188)
-local SEAWEED = Color3.fromRGB(46, 74, 44)
+local PALE = Color3.fromRGB(168, 190, 184)
+local SEAWEED = Color3.fromRGB(46, 96, 52)
+local PAGE = Color3.fromRGB(236, 226, 196)
 
 local SMOKE_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 local DROP_TEXTURE = "rbxasset://textures/particles/sparkles_main.dds"
 
 type Figure = {
 	root: BasePart,
-	halfHeight: number,
+	feet: number, -- the feet are this far below the root's centre
 	puddle: BasePart?,
 	mark: BasePart?,
 	page: BasePart?,
@@ -70,45 +47,10 @@ type Figure = {
 
 local figures: { [Model]: Figure } = {}
 
-local function piece(
-	model: Model,
-	root: BasePart,
-	name: string,
-	size: Vector3,
-	offset: CFrame,
-	color: Color3,
-	castShadow: boolean
-): Part
-	local p = Instance.new("Part")
-	p.Name = name
-	p.Size = size
-	p.CFrame = root.CFrame * offset
-	p.Color = color
-	p.Material = Enum.Material.SmoothPlastic
-	p.Anchored = false
-	p.Massless = true
-	p.CanCollide = false
-	p.CanTouch = false
-	p.CanQuery = false
-	p.CastShadow = castShadow
-	p.TopSurface = Enum.SurfaceType.Smooth
-	p.BottomSurface = Enum.SurfaceType.Smooth
-	local weld = Instance.new("WeldConstraint")
-	weld.Part0 = root
-	weld.Part1 = p
-	weld.Parent = p
-	p.Parent = model
-	return p
-end
-
-local function cylinderUp(): CFrame
-	return CFrame.Angles(0, 0, math.rad(90))
-end
-
-local function breathEmitter(head: BasePart, h: number)
+local function breathEmitter(head: BasePart, s: number)
 	local mouth = Instance.new("Attachment")
 	mouth.Name = "Mouth"
-	mouth.Position = Vector3.new(0, -0.12 * h, -0.62 * h)
+	mouth.Position = Vector3.new(0, -0.18 * s, -0.66 * s)
 	mouth.Parent = head
 
 	local emitter = Instance.new("ParticleEmitter")
@@ -164,175 +106,106 @@ local function dripEmitter(part: BasePart, position: Vector3)
 	emitter.Parent = drip
 end
 
--- Builds the figure standing at `feet`, facing `facing`.
+-- A strand of seaweed hanging from `on`, welded so it moves with it.
+local function seaweed(rig: Robloxian.Rig, on: BasePart, at: CFrame, length: number)
+	local s = rig.scale
+	local strand = Instance.new("Part")
+	strand.Name = "Seaweed"
+	strand.Size = Vector3.new(0.12 * s, length * s, 0.06 * s)
+	strand.CFrame = on.CFrame * at
+	strand.Color = SEAWEED
+	strand.Material = Enum.Material.SmoothPlastic
+	strand.Reflectance = 0.2
+	strand.Anchored = false
+	strand.Massless = true
+	strand.CanCollide = false
+	strand.CanTouch = false
+	strand.CanQuery = false
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = on
+	weld.Part1 = strand
+	weld.Parent = strand
+	strand.Parent = rig.model
+	table.insert(rig.all, strand)
+end
+
+-- Builds the passenger standing at `feet`, facing `facing`.
 function PassengerService.spawn(passenger: Types.Passenger, feet: Vector3, facing: Vector3, parent: Instance): Model
 	local look = passenger.look
-	local h = look.height
-	local halfHeight = 2.5 * h
-	local shadow = passenger.shadow
-	local isMara = passenger.kind == "mara"
-
-	local model = Instance.new("Model")
+	local rig = Robloxian.build(look, feet, facing)
+	local model = rig.model
 	model.Name = `Passenger{passenger.id}`
+	local s = rig.scale
 
-	local root = Instance.new("Part")
-	root.Name = "Root"
-	root.Size = Vector3.new(2 * h, 5 * h, 1 * h)
-	root.CFrame = CFrame.lookAt(feet + Vector3.new(0, halfHeight, 0), feet + Vector3.new(0, halfHeight, 0) + facing)
-	root.Transparency = 1
-	root.Anchored = true
-	root.CanCollide = false
-	root.CanTouch = false
-	root.CanQuery = false
-	root.CastShadow = false
-	root.Parent = model
-	model.PrimaryPart = root
-
-	-- Offsets are from the Root's centre; the feet are at -halfHeight.
-	local function at(x: number, y: number, z: number): CFrame
-		return CFrame.new(x * h, y * h - halfHeight, z * h)
-	end
-
-	local skin = SKINS[math.clamp(look.skin, 1, #SKINS)]
 	if look.pale then
-		skin = skin:Lerp(PALE, 0.75)
-	end
-	local coatColor = if isMara then MARA_COAT else COATS[math.clamp(look.coat, 1, #COATS)]
-	if passenger.wet then
-		coatColor = coatColor:Lerp(Color3.new(0, 0, 0), 0.45)
-	end
-
-	local arms = {}
-	for _, side in { -1, 1 } do
-		piece(model, root, "Leg", Vector3.new(0.7, 2.2, 0.8) * h, at(0.42 * side, 1.1, 0), LEGS, shadow)
-		table.insert(
-			arms,
-			piece(model, root, "Arm", Vector3.new(0.55, 2.2, 0.6) * h, at(1.3 * side, 3.0, 0), coatColor, shadow)
-		)
-	end
-	local coat = piece(model, root, "Coat", Vector3.new(2.1, 2.8, 1.25) * h, at(0, 2.8, 0), coatColor, shadow)
-	if passenger.wet then
-		coat.Reflectance = 0.25
-		for _, arm in arms do
-			arm.Reflectance = 0.25
+		for _, part in rig.skin do
+			part.Color = part.Color:Lerp(PALE, 0.75)
 		end
 	end
-
-	local head = piece(model, root, "Head", Vector3.new(1.25, 1.25, 1.25) * h, at(0, 4.85, 0), skin, shadow)
-	head.Shape = Enum.PartType.Ball
-	for _, side in { -1, 1 } do
-		piece(
-			model,
-			root,
-			"Eye",
-			Vector3.new(0.14, 0.14, 0.05) * h,
-			at(0.22 * side, 4.93, -0.6),
-			Color3.fromRGB(20, 20, 24),
-			false
-		)
-	end
-
-	local scarf = if isMara
-		then MARA_SCARF
-		elseif look.scarf > 0 then SCARVES[math.clamp(look.scarf, 1, #SCARVES)]
-		else nil
-	if scarf then
-		piece(model, root, "Scarf", Vector3.new(1.4, 0.35, 1.35) * h, at(0, 4.3, 0), scarf, shadow)
-	end
-
-	if not isMara then
-		if look.hat == 1 then
-			local beanie = piece(
-				model,
-				root,
-				"Hat",
-				Vector3.new(0.5, 1.28, 1.28) * h,
-				at(0, 5.35, 0) * cylinderUp(),
-				coatColor:Lerp(Color3.new(1, 1, 1), 0.15),
-				shadow
-			)
-			beanie.Shape = Enum.PartType.Cylinder
-		elseif look.hat == 2 then
-			local cap = piece(
-				model,
-				root,
-				"Hat",
-				Vector3.new(0.28, 1.36, 1.36) * h,
-				at(0, 5.42, 0) * cylinderUp(),
-				LEGS,
-				shadow
-			)
-			cap.Shape = Enum.PartType.Cylinder
-			piece(model, root, "Brim", Vector3.new(1.0, 0.08, 0.5) * h, at(0, 5.32, -0.72), LEGS, shadow)
-		elseif look.hat == 3 then
-			piece(model, root, "Hood", Vector3.new(1.5, 1.45, 1.1) * h, at(0, 4.95, 0.28), coatColor, shadow)
+	if passenger.wet then
+		-- Soaked through: darker and glossy, with the hair plastered dark too.
+		for _, part in rig.clothing do
+			part.Color = part.Color:Lerp(Color3.new(0, 0, 0), 0.4)
+			part.Reflectance = 0.22
 		end
-	end
-
-	if look.bag == 1 then
-		piece(
-			model,
-			root,
-			"Suitcase",
-			Vector3.new(1.4, 1.0, 0.45) * h,
-			at(1.55, 0.9, 0),
-			Color3.fromRGB(92, 64, 44),
-			shadow
-		)
-	elseif look.bag == 2 then
-		piece(
-			model,
-			root,
-			"Backpack",
-			Vector3.new(1.5, 1.7, 0.7) * h,
-			at(0, 3.2, 0.95),
-			Color3.fromRGB(52, 60, 50),
-			shadow
-		)
-	elseif look.bag == 3 then
-		piece(
-			model,
-			root,
-			"Tote",
-			Vector3.new(0.9, 1.0, 0.3) * h,
-			at(-1.45, 2.0, 0),
-			Color3.fromRGB(170, 160, 140),
-			shadow
-		)
-	end
-
-	if passenger.wet and look.pale then
-		piece(model, root, "Seaweed", Vector3.new(0.12, 1.3, 0.12) * h, at(-0.7, 3.9, -0.64), SEAWEED, shadow)
-		piece(model, root, "Seaweed", Vector3.new(0.1, 0.9, 0.1) * h, at(0.9, 2.2, -0.64), SEAWEED, shadow)
+		for _, part in rig.hair do
+			part.Color = part.Color:Lerp(Color3.new(0, 0, 0), 0.35)
+			part.Reflectance = 0.15
+		end
+		if look.pale then
+			seaweed(rig, rig.torso, CFrame.new(-0.55 * s, 0.35 * s, -0.54 * s), 1.2)
+			seaweed(rig, rig.rightArm, CFrame.new(0, -0.3 * s, -0.54 * s), 0.9)
+			seaweed(rig, rig.head, CFrame.new(0.5 * s, 0.1 * s, -0.5 * s) * CFrame.Angles(0, 0, math.rad(12)), 0.7)
+		end
 	end
 
 	local page: BasePart? = nil
 	if passenger.hasLedgerPage then
-		page = piece(
-			model,
-			root,
-			"LedgerPage",
-			Vector3.new(0.5, 0.7, 0.05) * h,
-			at(0.6, 2.7, -0.66) * CFrame.Angles(0, 0, math.rad(12)),
-			Color3.fromRGB(226, 218, 196),
-			shadow
-		)
+		local tucked = Instance.new("Part")
+		tucked.Name = "LedgerPage"
+		tucked.Size = Vector3.new(0.5, 0.7, 0.05) * s
+		tucked.CFrame = rig.torso.CFrame
+			* CFrame.new(0.55 * s, -0.25 * s, -0.54 * s)
+			* CFrame.Angles(0, 0, math.rad(12))
+		tucked.Color = PAGE
+		tucked.Material = Enum.Material.SmoothPlastic
+		tucked.Anchored = false
+		tucked.Massless = true
+		tucked.CanCollide = false
+		tucked.CanTouch = false
+		tucked.CanQuery = false
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = rig.torso
+		weld.Part1 = tucked
+		weld.Parent = tucked
+		tucked.Parent = model
+		table.insert(rig.all, tucked)
+		page = tucked
+	end
+
+	for _, part in rig.all do
+		part.CastShadow = passenger.shadow
 	end
 
 	if passenger.breath then
-		breathEmitter(head, h)
+		breathEmitter(rig.head, s)
 	end
 	if passenger.wet then
-		-- From the sleeve cuffs and the front of the hem: high enough to clear the sill.
-		for _, arm in arms do
-			dripEmitter(arm, Vector3.new(0, -1.1 * h, -0.2 * h))
+		-- From the cuffs and the front of the coat: high enough to clear the sill.
+		for _, arm in { rig.leftArm, rig.rightArm } do
+			dripEmitter(arm, Vector3.new(0, -0.95 * s, -0.3 * s))
 		end
+		local hem = rig.hem
 		for _, side in { -1, 1 } do
-			dripEmitter(coat, Vector3.new(0.55 * side * h, -1.4 * h, -0.66 * h))
+			if hem then
+				dripEmitter(hem, Vector3.new(0.55 * side * s, -0.2 * s, -0.45 * s))
+			else
+				dripEmitter(rig.torso, Vector3.new(0.55 * side * s, -0.95 * s, -0.45 * s))
+			end
 		end
 	end
 
-	figures[model] = { root = root, halfHeight = halfHeight, puddle = nil, page = page, walk = nil, tween = nil }
+	figures[model] = { root = rig.root, feet = rig.feet, puddle = nil, page = page, walk = nil, tween = nil }
 	model.Destroying:Once(function()
 		figures[model] = nil
 	end)
@@ -358,7 +231,7 @@ function PassengerService.walk(model: Model, path: { Vector3 }, speed: number, f
 		if figure.walk ~= token or model.Parent == nil then
 			return false
 		end
-		local target = point + Vector3.new(0, figure.halfHeight, 0)
+		local target = point + Vector3.new(0, figure.feet, 0)
 		local from = root.Position
 		local distance = (target - from).Magnitude
 		if distance > 0.05 then
@@ -413,7 +286,7 @@ function PassengerService.setPuddle(model: Model, on: boolean)
 	-- The sill hides their feet, and from the booth their body hides the planks right
 	-- behind them, so the puddle spreads wide: its sides show either side of them.
 	local root = figure.root
-	local centre = root.Position - Vector3.new(0, figure.halfHeight - 0.03, 0) - root.CFrame.LookVector * 0.9
+	local centre = root.Position - Vector3.new(0, figure.feet - 0.03, 0) - root.CFrame.LookVector * 0.9
 	local puddle = Instance.new("Part")
 	puddle.Name = "Puddle"
 	puddle.Shape = Enum.PartType.Cylinder
@@ -456,7 +329,7 @@ function PassengerService.footprints(model: Model, to: Vector3, speed: number)
 	if figure == nil then
 		return
 	end
-	local from = figure.root.Position - Vector3.new(0, figure.halfHeight, 0)
+	local from = figure.root.Position - Vector3.new(0, figure.feet, 0)
 	local flat = Vector3.new(to.X - from.X, 0, to.Z - from.Z)
 	local length = flat.Magnitude
 	if length < 1 then
@@ -509,13 +382,13 @@ function PassengerService.setShadowMark(model: Model, lamp: Vector3?)
 	if lamp == nil then
 		return
 	end
-	local feet = figure.root.Position - Vector3.new(0, figure.halfHeight, 0)
+	local feet = figure.root.Position - Vector3.new(0, figure.feet, 0)
 	local away = Vector3.new(feet.X - lamp.X, 0, feet.Z - lamp.Z)
 	if away.Magnitude < 0.1 then
 		return
 	end
 	local direction = away.Unit
-	local scale = figure.halfHeight / 2.5
+	local scale = figure.feet / 3
 	local length = 4.6 * scale
 	local centre = feet + direction * (length / 2 - 0.2) + Vector3.new(0, 0.025, 0)
 	local mark = flatPart(
@@ -556,7 +429,8 @@ function PassengerService.vanish(model: Model, seconds: number, sink: boolean?)
 		end
 	end
 	for _, descendant in model:GetDescendants() do
-		if descendant:IsA("BasePart") and descendant.Name ~= "Root" then
+		local fades = descendant:IsA("Decal") or (descendant:IsA("BasePart") and descendant.Name ~= "HumanoidRootPart")
+		if fades then
 			TweenService:Create(descendant, TweenInfo.new(seconds), { Transparency = 1 }):Play()
 		elseif descendant:IsA("ParticleEmitter") then
 			descendant.Enabled = false

@@ -11,6 +11,7 @@ require("./Rules.spec")
 require("./Generator.spec")
 require("./Run.spec")
 require("./Director.spec")
+require("./Passenger.spec")
 require("./Game.spec")
 
 if not TestLib.summary() then

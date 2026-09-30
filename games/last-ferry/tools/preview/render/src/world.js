@@ -324,7 +324,8 @@ export async function buildWorld(data, { renderer, textureFor, imageFor }) {
   celestial.castShadow = L.GlobalShadows !== false;
   celestial.shadow.mapSize.set(2048, 2048);
   Object.assign(celestial.shadow.camera, { left: -80, right: 80, top: 80, bottom: -80, near: 1, far: 500 });
-  celestial.shadow.bias = -0.0004;
+  celestial.shadow.bias = -0.0006;
+  celestial.shadow.normalBias = 0.06;
   scene.add(celestial, celestial.target);
 
   // Environment for reflections: the sky itself.

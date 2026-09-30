@@ -18,7 +18,18 @@ local function passenger(overrides: { [string]: any }?): Types.Passenger
 		saysName = false,
 		line = "Evening.",
 		hasLedgerPage = false,
-		look = { coat = 1, hat = 0, scarf = 0, bag = 0, skin = 1, height = 1, pale = false },
+		look = {
+			outfit = 1,
+			skin = 1,
+			hair = 0,
+			hairColor = 1,
+			hat = 0,
+			scarf = 0,
+			bag = 0,
+			face = 0,
+			height = 1,
+			pale = false,
+		},
 	}
 	if overrides then
 		for key, value in overrides do

@@ -54,23 +54,53 @@ local function draw(rng: Rng.Rng, pool: { string }, source: { string }, taken: {
 	error("Generator: ran out of unique names")
 end
 
-local function look(rng: Rng.Rng, pale: boolean): Types.Look
-	return {
-		coat = rng:int(1, 8),
-		hat = rng:int(0, 3),
-		scarf = rng:int(0, 5),
-		bag = rng:int(0, 3),
-		skin = rng:int(1, 6),
+-- A stable number for a name (djb2), so a name always picks the same look.
+local function hash(text: string): number
+	local h = 5381
+	for i = 1, #text do
+		h = (h * 33 + string.byte(text, i)) % 2147483647
+	end
+	return h
+end
+
+-- How someone looks, chosen from their name alone: the same person looks the same
+-- every night, and a passenger's kind never changes their clothes. `pale` is the one
+-- exception the design allows (the drowned on the early nights).
+function Generator.lookFor(name: string, pale: boolean): Types.Look
+	local rng = Rng.new(hash(name))
+	local wardrobe = Content.Wardrobe
+	local look: Types.Look = {
+		outfit = rng:int(1, wardrobe.outfits),
+		skin = rng:int(1, wardrobe.skins),
+		hair = rng:int(0, wardrobe.hairs - 1), -- pigtails are Mara's
+		hairColor = rng:int(1, wardrobe.hairColors),
+		hat = if rng:chance(0.45) then rng:int(1, wardrobe.hats) else 0,
+		scarf = if rng:chance(0.35) then rng:int(1, wardrobe.scarves) else 0,
+		bag = if rng:chance(0.5) then rng:int(1, wardrobe.bags) else 0,
+		face = if rng:chance(0.3) then rng:int(1, wardrobe.faces) else 0,
 		height = 0.92 + rng:next() * 0.16,
 		pale = pale,
 	}
+	local cast = Content.CastLooks[name]
+	if cast then
+		look.outfit = cast.outfit or look.outfit
+		look.skin = cast.skin or look.skin
+		look.hair = cast.hair or look.hair
+		look.hairColor = cast.hairColor or look.hairColor
+		look.hat = cast.hat or look.hat
+		look.scarf = cast.scarf or look.scarf
+		look.bag = cast.bag or look.bag
+		look.face = cast.face or look.face
+		look.height = cast.height or look.height
+	end
+	return look
 end
 
 local function validTicket(name: string, date: string): Types.Ticket
 	return { name = name, destination = Content.Destination, date = date, stamp = "gull" }
 end
 
-local function living(rng: Rng.Rng, role: string, name: string, date: string, line: string): Types.Passenger
+local function living(role: string, name: string, date: string, line: string): Types.Passenger
 	return {
 		id = 0,
 		kind = "living",
@@ -82,7 +112,7 @@ local function living(rng: Rng.Rng, role: string, name: string, date: string, li
 		saysName = false,
 		line = line,
 		hasLedgerPage = false,
-		look = look(rng, false),
+		look = Generator.lookFor(name, false),
 	}
 end
 
@@ -139,12 +169,12 @@ local function drowned(rng: Rng.Rng, night: number, def: Content.NightDef, name:
 		saysName = saysName,
 		line = line,
 		hasLedgerPage = false,
-		look = look(rng, pale),
+		look = Generator.lookFor(name, pale),
 	},
 		onManifest
 end
 
-local function anna(rng: Rng.Rng): Types.Passenger
+local function anna(): Types.Passenger
 	return {
 		id = 0,
 		kind = "drowned",
@@ -161,13 +191,11 @@ local function anna(rng: Rng.Rng): Types.Passenger
 		saysName = false,
 		line = Content.Anna.line,
 		hasLedgerPage = false,
-		look = look(rng, true),
+		look = Generator.lookFor(Content.Anna.name, true),
 	}
 end
 
-local function mara(rng: Rng.Rng, night: number): Types.Passenger
-	local passengerLook = look(rng, false)
-	passengerLook.height = 0.72
+local function mara(night: number): Types.Passenger
 	return {
 		id = 0,
 		kind = "mara",
@@ -184,7 +212,7 @@ local function mara(rng: Rng.Rng, night: number): Types.Passenger
 		saysName = false,
 		line = Content.Mara.lines[math.clamp(night, 1, MARA_NIGHT_LINES)],
 		hasLedgerPage = false,
-		look = passengerLook,
+		look = Generator.lookFor(Content.Mara.name, false),
 	}
 end
 
@@ -236,7 +264,7 @@ function Generator.buildNight(rng: Rng.Rng, number: number, pools: Pools): Types
 	local regulars = {}
 	for _, regular in Content.Regulars do
 		local line = regular.lines[math.clamp(number, 1, #regular.lines)]
-		table.insert(regulars, living(rng, "regular", regular.name, def.date, line))
+		table.insert(regulars, living("regular", regular.name, def.date, line))
 	end
 
 	-- Valid extras; on nights 2–4 one of them may be a red herring.
@@ -244,10 +272,10 @@ function Generator.buildNight(rng: Rng.Rng, number: number, pools: Pools): Types
 	for i = 1, def.validExtras do
 		if i == 1 and number >= 2 and number <= 4 and #pools.herrings > 0 and rng:chance(0.6) then
 			local herring = Content.RedHerrings[table.remove(pools.herrings) :: number]
-			table.insert(extras, living(rng, "herring", herring.name, def.date, herring.line))
+			table.insert(extras, living("herring", herring.name, def.date, herring.line))
 		else
 			local name = draw(rng, pools.living, Content.LivingNames, taken)
-			table.insert(extras, living(rng, "extra", name, def.date, rng:pick(Content.LivingLines)))
+			table.insert(extras, living("extra", name, def.date, rng:pick(Content.LivingLines)))
 		end
 	end
 
@@ -260,7 +288,7 @@ function Generator.buildNight(rng: Rng.Rng, number: number, pools: Pools): Types
 
 	for _ = 1, def.errors do
 		local name = draw(rng, pools.living, Content.LivingNames, taken)
-		local passenger = living(rng, "error", name, def.date, rng:pick(Content.LivingLines))
+		local passenger = living("error", name, def.date, rng:pick(Content.LivingLines))
 		local listed = applyError(rng, passenger, number, def)
 		add(passenger, listed)
 	end
@@ -290,11 +318,11 @@ function Generator.buildNight(rng: Rng.Rng, number: number, pools: Pools): Types
 	end
 
 	if def.anna then
-		table.insert(queue, rng:int(2, #queue + 1), anna(rng))
+		table.insert(queue, rng:int(2, #queue + 1), anna())
 	end
 
 	-- Mara: somewhere after the first passenger, and last on the final night.
-	local maraPassenger = mara(rng, number)
+	local maraPassenger = mara(number)
 	if number >= Content.FinalNight then
 		table.insert(queue, maraPassenger)
 	else

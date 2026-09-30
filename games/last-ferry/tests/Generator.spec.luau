@@ -19,6 +19,51 @@ local function eachNight(fn: (number, any, number) -> ())
 	end
 end
 
+T.test("a person looks the same every night, and kind never changes the clothes", function()
+	local seen: { [string]: string } = {}
+	local W = Content.Wardrobe
+	local function key(look): string
+		return table.concat({
+			look.outfit,
+			look.skin,
+			look.hair,
+			look.hairColor,
+			look.hat,
+			look.scarf,
+			look.bag,
+			look.face,
+			string.format("%.4f", look.height),
+		}, "|")
+	end
+	eachNight(function(number, night, seed)
+		for _, p in night.passengers do
+			local look = p.look
+			local where = `seed {seed} night {number} {p.ticket.name}`
+			T.expect(look.outfit >= (if p.kind == "mara" then 0 else 1) and look.outfit <= W.outfits, `outfit: {where}`)
+			T.expect(look.skin >= 1 and look.skin <= W.skins, `skin: {where}`)
+			T.expect(look.hair >= 0 and look.hair <= W.hairs, `hair: {where}`)
+			T.expect(look.hairColor >= 1 and look.hairColor <= W.hairColors, `hair colour: {where}`)
+			T.expect(look.hat >= 0 and look.hat <= W.hats, `hat: {where}`)
+			T.expect(look.scarf >= 0 and look.scarf <= W.scarves, `scarf: {where}`)
+			T.expect(look.bag >= 0 and look.bag <= W.bags, `bag: {where}`)
+			T.expect(look.face >= 0 and look.face <= W.faces, `face: {where}`)
+			T.expect(look.pale == false or p.kind ~= "living", `only the dead look pale: {where}`)
+			local name = p.ticket.name
+			local k = key(look)
+			if seen[name] then
+				T.equal(k, seen[name], `{name} changed clothes ({where})`)
+			end
+			seen[name] = k
+		end
+	end)
+	-- The same name gives the same look whoever wears it; only paleness differs.
+	local living = Generator.lookFor("Walter Finch", false)
+	local drowned = Generator.lookFor("Walter Finch", true)
+	drowned.pale = false
+	T.equal(key(living), key(drowned), "a drowned passenger is dressed like a living one with the same name")
+	T.equal(Generator.lookFor("Mara Pike", false).height, 0.72, "Mara is small")
+end)
+
 T.test("queue size matches the night's recipe", function()
 	eachNight(function(number, night)
 		local def = Content.Nights[number]

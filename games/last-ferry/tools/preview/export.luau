@@ -12,6 +12,7 @@
 		wet    - the first dripping passenger of night 1 (one of the drowned)
 		intro  - the night 1 title card, before the window opens
 		queue  - between passengers, with the queue walking up
+		lineup - the whole wardrobe in daylight (no player, no HUD)
 
 	--screen and --safe set the screen and its safe area in pixels (default 1280x720,
 	safe 1280x684). --touch makes the game see a phone.
@@ -53,7 +54,8 @@ local sim = Sim.new({
 })
 sim:startServer()
 sim:run(1)
-local player = sim:addPlayer("Preview", 1)
+-- The lineup frames its own camera, so no player (whose camera script would move it).
+local player = if scenario == "lineup" then nil else sim:addPlayer("Preview", 1)
 
 local function hud()
 	return player.PlayerGui.LastFerryHud.Root
@@ -95,8 +97,58 @@ local function playUntil(reached: () -> boolean, limit: number): boolean
 	end, limit, 1 / 20)
 end
 
+-- The whole wardrobe in daylight: one figure per outfit, with hats, hair, bags and
+-- faces cycling, plus Mara and a soaked, pale drowned passenger at the end.
+local function lineup()
+	local camera = sim:execute([[
+		local Lighting = game:GetService("Lighting")
+		local PassengerService = require("./Services/PassengerService")
+		Lighting.ClockTime = 14
+		local folder = workspace.World.Passengers
+		local count = 12
+		for i = 1, count do
+			local look = {
+				outfit = if i <= 10 then i else (if i == 11 then 0 else 3),
+				skin = (i - 1) % 6 + 1,
+				hair = i % 5,
+				hairColor = (i * 2) % 6 + 1,
+				hat = if i <= 10 then i % 7 else 0,
+				scarf = i % 3 == 0 and (i % 5 + 1) or 0,
+				bag = i % 4,
+				face = i % 3,
+				height = if i == 11 then 0.72 else 1,
+				pale = i == 12,
+			}
+			if i == 11 then
+				look.hair, look.scarf, look.skin = 5, 5, 3
+			end
+			PassengerService.spawn({
+				id = 900 + i,
+				kind = "living",
+				role = "extra",
+				ticket = { name = "Lineup", destination = "GULL ISLAND", date = "", stamp = "gull" },
+				wet = i == 12,
+				breath = i ~= 12,
+				shadow = true,
+				saysName = false,
+				line = "",
+				hasLedgerPage = false,
+				look = look,
+			}, Vector3.new((i - (count + 1) / 2) * 4.2, 0, -26), Vector3.new(0, 0, 1), folder)
+		end
+		local camera = workspace.CurrentCamera
+		camera.CFrame = CFrame.lookAt(Vector3.new(0, 4.6, -4), Vector3.new(0, 2.6, -26))
+		camera.FieldOfView = 62
+		return camera
+	]])
+	sim:run(2)
+	return camera
+end
+
 local done
-if scenario == "intro" then
+if scenario == "lineup" then
+	done = lineup() ~= nil
+elseif scenario == "intro" then
 	done = playUntil(function()
 		local overlay = hud().Overlay
 		return overlay.Visible and overlay.Card.Header.Title.Text == "Night 1"

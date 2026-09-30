@@ -168,7 +168,7 @@ end
 
 export type Options = {
 	root: string?,
-	player: any, -- whose screen to capture
+	player: any?, -- whose screen to capture (nil: the world only)
 	notes: { [string]: any }?,
 }
 
@@ -180,7 +180,7 @@ function Scene.capture(sim, options: Options): any
 	local workspaceTree = node(sim, sim.workspace, ids, nextId)
 	local lighting = sim.game:GetService("Lighting")
 	local lightingTree = node(sim, lighting, ids, nextId)
-	local gui = options.player:FindFirstChild("PlayerGui")
+	local gui = if options.player then options.player:FindFirstChild("PlayerGui") else nil
 	local guiTree = if gui then node(sim, gui, ids, nextId) else nil
 
 	local byId = {}

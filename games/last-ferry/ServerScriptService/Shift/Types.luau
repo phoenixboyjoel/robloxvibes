@@ -15,15 +15,21 @@ export type Ticket = {
 	stamp: Stamp,
 }
 
--- Indices into palettes chosen on the Roblox side, plus flags that change the build.
+-- How a passenger looks: indices into the wardrobe the Roblox side draws from
+-- (Content.Wardrobe gives the size of each list; 0 means "none"), plus flags that
+-- change the build. Chosen from the passenger's name, never their kind, so the same
+-- person looks the same every night and looks never give the drowned away.
 export type Look = {
-	coat: number,
+	outfit: number,
+	skin: number,
+	hair: number,
+	hairColor: number,
 	hat: number,
 	scarf: number,
 	bag: number,
-	skin: number,
-	height: number,
-	pale: boolean,
+	face: number, -- 0 nothing, 1 glasses, 2 a moustache
+	height: number, -- scale of the whole figure
+	pale: boolean, -- the drowned on the early nights, before they learn to hide it
 }
 
 export type Passenger = {

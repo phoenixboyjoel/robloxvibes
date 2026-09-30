@@ -29,12 +29,61 @@ export type Ending = {
 	text: string,
 }
 
+-- Part of a Look, for the cast whose looks are written by hand.
+export type LookOverride = {
+	outfit: number?,
+	skin: number?,
+	hair: number?,
+	hairColor: number?,
+	hat: number?,
+	scarf: number?,
+	bag: number?,
+	face: number?,
+	height: number?,
+}
+
 local Content = {}
 
 Content.FinalNight = 5
 Content.LanternsPerNight = 3
 Content.OldDate = "14 NOV 1999"
 Content.Destination = "GULL ISLAND"
+
+-- How many of each thing the Roblox side's wardrobe has (PassengerService draws them).
+-- Looks pick 1..n, or 0..n where 0 means none.
+Content.Wardrobe = {
+	outfits = 10, -- peacoat, classic, oilskin, flannel, parka, suit, sweater, tourist, scrubs, hoodie
+	skins = 6, -- classic yellow first, then five Roblox skin tones
+	hairs = 5, -- short, long, bun, spiky, pigtails (0: none)
+	hairColors = 6,
+	hats = 6, -- beanie, cap, sou'wester, top hat, bucket hat, hood (0: none)
+	scarves = 5,
+	bags = 3, -- suitcase, backpack, tote (0: none)
+	faces = 2, -- glasses, moustache (0: none)
+}
+
+-- Hand-written looks for the named cast, so they're recognisable night after night.
+-- Anyone not listed gets a look chosen from their name.
+Content.CastLooks = {
+	["Tomas Brennan"] = { outfit = 3, skin = 3, hair = 1, hairColor = 6, hat = 3, scarf = 0, bag = 0, face = 2 },
+	["Priya Nair"] = { outfit = 9, skin = 4, hair = 3, hairColor = 1, hat = 0, scarf = 0, bag = 3, face = 0 },
+	["Edith Crane"] = { outfit = 7, skin = 2, hair = 3, hairColor = 6, hat = 0, scarf = 2, bag = 3, face = 1 },
+	["Albie Shaw"] = { outfit = 10, skin = 3, hair = 4, hairColor = 5, hat = 0, scarf = 0, bag = 2, face = 0 },
+	["Noor Rahman"] = { outfit = 1, skin = 5, hair = 2, hairColor = 1, hat = 0, scarf = 1, bag = 3, face = 0 },
+	["Anna Pike"] = { outfit = 5, skin = 3, hair = 2, hairColor = 3, hat = 0, scarf = 1, bag = 0, face = 0 },
+	-- Mara's red coat and yellow scarf are hers alone (PassengerService); she's small.
+	["Mara Pike"] = {
+		outfit = 0,
+		skin = 3,
+		hair = 5,
+		hairColor = 3,
+		hat = 0,
+		scarf = 5,
+		bag = 0,
+		face = 0,
+		height = 0.72,
+	},
+} :: { [string]: LookOverride }
 
 -- Rules in the order they appear on the card. `night` is when each is introduced.
 Content.Rules = {

@@ -1637,6 +1637,13 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 			end, dt)
 		end
 		drain()
+		-- Then, as in Roblox's frame: PreSimulation (where custom animation sets
+		-- Motor6D.Transform), the scheduler, and Heartbeat after physics.
+		local preSimulation = state[runService].signals.PreSimulation
+		if preSimulation then
+			fire(preSimulation, nil, dt)
+		end
+		drain()
 		local due = {}
 		for i = #sleepers, 1, -1 do
 			if sleepers[i].time <= sim.now then

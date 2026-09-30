@@ -32,14 +32,18 @@ ticket, because some of tonight's passengers drowned in 1999.
 ## Core loop
 
 - **First 60 seconds:**
+  - You spawn on the pier behind the booth as your own avatar, with your
+    friends. A notice board says STAFF WANTED; you hold E at the time clock
+    and everyone is clocked in at the counter.
   - A radio voice explains two simple rules, and the first passenger walks out
     of the fog.
   - Within a minute you have checked a ticket, pressed BOARD or TURN AWAY, and
     seen someone with a 1999 ticket dripping seawater.
 - **Moment to moment (20–40 s per passenger):**
   - Read the ticket.
-  - Look at the person (drag to look): are they wet? Is their breath fogging in
-    the cold? Do they cast a shadow under the lamp? What do they say?
+  - Look at the person through the window (first person; lean in to check):
+    are they wet? Is their breath fogging in the cold? Do they cast a shadow
+    under the lamp? What do they say in the chat bubble over their head?
   - Decide.
 - **A night (about 3 minutes):** 6–9 passengers, 11 PM to 5 AM. Each night adds
   one or two rules. Three lanterns on the counter go out one per mistake; lose
@@ -54,8 +58,12 @@ ticket, because some of tonight's passengers drowned in 1999.
   - the Mara choice
   - randomized queues on every night and retry
 - **With friends:**
-  - Up to four players share one booth, and anyone can make the call.
-  - Friends argue over "is that breath or just the fog?"
+  - Up to four players share one booth as their own avatars, each at a stand
+    behind the counter in the harbor's captain's cap, and anyone can make the
+    call.
+  - Friends argue over "is that breath or just the fog?", in bubble chat, while
+    emoting and jumping round the booth between passengers.
+  - After the ending everyone clocks out onto the pier together.
 
 ## Rules the player learns (cumulative)
 
@@ -109,9 +117,15 @@ Not in the first build. Planned:
 
 ## Screen and camera
 
-- You sit in the booth. The camera is fixed at the window and only turns (drag,
-  keys or stick), and you can lean in (scroll, pinch or R2) to inspect breath
-  and shadows.
+- **On the pier** (between shifts) it's Roblox's own third-person camera round
+  your avatar, zoomed in close.
+- **In the booth** it's Roblox's first-person camera: look with the mouse (the
+  right button, since the cursor stays free for the HUD), a finger or the right
+  stick, walk round the booth, and lean in (scroll, pinch or R2) to inspect
+  breath and shadows. Every avatar's eye is held at the same height (5.1 studs,
+  the old fixed camera's), so a small avatar still sees over the counter and
+  everyone sees the planks the tells are tuned for.
+- **Cinematic views** turn you to the scene for the flood and the endings.
 - **The lamp hangs front-left of the window,** so each passenger's shadow falls
   back and to the right across the planks, clear of their own body. A lamp
   straight overhead would hide the shadow behind the passenger, and the shadow
@@ -120,32 +134,47 @@ Not in the first build. Planned:
 
   | Where | What |
   | --- | --- |
+  | Top | the night, the clock and date · the ledger, the queue, three lanterns; banners for lost lanterns and found pages |
   | Left, the "desk" | ticket, countdown, BOARD / TURN AWAY |
   | Right | rules card and manifest, which you can hide |
-  | Top centre | what the passenger says, Pike's radio, lost-lantern notes |
+  | Top centre | Pike's radio |
+  | Over each passenger | what they say, as a Roblox chat bubble (and in the chat window) |
   | Bottom centre | kept clear, because that's where the shadows fall |
 
-- Main buttons stay at least 44 px on the smallest phones.
+- In Roblox's chunky house style: thick dark outlines, rounded corners, hard
+  shadows, a green BOARD with a check and a red TURN AWAY with a cross, Fredoka
+  One titles, Builder Sans ExtraBold controls. Typewriter type only on the
+  paper ticket and ledger.
+- Main buttons stay at least 44 px on the smallest phones, and the rules panel
+  stops above Roblox's touch jump button.
 
 ## Art, audio, and assets
 
-- **Style:**
-  - Built entirely from parts: foggy blue night, warm sodium lamp, wet planks,
-    black water.
-  - Passengers are faceless figures in coats and hats. Only Mara wears red.
+- **Style:** a Roblox night, readable on phones.
+  - Built entirely from parts in bold Roblox colours: a harbor-teal booth with
+    white trim, a red roof and a neon-framed sign; white rails, red-and-white
+    lifebuoys, blinking channel buoys, blocky gulls; a starry built-in sky and a
+    light blue haze.
+  - Passengers are classic Robloxians: Roblox's own head mesh and smile, R6
+    proportions, a wardrobe of coats, hats, hair, scarves and bags. The drowned
+    are the same people made wrong by the tells. Only Mara wears red.
+  - Players are their own avatars.
 - **Assets:**
   - The first build uses no external assets and no asset IDs, so nothing needs
     licence checks.
   - Swap in owned packs later, following the checks in
     `research/07-assets-licensing-and-pipeline.md`.
 - **Audio:**
-  - None in the first build. Every cue is visual first; many players play muted.
-  - Planned: harbor ambience, ferry horn, radio static, water drips from Roblox's
+  - Only Roblox's built-in sounds, which ship with every client: passengers'
+    plastic footsteps, splashes, water sloshing in the flooded booth, the
+    stamp's thud, button clicks, a gust when a lantern blows out.
+  - Every tell stays visual; many players play muted.
+  - Planned: harbor ambience, ferry horn and radio static from Roblox's
     licensed library.
 
 ## Milestones (each one playable and testable on its own)
 
-All six are built and covered by the automated tests; each still needs its
+All seven are built and covered by the automated tests; each still needs its
 Studio playtest (see `PLAYTEST.md`) before it counts as done.
 
 | # | Phase | Done when (observable in a playtest) | Build |
@@ -156,6 +185,7 @@ Studio playtest (see `PLAYTEST.md`) before it counts as done.
 | 4 | Five nights | Rules accumulate, tells escalate, radio lines, night failure and retry | Built, tested headless |
 | 5 | Endings and secrets | Mara choice, ledger pages, four endings, saves and badges (badge IDs still to create) | Built, tested headless |
 | 6 | Phone pass | Compact layout at phone size, 44 px touch targets, readable text | Built; sizes tested, looks unchecked |
+| 7 | Looks and feels like Roblox | Classic Robloxian passengers; chat bubbles; players' own avatars on a pier lobby, clocking in to a first-person booth; the chunky Roblox HUD; the player list; Roblox's built-in sounds | Built, tested headless; previews rendered |
 
 ## Kill or continue
 

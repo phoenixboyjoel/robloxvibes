@@ -14,9 +14,16 @@ Start with **[00: the verdict](00-verdict-and-executive-summary.md)**, then
 | 06 | [Story-driven games on Roblox](06-story-driven-games-on-roblox.md) | What worked and failed for narrative and horror games, and the best openings for a story-first studio |
 | 07 | [Assets, licensing and pipeline](07-assets-licensing-and-pipeline.md) | Using owned packs legally, Creator Store, import limits, AI asset tools, commissioning, security audits |
 | 08 | [Action plan](08-action-plan.md) | Two tracks, the first game, an idea scorecard, week-by-week steps, budget, decision gates |
+| 09 | [The Roblox vibe](09-the-roblox-vibe.md) | What makes a game read as "a Roblox game" in 2025–2026: avatars, build style, UI, social signals, store pages, and ranked changes for Last Ferry |
+| 10 | [Roblox-vibe case studies](10-roblox-vibe-case-studies.md) | How the closest games (Scary Shawarma Kiosk, Animal Hospital and others) look and present themselves, and what made them work |
+| 11 | [Roblox-look engine facts](11-roblox-look-engine-facts.md) | Verified engine details: the stock R6/R15 rigs, animating NPCs, bubble chat, player characters in a booth, fonts and UI kit, built-in content, lighting |
 
 ## How this was researched, and its limits
 
+- **09–11** came later, when the first build didn't look like Roblox: three
+  research agents covered the platform's identity, the closest games, and the
+  engine facts, reading Roblox's docs source, API dump and client scripts
+  directly where they could.
 - **Parallel research.** Five research agents each covered one area (03–07).
   I wrote 00, 01, 02 and 08, checked the key facts in the others, and fixed
   what was wrong or out of date. For example, the story report had cited MCP

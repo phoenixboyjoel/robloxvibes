@@ -301,15 +301,28 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		return hit
 	end
 
+	local isACache = {}
 	local function isA(className: string, target: string): boolean
+		local byClass = isACache[className]
+		if byClass == nil then
+			byClass = {}
+			isACache[className] = byClass
+		end
+		local hit = byClass[target]
+		if hit ~= nil then
+			return hit
+		end
 		local name = className
+		hit = false
 		while name and reflection[name] do
 			if name == target then
-				return true
+				hit = true
+				break
 			end
 			name = reflection[name].superclass
 		end
-		return false
+		byClass[target] = hit
+		return hit
 	end
 
 	--------------------------------------------------------------------------
@@ -346,16 +359,42 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		end
 	end
 
+	-- Once the simulator is set up (`sealed`), its method and computed-property tables no
+	-- longer change, so lookups up the class chain are cached.
+	local sealed = false
+	local resolveCache = setmetatable({}, { __mode = "k" })
 	local function resolve(map, className: string, key: string)
+		local cache
+		if sealed then
+			local byMap = resolveCache[map]
+			if byMap == nil then
+				byMap = {}
+				resolveCache[map] = byMap
+			end
+			cache = byMap[className]
+			if cache == nil then
+				cache = {}
+				byMap[className] = cache
+			end
+			local hit = cache[key]
+			if hit ~= nil then
+				return hit or nil
+			end
+		end
+		local found = nil
 		local name = className
 		while name and reflection[name] do
 			local byClass = map[name]
 			if byClass and byClass[key] then
-				return byClass[key]
+				found = byClass[key]
+				break
 			end
 			name = reflection[name].superclass
 		end
-		return nil
+		if cache then
+			cache[key] = found or false
+		end
+		return found
 	end
 
 	local function eventFor(instance, st, key: string)
@@ -414,7 +453,7 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		return false, nil
 	end
 
-	local function defaultFor(instance, st, key: string, info)
+	local function computeDefault(st, key: string, info)
 		local found, real = realDefault(st.className, key)
 		if found and pcall(checkValue, st.className, key, info, real, 1) then
 			return real
@@ -479,7 +518,100 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		return nil
 	end
 
+	-- A property's default depends only on the class, and every value type is immutable,
+	-- so each is worked out once.
+	local defaults = {}
+	local NO_DEFAULT = newproxy()
+	local function defaultFor(_instance, st, key: string, info)
+		local byClass = defaults[st.className]
+		if byClass == nil then
+			byClass = {}
+			defaults[st.className] = byClass
+		end
+		local value = byClass[key]
+		if value == nil then
+			value = computeDefault(st, key, info)
+			byClass[key] = if value == nil then NO_DEFAULT else value
+		end
+		return if value == NO_DEFAULT then nil else value
+	end
+
+	-- Whether an instance is in the game's tree (under the DataModel).
+	local function inGame(instance): boolean
+		local cursor = instance
+		while cursor do
+			local st = state[cursor]
+			if st.className == "DataModel" then
+				return true
+			end
+			cursor = st.parent
+		end
+		return false
+	end
+
+	-- CollectionService tags: tag -> { [instance] = true }. As in Roblox, the added and
+	-- removed signals only fire for instances in the game's tree: when a tag is added to or
+	-- removed from one, or a tagged instance enters or leaves the tree.
+	local tagged = {}
+	local tagSignals = {}
+	local function tagSignal(tag: string, kind: string)
+		local key = `{kind}:{tag}`
+		local signal = tagSignals[key]
+		if signal == nil then
+			signal = newSignal(`CollectionService {kind} {tag}`)
+			tagSignals[key] = signal
+		end
+		return signal
+	end
+	local function addTag(instance, tag: string)
+		assert(type(tag) == "string", "AddTag expects a string")
+		tagged[tag] = tagged[tag] or {}
+		if not tagged[tag][instance] then
+			tagged[tag][instance] = true
+			if inGame(instance) then
+				fire(tagSignal(tag, "added"), nil, instance)
+			end
+		end
+	end
+	local function removeTag(instance, tag: string)
+		if tagged[tag] and tagged[tag][instance] then
+			tagged[tag][instance] = nil
+			if inGame(instance) then
+				fire(tagSignal(tag, "removed"), nil, instance)
+			end
+		end
+	end
+	local function untagAll(instance)
+		for tag, members in tagged do
+			if members[instance] then
+				removeTag(instance, tag)
+			end
+		end
+	end
+	-- `root` and everything under it entered (kind "added") or left ("removed") the tree.
+	local function retagTree(root, kind: string)
+		local function visit(instance)
+			for tag, members in tagged do
+				if members[instance] then
+					fire(tagSignal(tag, kind), nil, instance)
+				end
+			end
+			for _, child in state[instance].children do
+				visit(child)
+			end
+		end
+		visit(root)
+	end
+
+	-- Tests can count who writes a property: sim:countWrites(instance, key).
+	local writeCounts = setmetatable({}, { __mode = "k" })
+
 	local function changed(instance, st, key: string, value: any)
+		local counts = writeCounts[instance]
+		if counts and counts[key] then
+			local context = currentContext()
+			counts[key][context] = (counts[key][context] or 0) + 1
+		end
 		if isA(st.className, "ValueBase") then
 			if key == "Value" and st.signals.Changed then
 				fire(st.signals.Changed, nil, value)
@@ -514,6 +646,7 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		if old == parent then
 			return
 		end
+		local wasInGame = old ~= nil and inGame(old)
 		if old then
 			local siblings = state[old].children
 			local index = table.find(siblings, instance)
@@ -537,6 +670,10 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 				end
 				ancestor = state[ancestor].parent
 			end
+		end
+		local isInGame = parent ~= nil and inGame(parent)
+		if isInGame ~= wasInGame then
+			retagTree(instance, if isInGame then "added" else "removed")
 		end
 		changed(instance, st, "Parent", parent)
 	end
@@ -751,6 +888,25 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		return into
 	end
 
+	-- What an attribute can hold (Roblox's Properties window docs list the same types).
+	local ATTRIBUTE_TYPES = {
+		string = true,
+		boolean = true,
+		number = true,
+		UDim = true,
+		UDim2 = true,
+		BrickColor = true,
+		Color3 = true,
+		Vector2 = true,
+		Vector3 = true,
+		CFrame = true,
+		NumberSequence = true,
+		ColorSequence = true,
+		NumberRange = true,
+		Rect = true,
+		Font = true,
+	}
+
 	methods.Object = {
 		IsA = function(self, className)
 			return isA(state[self].className, className)
@@ -844,6 +1000,7 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 			if part0 and joints[part0] then
 				joints[part0][self] = nil
 			end
+			untagAll(self)
 			setParent(self, st, nil)
 			st.destroyed = true
 		end,
@@ -866,6 +1023,16 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 			return fullName(self)
 		end,
 		SetAttribute = function(self, name, value)
+			if type(name) ~= "string" or #name == 0 or #name > 100 or string.find(name, "[^%w_%.%-/]") then
+				error(
+					`Attribute name "{name}" is invalid: use letters, digits, periods, hyphens, slashes and underscores, up to 100`,
+					2
+				)
+			elseif string.sub(name, 1, 3) == "RBX" then
+				error(`Attribute name "{name}" is reserved: names starting with RBX are Roblox's`, 2)
+			elseif value ~= nil and not ATTRIBUTE_TYPES[typeOf(value)] then
+				error(`{typeOf(value)} is not a supported attribute type ("{name}" on {fullName(self)})`, 2)
+			end
 			local st = state[self]
 			st.attributes[name] = value
 			if st.attributeSignals[name] then
@@ -883,6 +1050,24 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 				st.attributeSignals[name] = signal
 			end
 			return signal
+		end,
+		AddTag = function(self, tag)
+			addTag(self, tag)
+		end,
+		RemoveTag = function(self, tag)
+			removeTag(self, tag)
+		end,
+		HasTag = function(self, tag)
+			return tagged[tag] ~= nil and tagged[tag][self] == true
+		end,
+		GetTags = function(self)
+			local list = {}
+			for tag, members in tagged do
+				if members[self] then
+					table.insert(list, tag)
+				end
+			end
+			return list
 		end,
 	}
 
@@ -1016,15 +1201,17 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		end,
 	}
 
+	-- A part's pivot sits at its PivotOffset from its CFrame; a model's is its PrimaryPart's
+	-- pivot, or its WorldPivot.
 	methods.PVInstance = {
 		GetPivot = function(self)
 			local st = state[self]
 			if isA(st.className, "BasePart") then
-				return self.CFrame
+				return self.CFrame * self.PivotOffset
 			end
 			local primary = st.props.PrimaryPart
 			if primary then
-				return primary.CFrame
+				return primary:GetPivot()
 			end
 			return st.props.WorldPivot or roblox.CFrame.new()
 		end,
@@ -1032,11 +1219,12 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 			if typeOf(target) ~= "CFrame" then
 				error("PivotTo expects a CFrame", 2)
 			end
-			local delta = target * self:GetPivot():Inverse()
 			if isA(state[self].className, "BasePart") then
-				self.CFrame = target
+				local offset = state[self].props.PivotOffset
+				self.CFrame = if offset then target * offset:Inverse() else target
 				return
 			end
+			local delta = target * self:GetPivot():Inverse()
 			-- Every target comes from where the parts are now, before any of them moves:
 			-- moving one part also moves the parts welded or jointed to it.
 			local moves = {}
@@ -1732,8 +1920,89 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		end,
 	}
 
+	service("CollectionService")
+	methods.CollectionService = {
+		GetTagged = function(_self, tag)
+			local list = {}
+			for instance in tagged[tag] or {} do
+				if inGame(instance) then
+					table.insert(list, instance)
+				end
+			end
+			return list
+		end,
+		GetInstanceAddedSignal = function(_self, tag)
+			return tagSignal(tag, "added")
+		end,
+		GetInstanceRemovedSignal = function(_self, tag)
+			return tagSignal(tag, "removed")
+		end,
+		AddTag = function(_self, instance, tag)
+			addTag(instance, tag)
+		end,
+		RemoveTag = function(_self, instance, tag)
+			removeTag(instance, tag)
+		end,
+		HasTag = function(_self, instance, tag)
+			return tagged[tag] ~= nil and tagged[tag][instance] == true
+		end,
+	}
+
+	-- Robert Penner's easings, which Roblox's EasingStyles follow. "In" is defined per
+	-- style; "Out" mirrors it and "InOut" joins the two.
+	local EASE_IN = {
+		Linear = function(t)
+			return t
+		end,
+		Sine = function(t)
+			return 1 - math.cos(t * math.pi / 2)
+		end,
+		Quad = function(t)
+			return t * t
+		end,
+		Cubic = function(t)
+			return t * t * t
+		end,
+		Quart = function(t)
+			return t ^ 4
+		end,
+		Quint = function(t)
+			return t ^ 5
+		end,
+		Exponential = function(t)
+			return if t == 0 then 0 else 2 ^ (10 * t - 10)
+		end,
+		Circular = function(t)
+			return 1 - math.sqrt(1 - t * t)
+		end,
+		Back = function(t)
+			return 2.70158 * t ^ 3 - 1.70158 * t * t
+		end,
+	}
+	local function ease(t: number, style, direction): number
+		local easeIn = EASE_IN[style.Name]
+		if easeIn == nil then
+			error(`sim: EasingStyle.{style.Name} isn't simulated (add it to EASE_IN)`, 3)
+		end
+		if direction == Enum.EasingDirection.In then
+			return easeIn(t)
+		elseif direction == Enum.EasingDirection.Out then
+			return 1 - easeIn(1 - t)
+		end
+		return if t < 0.5 then easeIn(2 * t) / 2 else 1 - easeIn(2 * (1 - t)) / 2
+	end
+
 	local tweens = setmetatable({}, { __mode = "k" })
 	methods.TweenService = {
+		GetValue = function(_self, alpha, style, direction)
+			assert(type(alpha) == "number", "GetValue alpha")
+			assert(typeOf(style) == "EnumItem" and Enum.EasingStyle[style.Name] == style, "GetValue EasingStyle")
+			assert(
+				typeOf(direction) == "EnumItem" and Enum.EasingDirection[direction.Name] == direction,
+				"GetValue EasingDirection"
+			)
+			return ease(math.clamp(alpha, 0, 1), style, direction)
+		end,
 		Create = function(_self, target, info, goals)
 			if not isInstance(target) then
 				error("TweenService:Create expects an Instance", 2)
@@ -2304,6 +2573,15 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		drain()
 	end
 
+	-- Counts writes of `key` on `instance` from now on, by context ("server",
+	-- "client:<UserId>", "engine" for tweens, "test"), in the table it returns.
+	function sim:countWrites(instance, key: string)
+		local counts = {}
+		writeCounts[instance] = writeCounts[instance] or {}
+		writeCounts[instance][key] = counts
+		return counts
+	end
+
 	function sim:className(instance): string
 		return state[instance].className
 	end
@@ -2316,6 +2594,7 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		drain()
 	end
 
+	sealed = true
 	return sim
 end
 

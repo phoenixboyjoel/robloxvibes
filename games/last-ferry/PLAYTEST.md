@@ -79,6 +79,12 @@ Open `LastFerry.rbxl` in Studio, open the **Output** window, then **Play**.
 - [ ] **Passengers look like Roblox people:** classic heads with the smile,
       varied outfits, hats and hair, walking with the classic arm and leg
       swing, swaying and looking about while they wait.
+- [ ] **Everything moves smoothly:** passengers walk without stutter and turn
+      into each leg of their walk (no snapping round); the booth door swings on
+      its hinge; the *Petrel* sails off smoothly at the end. Then add lag
+      (Studio Settings → Network → Incoming Replication Lag, 0.2 s) and check
+      again, in a 2-player test: nothing should jump or stutter, only start a
+      moment later.
 - [ ] The lighthouse is far out front-left, dark until an ending. The *Petrel*
       is moored along the right edge of the dock, its cabin windows lit.
 

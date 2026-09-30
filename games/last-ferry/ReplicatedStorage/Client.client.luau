@@ -9,9 +9,11 @@ end
 local CameraController = require("./Controllers/CameraController")
 local CrowdController = require("./Controllers/CrowdController")
 local EffectsController = require("./Controllers/EffectsController")
+local GlideController = require("./Controllers/GlideController")
 local HudController = require("./Controllers/HudController")
 
 -- Each start waits on something different (the world, the remotes), so none holds up the others.
+GlideController.start()
 EffectsController.start()
 task.spawn(CameraController.start)
 task.spawn(CrowdController.start)

@@ -586,6 +586,56 @@ T.test("passengers are classic Robloxians who move like Roblox characters", func
 	T.expect(model.Torso["Right Shoulder"].Transform ~= roblox.CFrame.identity, "the arms sway")
 end)
 
+T.test("passengers walk smoothly on every screen, and the booth door swings on its hinge", function()
+	local sim = boot()
+	local alice = sim:addPlayer("Alice", 101)
+	sim:run(1)
+	local door = sim.workspace.World.Booth.Door
+	local hinge = door:GetPivot().Position
+	local bot = newBot(sim, alice, { idle = true })
+	T.expect(clockIn(bot), "Alice clocks in")
+	local offHinge = 0
+	sim:run(0.8, 1 / 30, function()
+		offHinge = math.max(offHinge, (door:GetPivot().Position - hinge).Magnitude)
+	end)
+	T.expect(offHinge < 1e-3, `the door turns on its hinge as it shuts (drifted {offHinge})`)
+	T.expect((door.Position - roblox.Vector3.new(0, 3.45, 8)).Magnitude < 1e-3, `the door is shut ({door.Position})`)
+
+	-- The night starts and the first passengers walk out of the fog to the queue.
+	local root
+	sim:runUntil(
+		function()
+			for _, model in sim.workspace.World.Passengers:GetChildren() do
+				local candidate = model:FindFirstChild("HumanoidRootPart")
+				if candidate and (candidate:GetAttribute("GlideTime") or 0) > 3 then
+					root = candidate
+					return true
+				end
+			end
+			return false
+		end,
+		120,
+		1 / 30,
+		function()
+			tick(bot)
+		end
+	)
+	T.expect(root ~= nil, "a passenger set off from the fog")
+	local writes = sim:countWrites(root, "CFrame")
+	local positions = {}
+	sim:run(2, 1 / 30, function()
+		table.insert(positions, root.Position)
+	end)
+	local stride = 7 / 30 -- Config.WalkSpeed studs a second, 30 frames a second
+	for i = 2, #positions do
+		local step = (positions[i] - positions[i - 1]).Magnitude
+		T.expect(math.abs(step - stride) < 0.02, `frame {i}: moved {step} studs, not a steady {stride}`)
+	end
+	T.equal(writes.server or 0, 0, "the server sent the walk once and left the moving to the client")
+	T.expect((writes["client:101"] or 0) >= 59, `Alice's client moved them every frame ({writes["client:101"]})`)
+	clean(sim, "smooth walking")
+end)
+
 T.test("passengers speak in chat bubbles over their heads, and in the chat log", function()
 	local sim = boot()
 	local alice = sim:addPlayer("Alice", 101)

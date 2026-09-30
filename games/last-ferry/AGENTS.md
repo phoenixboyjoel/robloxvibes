@@ -110,6 +110,11 @@ otherwise. Don't weaken or skip a test to get green.
   parent)`. Set Parent last.
 - No deprecated APIs. The simulator records any deprecated member used, and the
   tests fail on it.
+- Never move things by tweening their CFrame on the server: it stutters on
+  players' screens and replicates every frame. Glide them
+  (`ReplicatedStorage/Shared/Glide`), and once something has glided move it only
+  with Glide. Tweening other properties on the server (a fade, a colour) is
+  fine.
 - Identify players with `player.User`; key saved data by `player.User.Id`.
 - New Roblox API in game code? The simulator will say "isn't simulated". Add
   the class to `tests/sim/gen_reflection.py` and the behaviour to

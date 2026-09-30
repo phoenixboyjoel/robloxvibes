@@ -14,12 +14,15 @@
 		lighthouse far front-left; the Marigold's ghost out in the fog
 
 	The lighthouse beam is spun by each client (EffectsController) while the
-	rotor's "Spinning" attribute is true, so it turns smoothly.
+	rotor's "Spinning" attribute is true, so it turns smoothly. For the same
+	reason whatever moves (the Petrel, the Marigold, the booth door, the flood)
+	is glided (Shared/Glide): each client moves it, not the server.
 ]]
 
 local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
 
+local Glide = require("../../ReplicatedStorage/Shared/Glide")
 local Sounds = require("../../ReplicatedStorage/Shared/Sounds")
 
 export type Markers = {
@@ -74,8 +77,6 @@ local clockPrompt: ProximityPrompt
 local pierSpawn: SpawnLocation
 local boothSpawn: SpawnLocation
 local ferry: Model
-local ferryMover: CFrameValue
-local ferryTween: Tween? = nil
 local ferryLoad = 0
 local lampLight: SpotLight
 local lampBulb: BasePart
@@ -87,8 +88,6 @@ local lighthouseBeam: BasePart
 local lighthouseRotor: BasePart
 local marigold: Model
 local marigoldParts: { BasePart } = {}
-local marigoldMover: CFrameValue
-local marigoldTween: Tween? = nil
 local marigoldFades: { Tween } = {}
 local sceneToken = 0 -- bumped on reset, so a late ending effect can't leak into the next run
 local flood: BasePart
@@ -362,18 +361,6 @@ local function bench(parent: Instance, at: Vector3, facing: Vector3)
 			parent = parent,
 		})
 	end
-end
-
--- Moves a model by tweening a CFrameValue and pivoting the model to it.
-local function mover(model: Model): CFrameValue
-	local value = Instance.new("CFrameValue")
-	value.Name = "Mover"
-	value.Value = model:GetPivot()
-	value.Changed:Connect(function(cframe: CFrame)
-		model:PivotTo(cframe)
-	end)
-	value.Parent = model
-	return value
 end
 
 local function setUpLighting()
@@ -652,9 +639,11 @@ local function buildPier(parent: Folder): Vector3
 	return Vector3.new(0, 0, 30)
 end
 
-local DOOR_HINGE = CFrame.new(-1.3, 3.45, 8)
-local DOOR_SHUT = DOOR_HINGE * CFrame.new(1.3, 0, 0)
-local DOOR_OPEN = DOOR_HINGE * CFrame.Angles(0, math.rad(-100), 0) * CFrame.new(1.3, 0, 0)
+-- The door swings on its hinge: its pivot is its hinged edge, so gliding the pivot
+-- turns it about the hinge.
+local DOOR_SHUT = CFrame.new(-1.3, 3.45, 8)
+local DOOR_OPEN = DOOR_SHUT * CFrame.Angles(0, math.rad(-100), 0)
+local DOOR_HINGE_EDGE = CFrame.new(-1.3, 0, 0) -- from the door's centre
 local door: BasePart
 
 local function buildBooth(parent: Folder): CFrame
@@ -724,15 +713,16 @@ local function buildBooth(parent: Folder): CFrame
 	door = part({
 		name = "Door",
 		size = Vector3.new(2.6, 6.9, 0.25),
-		cframe = DOOR_OPEN,
+		cframe = DOOR_OPEN * DOOR_HINGE_EDGE:Inverse(),
 		color = TRIM,
 		collide = false,
 		parent = booth,
 	})
+	door.PivotOffset = DOOR_HINGE_EDGE
 	local doorSign = part({
 		name = "DoorSign",
 		size = Vector3.new(1.8, 0.5, 0.05),
-		cframe = DOOR_OPEN * CFrame.new(0, 1.6, 0.16),
+		cframe = door.CFrame * CFrame.new(0, 1.6, 0.16),
 		color = Color3.fromRGB(33, 52, 96),
 		castShadow = false,
 		parent = booth,
@@ -1065,7 +1055,6 @@ local function buildFerry(parent: Folder)
 	sign(namePlate, Enum.NormalId.Front, "PETREL", Color3.fromRGB(30, 48, 82))
 	ferry.PrimaryPart = hull
 	ferry.Parent = parent
-	ferryMover = mover(ferry)
 end
 
 local function buildLighthouse(parent: Folder)
@@ -1175,7 +1164,6 @@ local function buildMarigold(parent: Folder)
 	marigoldParts = { hull, cabin, mast }
 	marigold.PrimaryPart = hull
 	marigold.Parent = parent
-	marigoldMover = mover(marigold)
 end
 
 local function buildFlood(parent: Folder)
@@ -1196,12 +1184,7 @@ local function buildFlood(parent: Folder)
 end
 
 local function moveFerry(target: CFrame, seconds: number, style: Enum.EasingStyle, direction: Enum.EasingDirection)
-	if ferryTween then
-		ferryTween:Cancel()
-	end
-	local tween = TweenService:Create(ferryMover, TweenInfo.new(seconds, style, direction), { Value = target })
-	ferryTween = tween
-	tween:Play()
+	Glide.start(ferry, target, seconds, { style = style, direction = direction })
 end
 
 -- Where the Petrel sits at the dock with this many of the drowned aboard.
@@ -1294,12 +1277,14 @@ function WorldService.clockPrompt(): ProximityPrompt
 	return clockPrompt
 end
 
--- The staff door swings open onto the pier between shifts, and shuts for one.
+-- The staff door swings open onto the pier between shifts, and shuts for one, on its
+-- hinge and with a little bounce.
 function WorldService.setDoor(open: boolean)
 	door.CanCollide = not open
-	TweenService:Create(door, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-		CFrame = if open then DOOR_OPEN else DOOR_SHUT,
-	}):Play()
+	Glide.start(door, if open then DOOR_OPEN else DOOR_SHUT, 0.6, {
+		style = Enum.EasingStyle.Back,
+		direction = Enum.EasingDirection.Out,
+	})
 	if not open then
 		task.delay(0.4, function()
 			doorThud:Play()
@@ -1349,16 +1334,9 @@ local function showMarigold(token: number)
 		fade:Play()
 	end
 	task.delay(6, function()
-		if sceneToken ~= token then
-			return
+		if sceneToken == token then
+			Glide.start(marigold, MARIGOLD_HOME * CFrame.new(-120, 0, 0), 40)
 		end
-		local tween = TweenService:Create(
-			marigoldMover,
-			TweenInfo.new(40, Enum.EasingStyle.Linear),
-			{ Value = MARIGOLD_HOME * CFrame.new(-120, 0, 0) }
-		)
-		marigoldTween = tween
-		tween:Play()
 	end)
 end
 
@@ -1383,9 +1361,11 @@ end
 -- The tide rises in the booth, over the counter, where the camera can see it: a splash
 -- as it pours in, then water sloshing round the clerks' legs until it drains.
 function WorldService.setFlood(on: boolean)
-	local cframe = if on then CFrame.new(0, 3.1, 4) else CFrame.new(0, 0.1, 4)
-	TweenService:Create(flood, TweenInfo.new(if on then 4 else 1, Enum.EasingStyle.Sine), {
-		CFrame = cframe,
+	local seconds = if on then 4 else 1
+	Glide.start(flood, if on then CFrame.new(0, 3.1, 4) else CFrame.new(0, 0.1, 4), seconds, {
+		style = Enum.EasingStyle.Sine,
+	})
+	TweenService:Create(flood, TweenInfo.new(seconds, Enum.EasingStyle.Sine), {
 		Transparency = if on then 0.25 else 1,
 	}):Play()
 	if on then
@@ -1403,17 +1383,9 @@ function WorldService.reset()
 	WorldService.setLighthouse(false)
 	WorldService.setFlood(false)
 	ferryLoad = 0
-	if ferryTween then
-		ferryTween:Cancel()
-		ferryTween = nil
-	end
-	ferryMover.Value = FERRY_HOME
+	Glide.set(ferry, FERRY_HOME)
 	sceneToken += 1
-	if marigoldTween then
-		marigoldTween:Cancel()
-		marigoldTween = nil
-	end
-	marigoldMover.Value = MARIGOLD_HOME
+	Glide.set(marigold, MARIGOLD_HOME)
 	-- Setting Transparency doesn't stop a running fade, so cancel them first.
 	for _, fade in marigoldFades do
 		fade:Cancel()

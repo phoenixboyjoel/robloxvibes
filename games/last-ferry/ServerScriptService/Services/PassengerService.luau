@@ -17,12 +17,14 @@
 	  if they're wet too
 
 	The HumanoidRootPart is anchored; every other part hangs off it on Roblox's
-	standard joints, so moving the root moves the whole figure, and clients swing
-	the limbs as they walk (CrowdController).
+	standard joints, so moving the root moves the whole figure. The server glides
+	the root (Shared/Glide), so every client walks them smoothly, turning into each
+	leg as they go, and swings their limbs as they walk (CrowdController).
 ]]
 
 local TweenService = game:GetService("TweenService")
 
+local Glide = require("../../ReplicatedStorage/Shared/Glide")
 local Sounds = require("../../ReplicatedStorage/Shared/Sounds")
 local Types = require("../Shift/Types")
 local Robloxian = require("./Robloxian")
@@ -36,6 +38,9 @@ local PAGE = Color3.fromRGB(236, 226, 196)
 local SMOKE_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 local DROP_TEXTURE = "rbxasset://textures/particles/sparkles_main.dds"
 
+-- How fast passengers turn to face where they're going: one and a half turns a second.
+local TURN_RATE = math.rad(540)
+
 type Figure = {
 	root: BasePart,
 	feet: number, -- the feet are this far below the root's centre
@@ -43,7 +48,6 @@ type Figure = {
 	mark: BasePart?,
 	page: BasePart?,
 	walk: {}?,
-	tween: Tween?,
 }
 
 local figures: { [Model]: Figure } = {}
@@ -206,12 +210,19 @@ function PassengerService.spawn(passenger: Types.Passenger, feet: Vector3, facin
 		end
 	end
 
-	figures[model] = { root = rig.root, feet = rig.feet, puddle = nil, page = page, walk = nil, tween = nil }
+	figures[model] = { root = rig.root, feet = rig.feet, puddle = nil, page = page, walk = nil }
 	model.Destroying:Once(function()
 		figures[model] = nil
 	end)
 	model.Parent = parent
 	return model
+end
+
+-- How long turning from facing as `from` does to facing as `to` does takes, or 0 if
+-- that's hardly a turn.
+local function turnTime(from: CFrame, to: CFrame): number
+	local angle = math.acos(math.clamp(from.LookVector:Dot(to.LookVector), -1, 1))
+	return if angle < math.rad(3) then 0 else math.max(angle / TURN_RATE, 0.12)
 end
 
 -- Walks through `path` (points at foot level), then turns to `faceAtEnd` if given.
@@ -223,41 +234,42 @@ function PassengerService.walk(model: Model, path: { Vector3 }, speed: number, f
 	end
 	local token = {}
 	figure.walk = token
-	if figure.tween then
-		figure.tween:Cancel()
+	local function current(): boolean
+		return figure.walk == token and model.Parent ~= nil
 	end
 
 	local root = figure.root
 	for _, point in path do
-		if figure.walk ~= token or model.Parent == nil then
+		if not current() then
 			return false
 		end
+		local here = Glide.frame(root)
 		local target = point + Vector3.new(0, figure.feet, 0)
-		local from = root.Position
-		local distance = (target - from).Magnitude
+		local distance = (target - here.Position).Magnitude
 		if distance > 0.05 then
-			local flat = Vector3.new(target.X - from.X, 0, target.Z - from.Z)
-			local rotation = if flat.Magnitude > 0.05
-				then CFrame.lookAt(Vector3.zero, flat).Rotation
-				else root.CFrame.Rotation
-			root.CFrame = CFrame.new(from) * rotation
-			local tween = TweenService:Create(
-				root,
-				TweenInfo.new(distance / speed, Enum.EasingStyle.Linear),
-				{ CFrame = CFrame.new(target) * rotation }
-			)
-			figure.tween = tween
-			tween:Play()
-			tween.Completed:Wait()
+			-- Turning into the leg as they set off, as Roblox characters do.
+			local flat = Vector3.new(target.X - here.X, 0, target.Z - here.Z)
+			local facing = if flat.Magnitude > 0.05 then CFrame.lookAt(Vector3.zero, flat) else here.Rotation
+			local seconds = distance / speed
+			Glide.start(root, CFrame.new(target) * facing, seconds, { turn = turnTime(here, facing) })
+			task.wait(seconds)
 		end
 	end
-
-	if figure.walk ~= token or model.Parent == nil then
+	if not current() then
 		return false
 	end
-	figure.tween = nil
+
 	if faceAtEnd then
-		root.CFrame = CFrame.lookAt(root.Position, root.Position + faceAtEnd)
+		local here = Glide.frame(root)
+		local facing = CFrame.lookAt(here.Position, here.Position + faceAtEnd)
+		local seconds = turnTime(here, facing)
+		if seconds > 0 then
+			Glide.start(root, facing, seconds, { style = Enum.EasingStyle.Sine })
+			task.wait(seconds)
+			if not current() then
+				return false
+			end
+		end
 	end
 	return true
 end
@@ -286,8 +298,8 @@ function PassengerService.setPuddle(model: Model, on: boolean)
 	end
 	-- The sill hides their feet, and from the booth their body hides the planks right
 	-- behind them, so the puddle spreads wide: its sides show either side of them.
-	local root = figure.root
-	local centre = root.Position - Vector3.new(0, figure.feet - 0.03, 0) - root.CFrame.LookVector * 0.9
+	local root = Glide.frame(figure.root)
+	local centre = root.Position - Vector3.new(0, figure.feet - 0.03, 0) - root.LookVector * 0.9
 	local puddle = Instance.new("Part")
 	puddle.Name = "Puddle"
 	puddle.Shape = Enum.PartType.Cylinder
@@ -330,7 +342,7 @@ function PassengerService.footprints(model: Model, to: Vector3, speed: number)
 	if figure == nil then
 		return
 	end
-	local from = figure.root.Position - Vector3.new(0, figure.feet, 0)
+	local from = Glide.frame(figure.root).Position - Vector3.new(0, figure.feet, 0)
 	local flat = Vector3.new(to.X - from.X, 0, to.Z - from.Z)
 	local length = flat.Magnitude
 	if length < 1 then
@@ -383,7 +395,7 @@ function PassengerService.setShadowMark(model: Model, lamp: Vector3?)
 	if lamp == nil then
 		return
 	end
-	local feet = figure.root.Position - Vector3.new(0, figure.feet, 0)
+	local feet = Glide.frame(figure.root).Position - Vector3.new(0, figure.feet, 0)
 	local away = Vector3.new(feet.X - lamp.X, 0, feet.Z - lamp.Z)
 	if away.Magnitude < 0.1 then
 		return
@@ -416,18 +428,19 @@ function PassengerService.vanish(model: Model, seconds: number, sink: boolean?)
 	local figure = figures[model]
 	if figure then
 		figure.walk = nil
-		if figure.tween then
-			figure.tween:Cancel()
-		end
 		if figure.puddle then
 			drain(figure.puddle)
 			figure.puddle = nil
 		end
+		local root = figure.root
 		if sink then
-			TweenService:Create(figure.root, TweenInfo.new(seconds, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-				CFrame = figure.root.CFrame * CFrame.new(0, -8, 0),
-			}):Play()
-			Sounds.make(Sounds.Splash, figure.root, "Splash"):Play()
+			Glide.start(root, Glide.frame(root) * CFrame.new(0, -8, 0), seconds, {
+				style = Enum.EasingStyle.Quad,
+				direction = Enum.EasingDirection.In,
+			})
+			Sounds.make(Sounds.Splash, root, "Splash"):Play()
+		else
+			Glide.stop(root)
 		end
 	end
 	for _, descendant in model:GetDescendants() do

@@ -1,7 +1,8 @@
 --!nonstrict
 --[[
 	The simulator's own engine behaviour that the game relies on: assemblies
-	(WeldConstraint), joints (Motor6D, Weld) and model pivots.
+	(WeldConstraint), joints (Motor6D, Weld), pivots, characters, accessories,
+	prompts, input, tags, easing and attributes.
 ]]
 
 local roblox = require("@lune/roblox")
@@ -189,6 +190,145 @@ T.test("a ProximityPrompt only triggers when enabled and within reach", function
 	T.equal(table.concat(log, ","), "Alice", "the server saw Alice trigger it")
 	prompt.Enabled = false
 	T.expect(not pcall(sim.triggerPrompt, sim, alice, prompt), "a disabled prompt can't be triggered")
+	T.equal(#sim.errors, 0, table.concat(sim.errors, "\n"))
+end)
+
+T.test("CollectionService: tags, and signals for tagged instances in the game", function()
+	local sim = Sim.new({ root = "." })
+	local log = sim:execute([[
+		local CollectionService = game:GetService("CollectionService")
+		local log = {}
+		CollectionService:GetInstanceAddedSignal("Glide"):Connect(function(instance)
+			table.insert(log, "+" .. instance.Name)
+		end)
+		CollectionService:GetInstanceRemovedSignal("Glide"):Connect(function(instance)
+			table.insert(log, "-" .. instance.Name)
+		end)
+		return log
+	]])
+	local model = sim:execute([[
+		local model = Instance.new("Model")
+		local hull = Instance.new("Part")
+		hull.Name = "Hull"
+		hull:AddTag("Glide")
+		hull.Parent = model
+		return model
+	]])
+	local CollectionService = sim.game:GetService("CollectionService")
+	local hull = model.Hull
+	T.equal(#log, 0, "nothing fires for an instance outside the game")
+	T.equal(#CollectionService:GetTagged("Glide"), 0, "and GetTagged doesn't find it")
+	T.expect(hull:HasTag("Glide") and CollectionService:HasTag(hull, "Glide"), "but it has the tag")
+	T.equal(table.concat(hull:GetTags(), ","), "Glide")
+
+	model.Parent = sim.workspace
+	sim:drain()
+	T.equal(table.concat(log, " "), "+Hull", "added fires when a tagged instance enters the game")
+	T.equal(CollectionService:GetTagged("Glide")[1], hull, "GetTagged finds it")
+	hull:RemoveTag("Glide")
+	hull:AddTag("Glide")
+	model.Parent = nil
+	model.Parent = sim.workspace
+	model:Destroy()
+	sim:drain()
+	T.equal(table.concat(log, " "), "+Hull -Hull +Hull -Hull +Hull -Hull", "every change in the game fires")
+	T.equal(#CollectionService:GetTagged("Glide"), 0, "a destroyed instance isn't tagged any more")
+	T.equal(#sim.errors, 0, table.concat(sim.errors, "\n"))
+end)
+
+T.test("TweenService:GetValue follows Roblox's easing curves", function()
+	local sim = Sim.new({ root = "." })
+	local v = sim:execute([[
+		local TweenService = game:GetService("TweenService")
+		local S, D = Enum.EasingStyle, Enum.EasingDirection
+		local peak = 0
+		for t = 0, 1, 0.01 do
+			peak = math.max(peak, TweenService:GetValue(t, S.Back, D.Out))
+		end
+		return {
+			linear = TweenService:GetValue(0.5, S.Linear, D.In),
+			quadIn = TweenService:GetValue(0.5, S.Quad, D.In),
+			quadOut = TweenService:GetValue(0.5, S.Quad, D.Out),
+			quadInOut = TweenService:GetValue(0.25, S.Quad, D.InOut),
+			sineOut = TweenService:GetValue(0.5, S.Sine, D.Out),
+			backPeak = peak,
+			backEnd = TweenService:GetValue(1, S.Back, D.Out),
+			below = TweenService:GetValue(-1, S.Linear, D.In),
+			above = TweenService:GetValue(2, S.Quad, D.Out),
+		}
+	]])
+	local function close(actual, expected, label)
+		T.expect(math.abs(actual - expected) < 1e-3, `{label}: expected {expected}, got {actual}`)
+	end
+	close(v.linear, 0.5, "Linear")
+	close(v.quadIn, 0.25, "Quad In")
+	close(v.quadOut, 0.75, "Quad Out")
+	close(v.quadInOut, 0.125, "Quad InOut")
+	close(v.sineOut, math.sin(math.pi / 4), "Sine Out")
+	close(v.backPeak, 1.1, "Back Out overshoots by a tenth")
+	close(v.backEnd, 1, "and ends at 1")
+	close(v.below, 0, "alpha is clamped below")
+	close(v.above, 1, "and above")
+	T.equal(#sim.errors, 0, table.concat(sim.errors, "\n"))
+end)
+
+T.test("a part pivots about its PivotOffset; a model about its PrimaryPart's pivot", function()
+	local sim = Sim.new({ root = "." })
+	local door, model = sim:execute([[
+		local door = Instance.new("Part")
+		door.Size = Vector3.new(2.6, 6.9, 0.25)
+		door.CFrame = CFrame.new(0, 3.45, 8)
+		door.PivotOffset = CFrame.new(-1.3, 0, 0)
+		door.Anchored = true
+		door.Parent = workspace
+		local model = Instance.new("Model")
+		local hull = Instance.new("Part")
+		hull.CFrame = CFrame.new(5, 0, 0)
+		hull.PivotOffset = CFrame.new(0, -2, 0)
+		hull.Parent = model
+		model.PrimaryPart = hull
+		model.Parent = workspace
+		return door, model
+	]])
+	local V = roblox.Vector3
+	near(door:GetPivot().Position, V.new(-1.3, 3.45, 8), "the door's pivot is its hinged edge")
+	door:PivotTo(door:GetPivot() * roblox.CFrame.Angles(0, math.rad(-90), 0))
+	near(door:GetPivot().Position, V.new(-1.3, 3.45, 8), "turning it leaves the hinge where it was")
+	T.expect(math.abs(door.CFrame.LookVector.Z) < 1e-3, `and turns the door a quarter turn ({door.CFrame.LookVector})`)
+	near(model:GetPivot().Position, V.new(5, -2, 0), "the model's pivot is its PrimaryPart's")
+	model:PivotTo(roblox.CFrame.new(0, 0, 0))
+	near(model.PrimaryPart.Position, V.new(0, 2, 0), "and it moves by it")
+	T.equal(#sim.errors, 0, table.concat(sim.errors, "\n"))
+end)
+
+T.test("attributes hold only the types Roblox allows, under valid names", function()
+	local sim = Sim.new({ root = "." })
+	local r = sim:execute([[
+		local part = Instance.new("Part")
+		local function try(name, value)
+			return (pcall(part.SetAttribute, part, name, value))
+		end
+		return {
+			cframe = try("GlideFrom", CFrame.new(1, 2, 3)),
+			number = try("GlideTime", 1.5),
+			string = try("GlideStyle", "Quad"),
+			boolean = try("Lit", true),
+			vector = try("Where", Vector3.one),
+			tableValue = try("List", {}),
+			instance = try("Other", part),
+			space = try("Two words", 1),
+			reserved = try("RBXThing", 1),
+			long = try(string.rep("a", 101), 1),
+			path = try("Glide.Id-2/x_y", 1),
+			cleared = try("GlideTime", nil) and part:GetAttribute("GlideTime") == nil,
+		}
+	]])
+	for _, ok in { "cframe", "number", "string", "boolean", "vector", "path", "cleared" } do
+		T.expect(r[ok], `{ok} is allowed`)
+	end
+	for _, bad in { "tableValue", "instance", "space", "reserved", "long" } do
+		T.expect(not r[bad], `{bad} is refused`)
+	end
 	T.equal(#sim.errors, 0, table.concat(sim.errors, "\n"))
 end)
 

@@ -1509,6 +1509,68 @@
    "service": false,
    "superclass": "TextChatConfigurations"
   },
+  "CollectionService": {
+   "creatable": false,
+   "events": {
+    "ItemAdded": {
+     "deprecated": true
+    },
+    "ItemRemoved": {
+     "deprecated": true
+    },
+    "TagAdded": {
+     "deprecated": false
+    },
+    "TagRemoved": {
+     "deprecated": false
+    }
+   },
+   "functions": {
+    "AddTag": {
+     "deprecated": false,
+     "yields": false
+    },
+    "CreateCollection": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetAllTags": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetCollection": {
+     "deprecated": true,
+     "yields": false
+    },
+    "GetInstanceAddedSignal": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetInstanceRemovedSignal": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetTagged": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetTags": {
+     "deprecated": false,
+     "yields": false
+    },
+    "HasTag": {
+     "deprecated": false,
+     "yields": false
+    },
+    "RemoveTag": {
+     "deprecated": false,
+     "yields": false
+    }
+   },
+   "properties": {},
+   "service": true,
+   "superclass": "Instance"
+  },
   "ColorCorrectionEffect": {
    "creatable": true,
    "events": {},

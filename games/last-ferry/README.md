@@ -94,6 +94,10 @@ lune run tests/run.luau
 rojo build -o LastFerry.rbxl
 ```
 
+GitHub Actions runs all of these on every pull request
+([.github/workflows/checks.yml](../../.github/workflows/checks.yml)), with the
+same pinned versions. It keeps the built place file as a download on each run.
+
 At the time of this build every check comes back clean:
 - 51 tests pass.
 - There are 0 selene findings.

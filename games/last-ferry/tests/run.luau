@@ -5,6 +5,7 @@ local process = require("@lune/process")
 
 local TestLib = require("./TestLib")
 
+require("./Sim.spec")
 require("./Rng.spec")
 require("./Rules.spec")
 require("./Generator.spec")

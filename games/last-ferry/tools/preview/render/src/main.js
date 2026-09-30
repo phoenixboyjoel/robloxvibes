@@ -113,12 +113,72 @@ function normalize(node) {
   for (const child of node.children) normalize(child);
 }
 
+// Roblox's chat bubbles (TextChatService:DisplayBubble) in their default style: a white
+// rounded bubble with dark text and a tail, above the part it belongs to, newest at the
+// bottom. They're screen-sized, not world-sized, like Roblox's.
+async function drawBubbles(ctx, bubbles, partsById, camera, W, H) {
+  if (bubbles.length === 0) return;
+  const font = { family: 'rbxasset://fonts/families/BuilderSans.json', weight: 'Medium', style: 'Normal' };
+  await loadFontsFor({ props: { FontFace: font }, children: [] });
+  const byPart = new Map();
+  for (const bubble of bubbles) {
+    if (!byPart.has(bubble.adornee)) byPart.set(bubble.adornee, []);
+    byPart.get(bubble.adornee).push(bubble);
+  }
+  const { canvasFont } = await import('./fonts.js');
+  for (const [id, list] of byPart) {
+    const part = partsById.get(id);
+    if (!part) continue;
+    const size = part.node.props.Size ?? [1, 1, 1];
+    const anchor = new THREE.Vector3(0, size[1] / 2 + 0.9, 0).applyMatrix4(part.world).project(camera);
+    if (anchor.z > 1) continue;
+    let bottom = ((1 - anchor.y) / 2) * H;
+    const x = ((anchor.x + 1) / 2) * W;
+    list.sort((a, b) => a.age - b.age);
+    for (const [index, bubble] of list.entries()) {
+      ctx.font = canvasFont(font, 16);
+      const maxWidth = 260;
+      const words = bubble.message.split(' ');
+      const lines = [''];
+      for (const word of words) {
+        const trial = lines[lines.length - 1] ? `${lines[lines.length - 1]} ${word}` : word;
+        if (ctx.measureText(trial).width > maxWidth && lines[lines.length - 1]) lines.push(word);
+        else lines[lines.length - 1] = trial;
+      }
+      const width = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 24;
+      const height = lines.length * 20 + 16;
+      const tail = index === 0 ? 8 : 0;
+      const top = bottom - tail - height;
+      ctx.save();
+      ctx.globalAlpha = index === 0 ? 1 : 0.85;
+      ctx.fillStyle = 'rgba(250, 250, 250, 0.95)';
+      ctx.beginPath();
+      ctx.roundRect(x - width / 2, top, width, height, 12);
+      ctx.fill();
+      if (tail) {
+        ctx.beginPath();
+        ctx.moveTo(x - 8, top + height - 1);
+        ctx.lineTo(x, top + height + tail);
+        ctx.lineTo(x + 8, top + height - 1);
+        ctx.fill();
+      }
+      ctx.fillStyle = 'rgb(57, 59, 61)';
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'center';
+      lines.forEach((line, i) => ctx.fillText(line, x, top + 8 + i * 20 + 10));
+      ctx.restore();
+      bottom = top - 6;
+    }
+  }
+}
+
 async function main() {
   const data = await (await fetch(params.get('scene'))).json();
   normalize(data.workspace);
   normalize(data.lighting);
   normalize(data.playerGui);
   data.terrain = Array.isArray(data.terrain) ? data.terrain : [];
+  data.bubbles = Array.isArray(data.bubbles) ? data.bubbles : [];
   const [W, H] = data.screen;
   const safe = {
     x: (W - data.safeArea[0]) / 2,
@@ -191,6 +251,7 @@ async function main() {
   overlay.width = W;
   overlay.height = H;
   const ctx = overlay.getContext('2d');
+  await drawBubbles(ctx, data.bubbles ?? [], world.partsById, camera, W, H);
   if (data.playerGui) {
     await loadFontsFor(data.playerGui);
     drawScreenGuis(ctx, data.playerGui, { w: W, h: H }, safe, imageFor);

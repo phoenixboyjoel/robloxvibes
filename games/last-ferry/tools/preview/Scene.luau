@@ -193,8 +193,18 @@ function Scene.capture(sim, options: Options): any
 		relink(guiTree, byId, ids)
 	end
 
+	-- Chat bubbles this player can still see (Roblox shows each for about 15 seconds).
+	local bubbles = {}
+	for _, bubble in sim.bubbles or {} do
+		local age = sim.now - bubble.time
+		if bubble.player == options.player and age <= 15 and ids[bubble.adornee] then
+			table.insert(bubbles, { adornee = ids[bubble.adornee], message = bubble.message, age = age })
+		end
+	end
+
 	local camera = sim.workspace.CurrentCamera
 	return {
+		bubbles = bubbles,
 		version = 2,
 		time = sim.now,
 		screen = { sim.screen.X, sim.screen.Y },

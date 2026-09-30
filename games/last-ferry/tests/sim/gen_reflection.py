@@ -23,11 +23,16 @@ CLASSES = [
     "ScrollingFrame", "ScreenGui", "UIPadding", "UIListLayout", "UICorner", "UIStroke",
     "UIScale", "CFrameValue", "Atmosphere", "PointLight", "SpotLight", "Attachment",
     "ParticleEmitter", "WeldConstraint", "RemoteEvent", "ColorCorrectionEffect", "BlurEffect",
+    "WedgePart", "Seat", "SpawnLocation", "Motor6D", "Weld", "Humanoid", "SpecialMesh", "Decal",
+    "Accessory", "BodyColors", "BillboardGui", "ImageLabel", "UIGradient", "UIAspectRatioConstraint",
+    "UISizeConstraint", "UITextSizeConstraint", "Sound", "Highlight", "Sky", "BloomEffect",
+    "SunRaysEffect", "TextChannel",
     # Services and objects the engine provides
     "DataModel", "Workspace", "Players", "Player", "PlayerGui", "ReplicatedStorage",
     "ServerScriptService", "RunService", "TweenService", "Tween", "Lighting", "Terrain",
     "Camera", "DataStoreService", "DataStore", "BadgeService", "StarterGui", "GuiService",
     "UserInputService", "InputObject", "TextChatService", "ChatWindowConfiguration",
+    "BubbleChatConfiguration", "SoundService", "StarterPlayer",
 ]
 
 SCRIPT_OK = {"None"}

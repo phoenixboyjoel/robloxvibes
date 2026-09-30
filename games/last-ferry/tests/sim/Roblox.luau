@@ -316,6 +316,7 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 
 	local state = setmetatable({}, { __mode = "k" })
 	local welds = setmetatable({}, { __mode = "k" }) -- part -> { [part] = true }, from WeldConstraints
+	local joints = setmetatable({}, { __mode = "k" }) -- Part0 -> { [joint] = true }, from Motor6Ds and Welds
 	local InstanceMT = { __type = "Instance" }
 	local computed = {} -- [className][property] = function(instance, st) -> value
 	local methods = {} -- [className][name] = function(instance, ...)
@@ -586,6 +587,56 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		error(`{key} is not a valid member of {st.className} "{fullName(instance)}"`, 2)
 	end
 
+	-- Assemblies: moving a part moves every part welded to it (WeldConstraint), and poses
+	-- every part jointed below it (Motor6D, Weld): Part1 = Part0 * C0 * Transform * C1:Inverse().
+	local propagate
+
+	local function placePart(part, cframe)
+		local partState = state[part]
+		local old = partState.props.CFrame or roblox.CFrame.new()
+		partState.props.CFrame = cframe
+		if old ~= cframe then
+			changed(part, partState, "CFrame", cframe)
+		end
+		return old
+	end
+
+	local function solveJoint(joint, visited)
+		local p = state[joint].props
+		local part0, part1 = p.Part0, p.Part1
+		if p.Enabled == false or part0 == nil or part1 == nil or visited[part1] then
+			return
+		end
+		local transform = if state[joint].className == "Motor6D"
+			then p.Transform or roblox.CFrame.new()
+			else roblox.CFrame.new()
+		local c1 = p.C1 or roblox.CFrame.new()
+		local target = (state[part0].props.CFrame or roblox.CFrame.new())
+			* (p.C0 or roblox.CFrame.new())
+			* transform
+			* c1:Inverse()
+		visited[part1] = true
+		local old = placePart(part1, target)
+		propagate(part1, old, visited)
+	end
+
+	propagate = function(part, old, visited)
+		local now = state[part].props.CFrame or roblox.CFrame.new()
+		if welds[part] and old ~= now then
+			local delta = now * old:Inverse()
+			for other in welds[part] do
+				if not visited[other] then
+					visited[other] = true
+					local otherOld = placePart(other, delta * (state[other].props.CFrame or roblox.CFrame.new()))
+					propagate(other, otherOld, visited)
+				end
+			end
+		end
+		for joint in joints[part] or {} do
+			solveJoint(joint, visited)
+		end
+	end
+
 	InstanceMT.__newindex = function(instance, key, value)
 		local st = state[instance]
 		if key == "Parent" then
@@ -620,22 +671,31 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 				welds[part0][part1] = true
 				welds[part1][part0] = true
 			end
-		elseif key == "CFrame" and old ~= nil and old ~= value and welds[instance] then
-			-- Moving a part moves the whole welded assembly with it.
-			local delta = value * old:Inverse()
-			local visited = { [instance] = true }
-			local queue = { instance }
-			while #queue > 0 do
-				local part = table.remove(queue)
-				for other in welds[part] or {} do
-					if not visited[other] then
-						visited[other] = true
-						local otherState = state[other]
-						otherState.props.CFrame = delta * (otherState.props.CFrame or roblox.CFrame.new())
-						changed(other, otherState, "CFrame", otherState.props.CFrame)
-						table.insert(queue, other)
-					end
+		elseif
+			isA(st.className, "JointInstance")
+			and (
+				key == "Part0"
+				or key == "Part1"
+				or key == "C0"
+				or key == "C1"
+				or key == "Transform"
+				or key == "Enabled"
+			)
+		then
+			if key == "Part0" then
+				if old and joints[old] then
+					joints[old][instance] = nil
 				end
+				if value then
+					joints[value] = joints[value] or {}
+					joints[value][instance] = true
+				end
+			end
+			solveJoint(instance, {})
+		elseif key == "CFrame" and isA(st.className, "BasePart") then
+			-- Moving a part moves its welded assembly and poses the parts jointed below it.
+			if old ~= nil and old ~= value or joints[instance] then
+				propagate(instance, old or value, { [instance] = true })
 			end
 		end
 	end
@@ -776,6 +836,10 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 			if st.signals.Destroying then
 				fire(st.signals.Destroying, nil)
 			end
+			local part0 = isA(st.className, "JointInstance") and st.props.Part0
+			if part0 and joints[part0] then
+				joints[part0][self] = nil
+			end
 			setParent(self, st, nil)
 			st.destroyed = true
 		end,
@@ -866,6 +930,36 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		service(name)
 	end
 
+	-- Service properties the Rojo project file sets, as a built place would have them.
+	-- Properties scripts can't see at all (Lighting.Technology) are skipped; `rojo build`
+	-- checks those names.
+	local projectPath = `{root}/default.project.json`
+	if fs.isFile(projectPath) then
+		local project = serde.decode("json", fs.readFile(projectPath))
+		for serviceName, entry in project.tree or {} do
+			if type(entry) == "table" and entry["$properties"] and reflection[serviceName] then
+				local instance = service(serviceName)
+				for key, raw in entry["$properties"] do
+					local found = member(serviceName, key)
+					if found == nil or found.kind ~= "property" then
+						continue
+					end
+					local info = found.info
+					local value = raw
+					if info.category == "Enum" then
+						value = Enum[info.type][raw]
+					elseif info.type == "Color3" then
+						value = roblox.Color3.new(raw[1], raw[2], raw[3])
+					elseif info.type == "Vector3" then
+						value = roblox.Vector3.new(raw[1], raw[2], raw[3])
+					end
+					checkValue(serviceName, key, info, value, 2)
+					state[instance].props[key] = value
+				end
+			end
+		end
+	end
+
 	computed.Workspace = {
 		Terrain = function()
 			return terrain
@@ -920,10 +1014,16 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 				self.CFrame = target
 				return
 			end
+			-- Every target comes from where the parts are now, before any of them moves:
+			-- moving one part also moves the parts welded or jointed to it.
+			local moves = {}
 			for _, descendant in descendants(self, {}) do
 				if isA(state[descendant].className, "BasePart") then
-					descendant.CFrame = delta * descendant.CFrame
+					table.insert(moves, { descendant, delta * descendant.CFrame })
 				end
+			end
+			for _, move in moves do
+				move[1].CFrame = move[2]
 			end
 		end,
 	}
@@ -1051,6 +1151,20 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		end,
 		GetCore = function()
 			return nil
+		end,
+	}
+
+	-- Chat bubbles: recorded per client, for tests and previews.
+	sim.bubbles = {}
+	methods.TextChatService = {
+		DisplayBubble = function(_self, partOrCharacter, message)
+			local player = clientPlayer[currentContext()]
+			if player == nil then
+				error("DisplayBubble can only be called from the client", 2)
+			end
+			assert(isInstance(partOrCharacter), "DisplayBubble expects a part or character")
+			assert(type(message) == "string", "DisplayBubble expects a string message")
+			table.insert(sim.bubbles, { time = sim.now, player = player, adornee = partOrCharacter, message = message })
 		end,
 	}
 
@@ -1452,6 +1566,27 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 
 	function sim:startServer()
 		runScript("server", "ServerScriptService/Server", "ServerScriptService/Server.server.luau")
+	end
+
+	-- Runs a snippet of Luau as a server script, for testing the simulator itself.
+	-- Returns whatever the snippet returns.
+	function sim:execute(source: string)
+		moduleCaches.server = moduleCaches.server or {}
+		local chunk = luau.load(source, {
+			debugName = "ServerScriptService/Snippet",
+			environment = environment("server", "ServerScriptService/Snippet"),
+			injectGlobals = false,
+		})
+		local results
+		local thread = newThread("server", function()
+			results = table.pack(chunk())
+		end)
+		resume(thread)
+		drain()
+		if results == nil then
+			return nil
+		end
+		return table.unpack(results, 1, results.n)
 	end
 
 	function sim:addPlayer(name: string, userId: number, displayName: string?)

@@ -137,7 +137,12 @@ Disabled**.
       jitter behind the view), is never under or over the ticket, the rules
       panel or the ledger, and never covers their face: look down at the
       planks and it stays above their head (off the top of the screen if it
-      has to).
+      has to). With a TAKE PAGE tab showing, turn about 30 degrees right, so
+      the passenger is near the ticket: the bubble moves beside the tab (or
+      just over it) and never onto the ticket.
+- [ ] On the first night, the hint along the bottom is two short lines on a
+      computer or with a gamepad (how to look, then the keys), and doesn't run
+      under the rules panel.
 - [ ] **BOARD** (green, with a check): the button squashes and clicks, the
       ticket gets a BOARDED stamp with a thud and slides away. They walk
       through the gate and up the gangway, then fade.
@@ -205,13 +210,21 @@ Disabled**.
       - On an iPad the rules panel stops above the bigger jump button.
       - On the Xbox (a TV screen) there's no Roblox chat at all, but the
         passenger's bubble still shows, in bigger type.
+      - No text anywhere is cut off or spills out of its box: the pills, the
+        ticket, the rules, the buttons and every card (the ending too).
+      - In Roblox's Settings, set Text Size to the largest: the bubble and
+        the pills grow and still fit (the bubble wraps into more lines; the
+        pills drop the date first).
       - Mara (the smallest passenger) has a normal-looking classic head.
 - [ ] **Test → Clients and Servers**, 2 players:
       - both see the same passenger;
       - either can make the call;
       - the Continue card shows "1 of 2 ready" until both press it, or the
         timer runs out;
-      - a player who joins mid-shift appears in the booth, capped.
+      - a player who joins mid-shift appears in the booth, capped, looking at
+        the passenger from their stand, with the whole line in the bubble
+        (Roblox can take a few seconds to load the bubble's font for a new
+        player; the bubble resizes once it has).
 - [ ] With API services enabled, finish a run, stop, and play again: the pier
       banner and the player list show the endings you've found.
 

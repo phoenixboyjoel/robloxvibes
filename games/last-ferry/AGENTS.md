@@ -130,7 +130,10 @@ otherwise. Don't weaken or skip a test to get green.
   `WorldToViewportPoint` starts at the notch's edge on phones.
 - Never measure something hidden by its `AbsoluteSize`: Roblox doesn't keep
   what's hidden laid out. Measure text with a label in a disabled ScreenGui
-  (`TextBounds`), as Roblox's own chat does and `Ui/TopBar` and `Ui/Speech` do.
+  (`TextBounds`), as Roblox's own chat does and `Ui/TopBar` and `Ui/Speech` do,
+  and measure it again once its font has loaded (`ContentProvider:PreloadAsync`)
+  and when `GuiService.PreferredTextSize` changes: text measured before its font
+  loads comes out a stand-in font's size.
 - New Roblox API in game code? The simulator will say "isn't simulated". Add
   the class to `tests/sim/gen_reflection.py` and the behaviour to
   `tests/sim/Roblox.luau`, rather than working around the test.
@@ -155,6 +158,12 @@ otherwise. Don't weaken or skip a test to get green.
   least 44 px: keep them 64 design px or more. `Game.spec` checks this.
 - Keep the bottom centre of the screen clear: the passenger's shadow falls
   there, and it's a rule from night 4.
+- Every piece of text must fit its box on every screen: Roblox doesn't draw the
+  lines of wrapped text that don't fit, and text that doesn't wrap spills out.
+  The simulator measures text with Roblox's real font widths, and `Game.spec`
+  checks every label on screen (and every card) on phones, a monitor and a TV.
+  Only text meant to be cut short uses `TextTruncate`. Add any new font the game
+  uses to `tests/sim/gen_fonts.py`.
 - Nothing may cover a passenger's face while they're at the window: breath is
   a rule from night 3. That's why the radio waits for an empty window,
   warnings show as a banner across the status in Roblox's top bar row, and

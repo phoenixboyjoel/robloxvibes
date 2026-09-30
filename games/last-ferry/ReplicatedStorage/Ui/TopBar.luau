@@ -17,6 +17,7 @@
 	at the top of the HUD instead (`fallback`), at the HUD's scale.
 ]]
 
+local ContentProvider = game:GetService("ContentProvider")
 local GuiService = game:GetService("GuiService")
 
 local Theme = require("./Theme")
@@ -243,29 +244,27 @@ function TopBar.new(parent: Instance, fallback: GuiObject): TopBar
 	-- How wide text is, measured the way Roblox measures the text in its own chat bubbles:
 	-- with a label in a ScreenGui that's never shown, whose TextBounds are worked out when
 	-- they're read. The pills' own sizes won't do, as Roblox only keeps what's showing laid
-	-- out. Each label's width is kept until its text (or the player's text size) changes.
+	-- out. Each label is measured afresh each time the pills are fitted, a few times a
+	-- second, so nothing measured before its font had loaded (it comes out the size of a
+	-- stand-in font's) or before the player changed their text size is kept.
 	local sizer = Instance.new("ScreenGui")
 	sizer.Name = "TopBarSizer"
 	sizer.Enabled = false
 	sizer.ResetOnSpawn = false
 	sizer.Parent = parent
 	local measure = Ui.label(sizer, "Measure", { frameSize = UDim2.fromOffset(10000, PILL) })
-	local measured: { [TextLabel]: { text: string, width: number } } = {}
+	local measured: { [TextLabel]: number } = {} -- this fitting's
 	local function textWidth(label: TextLabel): number
-		local known = measured[label]
-		if known and known.text == label.Text then
-			return known.width
+		local width = measured[label]
+		if width == nil then
+			measure.FontFace = label.FontFace
+			measure.TextSize = label.TextSize
+			measure.Text = label.Text
+			width = math.ceil(measure.TextBounds.X)
+			measured[label] = width
 		end
-		measure.FontFace = label.FontFace
-		measure.TextSize = label.TextSize
-		measure.Text = label.Text
-		local width = math.ceil(measure.TextBounds.X)
-		measured[label] = { text = label.Text, width = width }
 		return width
 	end
-	GuiService:GetPropertyChangedSignal("PreferredTextSize"):Connect(function()
-		table.clear(measured)
-	end)
 
 	-- How much room the pills take, at Roblox's size for the row, with `show` saying which of
 	-- the extras are showing: each pill, a gap between each, and two more between the ones on
@@ -296,14 +295,14 @@ function TopBar.new(parent: Instance, fallback: GuiObject): TopBar
 		if show[queuePill] then
 			textPill(queue)
 		end
-		local lit, width = 0, 2 * PILL_PADDING
+		local showing, width = 0, 2 * PILL_PADDING
 		for _, lantern in lanterns do
 			if lantern.Visible then
 				width += lantern.Size.X.Offset
-				lit += 1
+				showing += 1
 			end
 		end
-		add(width + math.max(lit - 1, 0) * PILL_GAP)
+		add(width + math.max(showing - 1, 0) * PILL_GAP)
 		return total + (count + 1) * GAP
 	end
 	-- Least needed first; the night, the ledger's icon and count, and the lanterns always stay.
@@ -369,6 +368,7 @@ function TopBar.new(parent: Instance, fallback: GuiObject): TopBar
 			row.Visible = shown
 		end,
 		fit = function()
+			table.clear(measured)
 			place()
 			-- How big the row is on screen, and so its scale: Roblox's (up on a TV), or the
 			-- HUD's in the fallback. Up in Roblox's row it's as big as the ScreenGui, which
@@ -416,6 +416,12 @@ function TopBar.new(parent: Instance, fallback: GuiObject): TopBar
 	place()
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(topBar.fit)
 	row:GetPropertyChangedSignal("AbsoluteSize"):Connect(topBar.fit)
+	-- And at once when the player changes their text size, or the pills' fonts have loaded.
+	GuiService:GetPropertyChangedSignal("PreferredTextSize"):Connect(topBar.fit)
+	task.spawn(function()
+		ContentProvider:PreloadAsync({ night, clock, date, queue, ledgerWord, ledgerCount })
+		topBar.fit()
+	end)
 	return topBar
 end
 

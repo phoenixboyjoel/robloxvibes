@@ -34,7 +34,7 @@ CLASSES = [
     "Camera", "DataStoreService", "DataStore", "BadgeService", "StarterGui", "GuiService",
     "UserInputService", "InputObject", "TextChatService", "ChatWindowConfiguration",
     "BubbleChatConfiguration", "SoundService", "StarterPlayer", "ContextActionService",
-    "ProximityPromptService", "CollectionService",
+    "ProximityPromptService", "CollectionService", "ContentProvider",
 ]
 
 SCRIPT_OK = {"None"}

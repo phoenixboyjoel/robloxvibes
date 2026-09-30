@@ -54,13 +54,13 @@ something.
 | `ReplicatedStorage/Controllers/CrowdController.luau` | Animates passengers on each client: the classic Roblox walk, idle sway and look-about, via `Motor6D.Transform` in `PreSimulation`, with Roblox's plastic footsteps while they walk |
 | `ReplicatedStorage/Controllers/GlideController.luau` | Moves everything tagged `Glide` on this client every frame, before the camera (render priority First). A glide is played from when it arrives, as far behind the server as the network is, so it's seen whole and lines up with the server's own moves; one more than half a second late (a player who has just joined) is joined where it has got to. A glide that carries straight on from the last keeps that one's lag, so a walk's legs join with no skip or pause. For a second after a glide ends it holds the thing at the end, so a late move from the server can't leave it elsewhere. It also grows everything tagged `Spread` |
 | `ReplicatedStorage/Controllers/EffectsController.luau` | Blur behind cards, flood tint, lantern-out pulse, client-side lighthouse spin |
-| `ReplicatedStorage/Controllers/HudController.luau` | The whole HUD and its wiring to the remotes: the lobby banner on the pier, the shift HUD (the status up in Roblox's top bar row, `Ui/TopBar`; the desk and the rules panel under it), passengers' lines as speech bubbles (`Ui/Speech`) kept to the room the HUD leaves them, and chat-log lines, `ContextActionService` shortcuts that give way to Roblox's controls, the Modal button that frees the mouse in first person, and Roblox's player list put away on shift (on a computer it's open over the top right, where the rules panel is) and back on the pier |
+| `ReplicatedStorage/Controllers/HudController.luau` | The whole HUD and its wiring to the remotes: the lobby banner on the pier, the shift HUD (the status up in Roblox's top bar row, `Ui/TopBar`; the desk and the rules panel under it; on the first night, a hint along the bottom, no wider than the room left of the rules panel), passengers' lines as speech bubbles (`Ui/Speech`) kept to the room the HUD leaves them, and chat-log lines, `ContextActionService` shortcuts that give way to Roblox's controls, the Modal button that frees the mouse in first person, and Roblox's player list put away on shift (on a computer it's open over the top right, where the rules panel is) and back on the pier |
 | `ReplicatedStorage/Ui/Theme.luau` | Colours and fonts in Roblox's chunky house style (Fredoka One titles, Builder Sans ExtraBold controls, Special Elite and Oswald only on paper), design canvas and scale limits |
 | `ReplicatedStorage/Ui/Ui.luau` | Typed UI builders: frames, labels, layout, text strokes, hard shadows (`UIShadow`), gloss, drawn icons (check, cross, play, bang, page) and chunky buttons that squash and spring back |
 | `ReplicatedStorage/Ui/Widgets.luau` | Shared pieces: captions, paragraphs, tags, rule rows with number badges, lantern icons, text outlines |
 | `ReplicatedStorage/Ui/Sfx.luau` | Sounds only this player hears (clicks, the stamp, a lantern's gust), made in SoundService on the client |
-| `ReplicatedStorage/Ui/Speech.luau` | What the passenger at the window says, drawn exactly like Roblox's chat bubble (Gotham SSm Medium 16, white, rounded, Roblox's tail) and sized from its measured text as Roblox sizes its own, on its own ScreenGui (`LastFerrySpeech`, DisplayOrder 7) over the HUD. Every frame, once the camera has moved, it goes over their head and then moves to stay in the room the HUD leaves it: along or up as far as it takes, down only until its tail touches the top of their head (`Speech.place`). Where the camera draws their head comes from `WorldToScreenPoint`, which is in the same coordinates as `AbsolutePosition` (so it's right on a notched phone too, where viewport coordinates aren't); the bubble's layer covers the whole screen, so it takes off where the layer starts. The room can have obstacles lower down (the page tab): it keeps to one side of one only if it would otherwise cover it. It stays up for the whole window and works where Roblox's chat doesn't (consoles, with bigger text) |
-| `ReplicatedStorage/Ui/TopBar.luau` | The shift's status in Roblox's own top bar row (`ScreenInsets.TopbarSafeInsets`, beside Roblox's buttons), as pills like Roblox's: night, clock and date; ledger, queue and lanterns; a lost lantern or a found page as a banner across the row. It scales with the row (up on a TV) and fits whatever room Roblox's buttons leave, dropping the date, then the queue, the word LEDGER and the clock. With no row tall enough, or none wide enough for the pills that always show (the night, the ledger's icon and page count, the lanterns), it sits at the top of the HUD instead. The pills are measured from their text, the way Roblox measures its chat bubbles (a label in a ScreenGui that's never shown), not from their own sizes: Roblox doesn't keep what's hidden laid out |
+| `ReplicatedStorage/Ui/Speech.luau` | What the passenger at the window says, drawn exactly like Roblox's chat bubble (Gotham SSm Medium 16, white, rounded, Roblox's tail) and sized from its measured text as Roblox sizes its own, on its own ScreenGui (`LastFerrySpeech`, DisplayOrder 7) over the HUD. Every frame, once the camera has moved, it goes over their head and then moves to stay in the room the HUD leaves it: along or up as far as it takes, down only until its tail touches the top of their head (`Speech.place`). Where the camera draws their head comes from `WorldToScreenPoint`, which is in the same coordinates as `AbsolutePosition` (so it's right on a notched phone too, where viewport coordinates aren't); the bubble's layer covers the whole screen, so it takes off where the layer starts. The room can have obstacles lower down (the page tab): if the bubble would cover one, it goes beside it, on the tip's side if even the narrowest bubble fits there and the other side if not, or over it if neither side has room (`Speech.placeInRoom`). Its line is measured again once the bubble's font has loaded (`ContentProvider:PreloadAsync`: text measured before then comes out a stand-in font's size, and Roblox doesn't draw wrapped lines that don't fit) and when the player's text size changes. It stays up for the whole window and works where Roblox's chat doesn't (consoles, with bigger type on a TV, told by `GuiService.ViewportDisplaySize`) |
+| `ReplicatedStorage/Ui/TopBar.luau` | The shift's status in Roblox's own top bar row (`ScreenInsets.TopbarSafeInsets`, beside Roblox's buttons), as pills like Roblox's: night, clock and date; ledger, queue and lanterns; a lost lantern or a found page as a banner across the row. It scales with the row (up on a TV) and fits whatever room Roblox's buttons leave, dropping the date, then the queue, the word LEDGER and the clock. With no row tall enough, or none wide enough for the pills that always show (the night, the ledger's icon and page count, the lanterns), it sits at the top of the HUD instead. The pills are measured from their text, the way Roblox measures its chat bubbles (a label in a ScreenGui that's never shown), not from their own sizes: Roblox doesn't keep what's hidden laid out. They're measured afresh each time they're fitted (a few times a second), and fitted again as soon as their fonts have loaded or the player's text size changes |
 | `ReplicatedStorage/Ui/Ticket.luau` | The ticket card, its drawn stamps, the torn-page tab, the BOARDED / TURNED AWAY stamp |
 | `ReplicatedStorage/Ui/Overlay.luau` | Intro, summary, tide-came-in and ending cards, with the co-op Continue |
 | `tests/` | Lune test suite (`lune run tests/run.luau`) and the headless simulator in `tests/sim/` |
@@ -145,8 +145,8 @@ after `BubbleDuration`, sit under every ScreenGui (they're BillboardGuis, so the
 HUD would cover them), and don't show at all on consoles. The bubble is on its
 own layer over the HUD, and the HUD tells it the room it may use: right of the
 desk, left of the rules panel (or the ledger, or the RULES button), below
-anything at the top, above the hint, and to one side of the ticket's page tab if
-it would otherwise cover it. The status is up in
+anything at the top, above the hint, and beside the ticket's page tab (or over
+it, if there's no room beside it) if it would otherwise cover it. The status is up in
 Roblox's top bar row so that on a phone there's room above a passenger's head
 for the longest line in the game.
 
@@ -211,13 +211,16 @@ Studs; dock surface at y = 0; the booth window faces −Z.
 - `tests/Sim.spec.luau`: the simulator's own engine behaviour: rigs and joints,
   characters and spawns, accessories, ProximityPrompts, ContextActionService,
   CollectionService tags, easing curves (Bounce too), pivots, attribute types,
-  GUI layout (where things are on screen), Roblox's top bar row, and where the
-  camera draws a point in each of Roblox's coordinate systems.
+  GUI layout (where things are on screen), Roblox's top bar row, where the
+  camera draws a point in each of Roblox's coordinate systems, `IgnoreGuiInset`,
+  `ViewportDisplaySize`, and text: each font's real widths, wrapping,
+  `TextFits`, and fonts that load late.
 - `tests/Glide.spec.luau`: glides are eased, sent once and moved by every
   client every frame; late joiners, changes of course, stops and late server
   moves; a walk's legs joining up; the server's end move with nobody watching;
   spreading parts; models and hinged parts.
-- `tests/Speech.spec.luau`: where a speech bubble goes in the room it has.
+- `tests/Speech.spec.luau`: where a speech bubble goes in the room it has, and
+  beside or over anything in the way lower down.
 - `tests/Passenger.spec.luau`: passengers look the same whatever their kind;
   the tells come from their facts.
 - `tests/Game.spec.luau`: the real server and client scripts in
@@ -227,9 +230,12 @@ Studs; dock surface at y = 0; the booth window faces −Z.
   monitor, a notched phone and an iPhone SE, that the longest line in the game
   sits clear of every piece of the HUD and never over the passenger's face;
   that every stand's view is aimed at the passenger, even straight after a
-  respawn; and that the status fits however much of the top bar row Roblox's
+  respawn; that the bubble stays off the HUD with the view turned 40 degrees
+  either way; that the status fits however much of the top bar row Roblox's
   buttons leave, with a page in the ledger too, moving to the HUD only when
-  even the pills that always show wouldn't fit.
+  even the pills that always show wouldn't fit; that every piece of text on
+  screen fits its box (every card, on an iPhone SE, a monitor and a TV); and
+  that text measured before its font has loaded is measured again once it has.
 
 When the game starts using a Roblox class or method the simulator doesn't know:
 
@@ -242,7 +248,15 @@ values. It has one copy of the world, shared by the server and every client,
 so a client's glide shows on the server's copy too; `sim:countWrites` tells
 who moved what. It lays GUI out as Roblox does (sizes, anchors, padding,
 UIScale, list layouts, automatic sizes) for `AbsolutePosition` and
-`AbsoluteSize`, but text has no font engine: `TextBounds` is an estimate.
+`AbsoluteSize`. Text is measured with each character's width in the font it's
+drawn in, from Roblox's own font files (`tests/sim/fonts.json`, made by
+`gen_fonts.py`; no kerning, so within about 1%), and wrapped as Roblox wraps it;
+fonts it doesn't know get an estimate. `Sim.new({ fontsLoadAt = seconds })`
+makes the fonts load late, as they can in Roblox: until then text measures as a
+stand-in font's, and `ContentProvider:PreloadAsync` waits. Unlike Roblox, it
+keeps hidden objects laid out and doesn't fire `AbsoluteSize` changes for
+GuiObjects (only for ScreenGuis), so code that relies on either (like `TopBar`
+fitting again when its row is resized) isn't tested by it.
 Screens are `Sim.new({ screen, safeArea, topbarInset })`, where the top bar row's
 free part defaults to all but Roblox's buttons (`sim:setTopbarInset` changes it,
 as when Roblox's chat pill opens); consoles are `Sim.new({ tenFoot = true })`.

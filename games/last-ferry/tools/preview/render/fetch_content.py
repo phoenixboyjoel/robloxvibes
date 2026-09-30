@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
-"""Downloads the built-in Roblox client textures the previews use (the classic face,
-particle sprites, the chat bubble's tail) from the Roblox Client Tracker into rbxcontent/, converting .dds
-files to .png. These are Roblox's files: they stay local and are not committed.
+"""Downloads the built-in Roblox client content the previews use into rbxcontent/: the
+textures (the classic face, particle sprites, the chat bubble's tail) from the Roblox
+Client Tracker, converting .dds files to .png, and the fonts the game's text is drawn in
+(Builder Sans, and Montserrat, which Roblox draws Gotham as) from a mirror of Studio's
+content folder. These are Roblox's files: they stay local and are not committed. (Builder
+Sans is under Roblox's Builder Font License, for making and promoting experiences on
+Roblox, which this is.)
 
     python3 fetch_content.py
 """
@@ -22,7 +26,32 @@ FILES = [
     "textures/ui/InGameChat/Caret.png",
 ]
 
+FONTS_BASE = "https://raw.githubusercontent.com/suscersal/roblox-studio-web/main/content/"
+FONTS = [
+    f"fonts/{name}"
+    for name in [
+        "BuilderSans-Regular.otf",
+        "BuilderSans-Medium.otf",
+        "BuilderSans-Bold.otf",
+        "BuilderSans-ExtraBold.otf",
+        "Montserrat-Regular.ttf",
+        "Montserrat-Medium.ttf",
+        "Montserrat-Bold.ttf",
+        "Montserrat-Black.ttf",
+        "FredokaOne-Regular.ttf",
+        "Oswald-Regular.ttf",
+        "Oswald-Bold.ttf",
+        "SpecialElite-Regular.ttf",
+    ]
+]
+
 here = os.path.dirname(os.path.abspath(__file__))
+for path in FONTS:
+    out = os.path.join(here, "rbxcontent", path)
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    with open(out, "wb") as f:
+        f.write(urllib.request.urlopen(FONTS_BASE + path, timeout=60).read())
+    print("fetched", out)
 for path in FILES:
     data = urllib.request.urlopen(BASE + path, timeout=60).read()
     out = os.path.join(here, "rbxcontent", path)

@@ -93,6 +93,9 @@ function Sim.new(
 	local opts = options or {}
 	local root = opts.root or "."
 	local reflection = serde.decode("json", fs.readFile(`{root}/tests/sim/reflection.json`)).classes
+	-- Each character's width in the fonts the game uses, as a share of the text size, from
+	-- Roblox's own font files (made by gen_fonts.py).
+	local fontWidths = serde.decode("json", fs.readFile(`{root}/tests/sim/fonts.json`))
 
 	-- Lune's fs calls yield to Lune's own scheduler, which would stall a simulated thread,
 	-- so every script and module is read up front, here on Lune's main thread.
@@ -122,8 +125,14 @@ function Sim.new(
 		safeArea = opts.safeArea or opts.screen or roblox.Vector2.new(1280, 662),
 		topbarInset = opts.topbarInset,
 		preferredInput = opts.preferredInput or Enum.PreferredInput.KeyboardAndMouse,
-		-- A console on a TV: GuiService:IsTenFootInterface(), and Roblox's chat never shows.
+		-- A console on a TV: GuiService:IsTenFootInterface(), a Large ViewportDisplaySize, and
+		-- Roblox's chat never shows.
 		tenFoot = opts.tenFoot == true,
+		-- When the fonts finish loading, in seconds of game time (at once by default). Roblox
+		-- loads each font the first time it's needed; until then, text measures as a
+		-- stand-in font's does.
+		fontsLoadAt = opts.fontsLoadAt or 0,
+		fontsLoaded = (opts.fontsLoadAt or 0) <= 0,
 		stores = {},
 		badges = {},
 		coreCalls = {},
@@ -883,6 +892,16 @@ function Sim.new(
 			end
 			changed(instance, st, key, value)
 		end
+		if key == "IgnoreGuiInset" and st.className == "ScreenGui" then
+			-- As in Roblox: true moves a ScreenGui from the safe area below the top bar to the
+			-- device's safe area, top bar and all; false moves it back.
+			local insets = instance.ScreenInsets
+			if value and insets == Enum.ScreenInsets.CoreUISafeInsets then
+				instance.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets
+			elseif not value and insets == Enum.ScreenInsets.DeviceSafeInsets then
+				instance.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
+			end
+		end
 		if st.className == "WeldConstraint" and (key == "Part0" or key == "Part1") then
 			local part0, part1 = st.props.Part0, st.props.Part1
 			if part0 and part1 then
@@ -1311,6 +1330,13 @@ function Sim.new(
 		TopbarInset = function()
 			return topbarInset()
 		end,
+		-- A TV, a phone or tablet, or a computer's screen.
+		ViewportDisplaySize = function()
+			return if sim.tenFoot
+				then Enum.DisplaySize.Large
+				elseif sim.preferredInput == Enum.PreferredInput.Touch then Enum.DisplaySize.Small
+				else Enum.DisplaySize.Medium
+		end,
 	}
 	-- Where a ScreenGui's area is, in GUI coordinates, and how big it is.
 	local function screenArea(instance, st)
@@ -1336,31 +1362,107 @@ function Sim.new(
 			return position
 		end,
 	}
-	-- Text's size, estimated (there's no font engine): about half the text size a
-	-- character, wrapped by words at `maxWidth` if given. Enough for layout that measures
-	-- text, like a chat bubble fitting its line.
+	-- The character widths for a Font: its family's (Gotham is drawn as Montserrat, as
+	-- Roblox draws it) at the nearest weight that ships with Roblox, or nil for a font
+	-- that isn't in fonts.json.
+	local faces = {}
+	local function faceWidths(font): { [string]: number }?
+		if font == nil then
+			return nil
+		end
+		local key = `{font.Family}|{font.Weight.Value}`
+		local found = faces[key]
+		if found == nil then
+			local family = string.match(font.Family, "families/(.-)%.json$")
+			if family == "GothamSSm" or family == "Gotham" then
+				family = "Montserrat"
+			end
+			local weights = family and fontWidths[family]
+			local gap = math.huge
+			found = false
+			for weight, widths in weights or {} do
+				local off = math.abs(tonumber(weight) - font.Weight.Value)
+				if off < gap then
+					found, gap = widths, off
+				end
+			end
+			faces[key] = found
+		end
+		return found or nil
+	end
+
+	local ENTITIES = { lt = "<", gt = ">", amp = "&", quot = '"', apos = "'" }
+
+	-- How much room text takes, as Roblox lays it out: each character as wide as it is in
+	-- its font (no kerning), a line for each line break, and, wrapped at `maxWidth` if
+	-- given, breaking lines between words and breaking a word wider than a line across
+	-- lines. While the fonts are loading, and for a font it doesn't know, every character
+	-- is about half the text size wide (a fifth less while loading, as a stand-in font's).
 	local function measureText(st, maxWidth: number?)
 		local text = st.props.Text or ""
+		if st.props.RichText then
+			text = string.gsub(string.gsub(text, "<[^>]*>", ""), "&(%a+);", ENTITIES)
+		end
 		if text == "" then
 			return roblox.Vector2.zero
 		end
 		local size = st.props.TextSize or 14
-		local charWidth = size * 0.52
+		local widths = if sim.fontsLoaded then faceWidths(st.props.FontFace) else nil
+		local rough = if sim.fontsLoaded then 0.52 else 0.42
+		local function width(character: string): number
+			if widths then
+				return (widths[character] or widths["?"]) * size
+			end
+			return (if character == " " then rough * 0.55 else rough) * size
+		end
 		local limit = if maxWidth and maxWidth > 0 then maxWidth else math.huge
-		local lines, widest, current = 1, 0, 0
-		for word in string.gmatch(text, "%S+") do
-			local width = (utf8.len(word) or #word) * charWidth
-			local joined = if current > 0 then current + charWidth * 0.55 + width else width
-			if current > 0 and joined > limit then
+		local space = width(" ")
+		local lines, widest = 0, 0
+		for line in string.gmatch(text .. "\n", "(.-)\n") do
+			lines += 1
+			local current = 0
+			local function breakLine()
 				widest = math.max(widest, current)
 				lines += 1
-				current = width
-			else
-				current = joined
+				current = 0
+			end
+			for word in string.gmatch(line, "%S+") do
+				local wordWidth = 0
+				for _, code in utf8.codes(word) do
+					wordWidth += width(utf8.char(code))
+				end
+				if current > 0 and current + space + wordWidth <= limit then
+					current += space + wordWidth
+				else
+					if current > 0 then
+						breakLine()
+					end
+					if wordWidth <= limit then
+						current = wordWidth
+					else
+						for _, code in utf8.codes(word) do
+							local characterWidth = width(utf8.char(code))
+							if current > 0 and current + characterWidth > limit then
+								breakLine()
+							end
+							current += characterWidth
+						end
+					end
+				end
+			end
+			widest = math.max(widest, current)
+		end
+		return roblox.Vector2.new(math.ceil(widest), lines * size)
+	end
+
+	-- The fonts have loaded: all text is laid out again with them.
+	local function loadFonts()
+		sim.fontsLoaded = true
+		for instance, st in state do
+			if isA(st.className, "TextLabel") or isA(st.className, "TextButton") or isA(st.className, "TextBox") then
+				touchGui(instance)
 			end
 		end
-		widest = math.max(widest, current)
-		return roblox.Vector2.new(math.ceil(math.min(widest, limit)), lines * size)
 	end
 
 	-- GUI layout, for GuiObject.AbsolutePosition and AbsoluteSize, roughly as Roblox lays
@@ -1620,18 +1722,31 @@ function Sim.new(
 		end,
 	}
 
-	-- As laid out: wrapped at the object's width, less its padding.
+	-- An object's text as laid out, wrapped at its width less its padding if it wraps, and
+	-- the room it has for it.
+	local function textLayout(instance, st)
+		local box = layoutOf(instance)
+		local left, top, right, bottom = paddingOf(st)
+		local width = box.size.X / box.scale - left - right
+		local height = box.size.Y / box.scale - top - bottom
+		return measureText(st, if st.props.TextWrapped then width else nil), width, height
+	end
+	-- Wrapped text never measures taller than its object: as in Roblox, lines that don't fit
+	-- aren't drawn (and TextFits says so).
 	local function textBounds(instance, st)
-		local wrap = nil
-		if st.props.TextWrapped then
-			local box = layoutOf(instance)
-			local left, _, right = paddingOf(st)
-			wrap = box.size.X / box.scale - left - right
+		local bounds, _, height = textLayout(instance, st)
+		if st.props.TextWrapped and bounds.Y > height then
+			local size = st.props.TextSize or 14
+			return roblox.Vector2.new(bounds.X, math.max(0, math.floor(height / size)) * size)
 		end
-		return measureText(st, wrap)
+		return bounds
+	end
+	local function textFits(instance, st)
+		local bounds, width, height = textLayout(instance, st)
+		return bounds.X <= width + 0.5 and bounds.Y <= height + 0.5
 	end
 	for _, className in { "TextLabel", "TextButton", "TextBox" } do
-		computed[className] = { TextBounds = textBounds }
+		computed[className] = { TextBounds = textBounds, TextFits = textFits }
 	end
 
 	computed.Camera = {
@@ -2628,6 +2743,20 @@ function Sim.new(
 			return new
 		end,
 	}
+	methods.ContentProvider = {
+		-- Every asset is there from the start, except fonts, which load at sim.fontsLoadAt.
+		PreloadAsync = function(_self, contents, callback)
+			assert(type(contents) == "table", "PreloadAsync takes a list of instances or content ids")
+			while not sim.fontsLoaded do
+				taskApi.wait(0.1)
+			end
+			if callback then
+				for _, content in contents do
+					callback(if type(content) == "string" then content else "", Enum.AssetFetchStatus.Success)
+				end
+			end
+		end,
+	}
 	methods.BadgeService = {
 		AwardBadgeAsync = function(_self, user, badgeId)
 			assert(typeOf(user) == "User" or type(user) == "number", "AwardBadgeAsync user")
@@ -2940,6 +3069,9 @@ function Sim.new(
 	function sim:step(dt: number)
 		sim.now += dt
 		sim.frames += 1
+		if not sim.fontsLoaded and sim.now >= sim.fontsLoadAt then
+			loadFonts()
+		end
 		if sim.cameraFollows then
 			emulateCamera(sim.cameraFollows)
 		end

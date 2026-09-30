@@ -128,7 +128,7 @@ GitHub Actions runs all of these on every pull request
 same pinned versions. It keeps the built place file as a download on each run.
 
 At the time of this build every check comes back clean:
-- 92 tests pass.
+- 98 tests pass.
 - There are 0 selene findings.
 - There are 0 strict type errors.
 
@@ -197,6 +197,29 @@ The third review, of the top bar and the bubble, found, and this build fixes:
   always show don't. The pills are measured from their text, as Roblox
   measures its bubbles, rather than switched on and off to measure them.
 
+The fourth review, of those fixes, found, and this build fixes:
+- **The bubble on the ticket:** with a page to take, turning about 30° right
+  put the passenger's head left of the tab, and the bubble was squeezed into a
+  gap of less than no width, over the ticket and its stamp. It now goes beside
+  the tab on whichever side has room, or over it, and the tests turn the view
+  40° each way on three screens.
+- **Text measured before its font loads:** Roblox can take seconds to load a
+  font, and text measured before then comes out a stand-in's size. Roblox
+  doesn't draw wrapped lines that don't fit, so part of a passenger's line
+  could have gone missing. The bubble and the status measure again once their
+  fonts are in, and whenever the player changes their text size.
+- **Real text sizes in the tests:** the simulator now measures text with the
+  widths of Roblox's own fonts, where it used to estimate (a long name came out
+  half its real width). The tests now check that every piece of text on screen
+  fits its box, on every card, on an iPhone SE, a monitor and a TV. That found
+  the first night's keyboard hint running under the rules panel on a 16:9
+  monitor (you can see it in the old previews); it's now two short lines,
+  clear of it.
+- **Plus:** the bubble's tail kept clear of anything below it, bigger type
+  decided by the display's size (as Roblox's docs advise) rather than by being
+  a console, each clerk's stand checked in co-op and cleared at clock-out, and
+  the previews drawn in Roblox's own fonts.
+
 Smooth movement came out of the same research: nothing is tweened on the
 server any more. The server sends each move once and every client plays it
 smoothly (`Shared/Glide`), so passengers, the ferry and the door don't stutter,
@@ -228,12 +251,13 @@ The tests have three layers:
      and restored), gamepad A boarding instead of jumping, what players hear,
      button sizes and the jump-button gap on phones and tablets, passengers'
      lines on a console, the co-op view, respawns, and the error path.
-   - The simulator lays GUI out as Roblox does, so the tests check where things
-     are on screen: the longest line clear of every piece of the HUD and above
-     the passenger's head from every stand, on three screens; the status
-     fitting however much of the top bar Roblox's buttons leave, with a page in
-     the ledger too; every stand's view aimed at the passenger, respawns
-     included.
+   - The simulator lays GUI out as Roblox does, and measures text with Roblox's
+     own font widths, so the tests check where things are on screen: the
+     longest line clear of every piece of the HUD and above the passenger's
+     head from every stand, on three screens, and with the view turned; the
+     status fitting however much of the top bar Roblox's buttons leave, with a
+     page in the ledger too; every piece of text fitting its box, on every
+     card; every stand's view aimed at the passenger, respawns included.
    - Passengers walk a steady stride every frame on each client while the
      server sends each leg once (`sim:countWrites` counts who moved what), and
      glides survive late joiners, changes of course and late server moves.

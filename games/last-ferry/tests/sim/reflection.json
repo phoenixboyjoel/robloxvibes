@@ -1604,6 +1604,76 @@
    "service": false,
    "superclass": "PostEffect"
   },
+  "ContentProvider": {
+   "creatable": false,
+   "events": {
+    "AssetFetchFailed": {
+     "deprecated": false
+    }
+   },
+   "functions": {
+    "GetAssetFetchStatus": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetAssetFetchStatusChangedSignal": {
+     "deprecated": false,
+     "yields": false
+    },
+    "ListEncryptedAssets": {
+     "deprecated": false,
+     "yields": false
+    },
+    "Preload": {
+     "deprecated": true,
+     "yields": false
+    },
+    "PreloadAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "RegisterDefaultEncryptionKey": {
+     "deprecated": false,
+     "yields": false
+    },
+    "RegisterDefaultSessionKey": {
+     "deprecated": false,
+     "yields": false
+    },
+    "RegisterEncryptedAsset": {
+     "deprecated": false,
+     "yields": false
+    },
+    "RegisterSessionEncryptedAsset": {
+     "deprecated": false,
+     "yields": false
+    },
+    "UnregisterDefaultEncryptionKey": {
+     "deprecated": false,
+     "yields": false
+    },
+    "UnregisterEncryptedAsset": {
+     "deprecated": false,
+     "yields": false
+    }
+   },
+   "properties": {
+    "BaseUrl": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "string"
+    },
+    "RequestQueueSize": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "int"
+    }
+   },
+   "service": true,
+   "superclass": "Instance"
+  },
   "ContextActionService": {
    "creatable": false,
    "events": {

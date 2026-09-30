@@ -28,6 +28,7 @@ type Bot = {
 	decided: { [string]: boolean },
 	cardSince: number,
 	lastCard: string,
+	checkedCard: string?, -- the last card whose text was checked for fit
 	ending: string?,
 	endingText: string,
 	lanternsLost: number,
@@ -205,8 +206,50 @@ local function describe(r): string
 	return string.format("(%d, %d)-(%d, %d)", r.left, r.top, r.right, r.bottom)
 end
 
--- The pieces of the shift HUD on a player's screen now: everything showing at its top level,
--- the ticket's page tab, and the status pills (or the alert) up in the top bar row.
+-- Every piece of text showing on this player's screen fits in its box, as the fonts measure
+-- it: Roblox doesn't draw the lines of wrapped text that don't fit, and text that doesn't wrap
+-- spills out. The only exceptions are meant to be cut short, with "…" (TextTruncate).
+local function checkTextFits(sim, player, label: string)
+	for _, gui in player.PlayerGui:GetChildren() do
+		if gui:IsA("ScreenGui") and gui.Enabled then
+			for _, object in gui:GetDescendants() do
+				if
+					(object:IsA("TextLabel") or object:IsA("TextButton"))
+					and object.Text ~= ""
+					and object.TextTruncate == roblox.Enum.TextTruncate.None
+					and sim:shown(object)
+				then
+					local size = object.AbsoluteSize
+					T.expect(
+						object.TextFits,
+						`{label}: {object:GetFullName()} ("{object.Text}") doesn't fit in {size.X} x {size.Y}`
+					)
+				end
+			end
+		end
+	end
+end
+
+-- On the first night the hint along the bottom is up, clear of the desk and of the rules
+-- panel (or the ledger in its place).
+local function checkHint(sim, player, label: string)
+	local play = player.PlayerGui.LastFerryHud.Root.Play
+	T.expect(sim:shown(play.Hint), `{label}: the first night's hint is up`)
+	local hint = box(play.Hint)
+	for _, piece in { play.Desk, play.Side, play.Ledger } do
+		if sim:shown(piece) then
+			local r = box(piece)
+			T.expect(
+				not overlap(hint, r),
+				`{label}: the hint {describe(hint)} runs into the {piece.Name} {describe(r)}`
+			)
+		end
+	end
+end
+
+-- The pieces of the shift HUD on a player's screen now, by their parent's name and their
+-- own ("Play.Ledger", "Right.Ledger"): everything showing at its top level, the ticket's
+-- page tab, and the status pills (or the alert) up in the top bar row.
 local function hudPieces(sim, player)
 	local pieces = {}
 	local play = player.PlayerGui.LastFerryHud.Root.Play
@@ -223,7 +266,7 @@ local function hudPieces(sim, player)
 		if piece:IsA("GuiObject") and sim:shown(piece) then
 			local r = box(piece)
 			if r.right > r.left and r.bottom > r.top then
-				pieces[piece.Name] = r
+				pieces[`{piece.Parent.Name}.{piece.Name}`] = r
 			end
 		end
 	end
@@ -326,6 +369,11 @@ local function tick(bot: Bot)
 			if title == "The Tide Came In" then
 				bot.sawFailed = true
 			end
+		end
+		if bot.checkedCard ~= key and sim.now - bot.cardSince >= 0.5 then
+			-- Once it's settled, every word on it fits (on whatever screen this is).
+			bot.checkedCard = key
+			checkTextFits(sim, bot.player, `the card "{key}"`)
 		end
 		local night = tonumber(string.match(title, "^Night (%d+)$"))
 		if night then
@@ -508,6 +556,7 @@ T.test("a clerk playing from the HUD finishes five nights clean", function()
 	T.expect(hatHidden, "her own hat goes under the clerk's cap for the shift, logo, sparkle and all")
 	sim:run(3) -- the save finishes just after the ending card appears
 	clean(sim, "clean run")
+	checkTextFits(sim, alice, "the ending card")
 	T.expect(finished, `the run never ended (stuck at {math.floor(sim.now)}s on "{bot.lastCard}")`)
 	T.equal(bot.ending, "The Petrel Sails")
 	T.equal(bot.lanternsLost, 0, "no lantern lost")
@@ -539,6 +588,7 @@ T.test("a clerk playing from the HUD finishes five nights clean", function()
 	T.expect(back, "back to the lobby after the ending")
 	T.expect(onPier(alice), `Alice is back on the pier (feet at {feet(alice)})`)
 	T.equal(alice:GetAttribute("OnShift"), false, "off shift")
+	T.equal(alice:GetAttribute("Stand"), nil, "with no stand")
 	T.expect(alice.Character:FindFirstChild("ClerkCap") == nil, "the cap comes off")
 	T.equal(alice.Character.Humanoid.WalkSpeed, 16, "walking at Roblox's usual pace again")
 	T.equal(hat.Transparency, 0.1, "her own hat comes back as it was")
@@ -957,7 +1007,14 @@ T.test("passengers speak in Roblox-style bubbles for the whole window, and in th
 end)
 
 T.test("on a console, where Roblox's chat never shows, passengers' lines still do, bigger", function()
-	local sim = Sim.new({ root = ROOT, tenFoot = true, preferredInput = roblox.Enum.PreferredInput.Gamepad })
+	-- A 1080p TV, under Roblox's top bar at its TV size (87 px).
+	local sim = Sim.new({
+		root = ROOT,
+		tenFoot = true,
+		preferredInput = roblox.Enum.PreferredInput.Gamepad,
+		screen = roblox.Vector2.new(1920, 1080),
+		safeArea = roblox.Vector2.new(1920, 993),
+	})
 	sim:startServer()
 	sim:run(1)
 	local alice = sim:addPlayer("Alice", 101)
@@ -976,6 +1033,8 @@ T.test("on a console, where Roblox's chat never shows, passengers' lines still d
 	clean(sim, "console")
 	T.expect(seen, "the passenger's line shows")
 	T.equal(speechBubble(alice).Bubble.Line.TextSize, 24, "in bigger type, for a TV across the room")
+	sim:run(0.5)
+	checkTextFits(sim, alice, "on a TV")
 end)
 
 -- On one screen, from every stand: the passenger's line is up, clear of every piece of the
@@ -1026,8 +1085,80 @@ local function checkSpeechPlacement(sim, player, model, label: string, snug: boo
 	end
 end
 
--- Makes every passenger say the longest line any of them can (with "{name}" as the longest
--- display name Roblox allows), and returns it.
+-- From the front stand, turning the view from 40 degrees left to 40 right and tilting it up
+-- and down a little: wherever the passenger is on screen, their line never covers a piece of
+-- the HUD. The one exception is the top bar row, which it goes over only when their head is
+-- so high on screen that it would otherwise cover their face: it's then sitting on their
+-- head. Then back to looking at them.
+local function checkSpeechTurning(sim, player, model, label: string)
+	standAt(sim, player, STANDS.front)
+	local camera = sim.workspace.CurrentCamera
+	local ahead = camera.CFrame
+	for _, pitch in { -8, 0, 8 } do
+		for yaw = -40, 40, 4 do
+			camera.CFrame = roblox.CFrame.new(ahead.Position)
+				* roblox.CFrame.Angles(0, math.rad(yaw), 0)
+				* ahead.Rotation
+				* roblox.CFrame.Angles(math.rad(pitch), 0, 0)
+			sim:step(1 / 30)
+			local stack = speechBubble(player)
+			if sim:shown(stack) then
+				local where = `{label}, turned {yaw} degrees and tilted {pitch}`
+				local bubble = box(stack)
+				local boxFrame, size = model:GetBoundingBox()
+				local root = model.HumanoidRootPart.Position
+				local head =
+					camera:WorldToScreenPoint(roblox.Vector3.new(root.X, boxFrame.Position.Y + size.Y / 2, root.Z))
+				for piece, r in hudPieces(sim, player) do
+					if overlap(bubble, r) then
+						local group = string.match(piece, "^(%a+)%.")
+						local upTop = group == "Left" or group == "Right" or group == "Row"
+						local onHead = math.abs(bubble.bottom - head.Y) < 1.5
+						T.expect(
+							upTop and onHead,
+							`{where}: the bubble {describe(bubble)} covers the HUD's {piece} {describe(r)}, with their head at y {head.Y}`
+						)
+					end
+				end
+			end
+		end
+	end
+	standAt(sim, player, STANDS.front)
+end
+
+-- Makes every passenger say `line`.
+local function everyoneSays(sim, line: string)
+	sim:execute(string.format(
+		[[
+		local Content = require("./Shift/Content")
+		local line = %q
+		for _, regular in Content.Regulars do
+			for i in regular.lines do
+				regular.lines[i] = line
+			end
+		end
+		for i in Content.LivingLines do
+			Content.LivingLines[i] = line
+		end
+		for _, herring in Content.RedHerrings do
+			herring.line = line
+		end
+		for _, lines in Content.DrownedLines do
+			for i in lines do
+				lines[i] = line
+			end
+		end
+		for i in Content.Mara.lines do
+			Content.Mara.lines[i] = line
+		end
+		Content.Anna.line = line
+	]],
+		line
+	))
+end
+
+-- The longest line any passenger can say (with "{name}" as the longest display name Roblox
+-- allows).
 local LONGEST_LINE = [[
 	local Content = require("./Shift/Content")
 	local name = string.rep("W", 20)
@@ -1058,26 +1189,6 @@ local LONGEST_LINE = [[
 		consider(line)
 	end
 	consider(Content.Anna.line)
-	for _, regular in Content.Regulars do
-		for i in regular.lines do
-			regular.lines[i] = longest
-		end
-	end
-	for i in Content.LivingLines do
-		Content.LivingLines[i] = longest
-	end
-	for _, herring in Content.RedHerrings do
-		herring.line = longest
-	end
-	for _, lines in Content.DrownedLines do
-		for i in lines do
-			lines[i] = longest
-		end
-	end
-	for i in Content.Mara.lines do
-		Content.Mara.lines[i] = longest
-	end
-	Content.Anna.line = longest
 	return longest
 ]]
 
@@ -1131,6 +1242,7 @@ T.test("the passenger's line is never under the HUD or over their face, from any
 		})
 		-- Everyone says the longest line in the game, so the bubble is as big as it gets.
 		local longest = sim:execute(LONGEST_LINE)
+		everyoneSays(sim, longest)
 		local alice = sim:addPlayer("Alice", 101)
 		sim.cameraFollows = alice
 		local bot = newBot(sim, alice, { stopAtPage = true })
@@ -1139,14 +1251,20 @@ T.test("the passenger's line is never under the HUD or over their face, from any
 		local root = alice.PlayerGui.LastFerryHud.Root
 		local tab = root.Play.Desk.TicketHolder.PageTab
 		checkSpeechPlacement(sim, alice, model, `{screen.label}, a page to take`, screen.snug == true)
+		checkTextFits(sim, alice, `{screen.label}, a page to take`)
+		checkHint(sim, alice, `{screen.label}, a page to take`)
+		checkSpeechTurning(sim, alice, model, `{screen.label}, a page to take`)
 		sim:click(tab)
 		sim:run(1)
 		T.expect(sim:shown(root.Play.Ledger), `{screen.label}: taking the page opened the ledger`)
 		checkSpeechPlacement(sim, alice, model, `{screen.label}, ledger open`, screen.snug == true)
+		checkTextFits(sim, alice, `{screen.label}, ledger open`)
+		checkHint(sim, alice, `{screen.label}, ledger open`)
 		sim:click(root.Play.Ledger.Close)
 		checkSpeechPlacement(sim, alice, model, `{screen.label}, rules showing`, screen.snug == true)
 		sim:click(root.Play.Side.Tabs.HIDE)
 		checkSpeechPlacement(sim, alice, model, `{screen.label}, rules hidden`, screen.snug == true)
+		checkTextFits(sim, alice, `{screen.label}, rules hidden`)
 		clean(sim, screen.label)
 	end
 end)
@@ -1300,6 +1418,7 @@ T.test("on phones the HUD scales down but the main buttons stay at least 44 px",
 		local alice = sim:addPlayer("Alice", 101)
 		sim:run(3)
 		clean(sim, "phone boot")
+		checkTextFits(sim, alice, "on the pier, on a phone")
 		local root = alice.PlayerGui.LastFerryHud.Root
 		local scale = root.UIScale.Scale
 		T.expect(scale < 1, `scaled down ({scale})`)
@@ -1353,6 +1472,33 @@ local function checkPills(player, label: string): number
 	)
 	return rightStart - leftEnd
 end
+
+T.test("on the smallest phone, every card's words fit, from the first night to the ending", function()
+	-- An iPhone SE in landscape, under Roblox's top bar. The bot checks each card's text
+	-- as it comes up (tick); the ending card is checked here, as the bot stops at it.
+	local sim = boot({
+		root = ROOT,
+		screen = roblox.Vector2.new(667, 375),
+		safeArea = roblox.Vector2.new(667, 317),
+		preferredInput = roblox.Enum.PreferredInput.Touch,
+	})
+	local alice = sim:addPlayer("Alice", 101)
+	local bot = newBot(sim, alice, { takePages = true })
+	local finished = sim:runUntil(
+		function()
+			return bot.ending ~= nil
+		end,
+		3600,
+		1 / 20,
+		function()
+			tick(bot)
+		end
+	)
+	T.expect(finished, `the run never ended (stuck at {math.floor(sim.now)}s on "{bot.lastCard}")`)
+	sim:run(3)
+	clean(sim, "phone run")
+	checkTextFits(sim, alice, "the ending card, on a phone")
+end)
 
 T.test("the status fits whatever room Roblox's own top bar buttons leave it", function()
 	local sim = boot()
@@ -1476,6 +1622,55 @@ T.test("with a page in the ledger the status still fits, and moves to the HUD on
 	clean(sim, "ledger in the top bar")
 end)
 
+T.test("text measured before its font has loaded is measured again once it has", function()
+	-- Roblox loads each font the first time it's needed; until then text measures as a
+	-- stand-in font's does (a fifth narrower, in the simulator).
+	local sim = boot({ root = ROOT, fontsLoadAt = 25 })
+	-- A short line, which a bubble left the stand-in font's size would be too narrow for.
+	everyoneSays(sim, "Evening, clerk.")
+	local alice = sim:addPlayer("Alice", 101)
+	sim.cameraFollows = alice
+	local bot = newBot(sim, alice, { idle = true })
+	local model
+	T.expect(
+		sim:runUntil(
+			function()
+				local tells = lookAtPassenger(sim)
+				model = tells and tells.model
+				return model ~= nil and heard(bot, model) ~= ""
+			end,
+			24,
+			1 / 20,
+			function()
+				tick(bot)
+			end
+		),
+		"a passenger is talking before the fonts have loaded"
+	)
+	-- Their line fits in its bubble, measured with the stand-in font and then with the real
+	-- one. (Roblox doesn't draw the lines of wrapped text that don't fit, so a bubble left
+	-- the stand-in's size would lose some of what they say.)
+	local line = speechBubble(alice).Bubble.Line
+	local function fits(label: string)
+		local room = line.AbsoluteSize
+		T.expect(line.TextFits, `{label}: "{line.Text}" doesn't fit in a bubble with room for {room.X} x {room.Y}`)
+	end
+	sim:run(0.5)
+	T.expect(not sim.fontsLoaded, "the fonts are still loading")
+	fits("before the fonts have loaded")
+	sim:run(sim.fontsLoadAt - sim.now + 0.5)
+	T.expect(sim.fontsLoaded, "the fonts have loaded")
+	fits("once they have")
+	-- And the status, measured with the stand-in font at first, fits the room it has with
+	-- the real one, however much that is.
+	for left = 164, 1100, 16 do
+		sim:setTopbarInset(roblox.Rect.new(left, 0, 1280, 58))
+		sim:run(0.3)
+		checkPills(alice, `with the fonts loaded, the row from x {left}`)
+	end
+	clean(sim, "late fonts")
+end)
+
 T.test("with no top bar row to put it in, the status sits at the top of the HUD instead", function()
 	-- An old 36 px top bar: too short for the status's pills.
 	local sim = boot({
@@ -1523,6 +1718,7 @@ T.test("with no top bar row to put it in, the status sits at the top of the HUD 
 		"a passenger is at the window, talking"
 	)
 	checkSpeechPlacement(sim, alice, model, "no top bar row", true)
+	checkTextFits(sim, alice, "no top bar row")
 	clean(sim, "no top bar row")
 end)
 
@@ -1538,6 +1734,7 @@ T.test("on tablets the rules panel clears Roblox's bigger jump button", function
 	local alice = sim:addPlayer("Alice", 101)
 	sim:run(3)
 	clean(sim, "tablet boot")
+	checkTextFits(sim, alice, "on the pier, on a tablet")
 	local root = alice.PlayerGui.LastFerryHud.Root
 	local side = root.Play.Side
 	local screenBottom = root.Parent.AbsolutePosition.Y + root.Parent.AbsoluteSize.Y
@@ -1570,6 +1767,11 @@ T.test("co-op: a friend who joins late sees the same shift, and the Continue wai
 	T.equal(bob:GetAttribute("OnShift"), true, "Bob is on shift")
 	T.expect(bob.Character:FindFirstChild("ClerkCap") ~= nil, "Bob wears the cap")
 	T.expect(tostring(feet(bob)) ~= tostring(feet(alice)), "Bob gets his own stand")
+	local bobStand = bob:GetAttribute("Stand")
+	T.expect(
+		typeof(bobStand) == "Vector3" and (bobStand - feet(bob)).Magnitude < 0.05,
+		`the server told Bob's client which stand is his ({bobStand}, where his feet are: {feet(bob)})`
+	)
 	T.expect(not sim:coreGuiEnabled(bob, "PlayerList"), "and his player list is put away for the shift too")
 	local aliceNight = topRow(alice).TopBar.Left.NightPill.Night.Text
 	local bobNight = topRow(bob).TopBar.Left.NightPill.Night.Text

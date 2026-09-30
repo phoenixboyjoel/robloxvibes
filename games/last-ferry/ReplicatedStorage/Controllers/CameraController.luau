@@ -275,13 +275,6 @@ function CameraController.start()
 
 	connectInput()
 	player:GetAttributeChangedSignal("OnShift"):Connect(applyMode)
-	-- A clerk given a stand (one who joins mid-shift gets theirs a moment after their
-	-- camera starts) looks at the passenger from it.
-	player:GetAttributeChangedSignal("Stand"):Connect(function()
-		if inBooth and cinematic == nil then
-			aimPending = true
-		end
-	end)
 	player.CharacterAdded:Connect(function()
 		eyeOffset = nil
 		-- A new character (a respawn mid-shift) starts off looking out of the window again,

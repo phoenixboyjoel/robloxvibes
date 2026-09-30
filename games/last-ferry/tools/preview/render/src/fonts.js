@@ -1,6 +1,28 @@
-// Roblox font families (rbxasset://fonts/families/<Name>.json) mapped to the same
-// typefaces from @fontsource. Roblox's own Builder Sans and Gotham aren't public, so
-// they fall back to close relatives (Inter and Montserrat).
+// Roblox font families (rbxasset://fonts/families/<Name>.json), drawn with Roblox's own
+// font files where fetch_content.py has fetched them (the families the game uses), and
+// otherwise with the same typefaces from @fontsource (Inter standing in for Builder Sans).
+// Gotham is gone from Roblox, which draws it as Montserrat.
+
+// The faces of each family that ship with Roblox, by weight, in rbxcontent/fonts/.
+const ROBLOX_FACES = {
+  BuilderSans: {
+    400: 'BuilderSans-Regular.otf',
+    500: 'BuilderSans-Medium.otf',
+    700: 'BuilderSans-Bold.otf',
+    800: 'BuilderSans-ExtraBold.otf',
+  },
+  Montserrat: {
+    400: 'Montserrat-Regular.ttf',
+    500: 'Montserrat-Medium.ttf',
+    700: 'Montserrat-Bold.ttf',
+    900: 'Montserrat-Black.ttf',
+  },
+  FredokaOne: { 400: 'FredokaOne-Regular.ttf' },
+  Oswald: { 400: 'Oswald-Regular.ttf', 700: 'Oswald-Bold.ttf' },
+  SpecialElite: { 400: 'SpecialElite-Regular.ttf' },
+};
+ROBLOX_FACES.GothamSSm = ROBLOX_FACES.Montserrat;
+ROBLOX_FACES.Gotham = ROBLOX_FACES.Montserrat;
 
 const FAMILIES = {
   AmaticSC: 'amatic-sc',
@@ -79,6 +101,27 @@ async function tryLoad(pkg, weight, italic) {
   return true;
 }
 
+// Loads Roblox's own face at the closest weight that ships with Roblox, if it's been
+// fetched.
+async function tryRoblox(font, pkg, weight, italic) {
+  const faces = ROBLOX_FACES[familyName(font)];
+  if (!faces || italic) {
+    return false;
+  }
+  const nearest = Object.keys(faces)
+    .map(Number)
+    .sort((a, b) => Math.abs(a - weight) - Math.abs(b - weight))[0];
+  const url = `rbxcontent/fonts/${faces[nearest]}`;
+  const response = await fetch(url, { method: 'HEAD' });
+  if (!response.ok) {
+    return false;
+  }
+  const face = new FontFace(`rbx-${pkg}`, `url(${url})`, { weight: String(weight), style: 'normal' });
+  await face.load();
+  document.fonts.add(face);
+  return true;
+}
+
 // Loads the closest available weight of a font; single-weight families (Fredoka One,
 // Luckiest Guy...) load their only weight and the browser synthesizes the rest.
 export async function loadFont(font) {
@@ -88,6 +131,9 @@ export async function loadFont(font) {
     return loaded.get(key);
   }
   const attempt = (async () => {
+    if (await tryRoblox(font, pkg, weight, italic)) {
+      return true;
+    }
     const candidates = [weight, 400, 700, 500, 600, 300, 800, 900, 200, 100];
     for (const w of candidates) {
       if (await tryLoad(pkg, w, italic)) {

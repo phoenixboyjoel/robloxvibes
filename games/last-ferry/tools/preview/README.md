@@ -43,7 +43,7 @@ simulator (`tests/sim`), using a three.js approximation of Roblox's renderer.
    cd tools/preview/render
    npm install                   # three.js, fonts, Playwright
    npx playwright install chromium   # skip if Chromium is already installed for Playwright
-   python3 fetch_content.py      # Roblox's built-in face, particle and chat-tail textures (needs Pillow)
+   python3 fetch_content.py      # Roblox's face, particle and chat-tail textures and its fonts (needs Pillow)
    node shot.mjs ../../../preview/first.json ../../../preview/first.png
    ```
 
@@ -60,8 +60,10 @@ whether a tell can be seen from the booth. It is not Roblox's renderer.
     ColorCorrection and Blur;
   - the HUD, drawn from the real GUI tree with Roblox's layout rules (UDim2,
     anchors, list layouts, padding, automatic size, UIScale, rich text, strokes,
-    corners, gradients, UIShadow, rotation) and the same fonts. Builder Sans and
-    Gotham aren't public, so Inter and Montserrat stand in for them;
+    corners, gradients, UIShadow, rotation) and Roblox's own font files for the
+    fonts the game uses (Builder Sans; Montserrat, which Roblox draws Gotham as;
+    Fredoka One, Oswald, Special Elite), fetched by `fetch_content.py`, with
+    look-alikes from @fontsource for any it hasn't fetched;
   - Roblox's own chat bubbles (anchored over a model's bounding box, as the
     client's ExperienceChat does) and its default ProximityPrompt, both drawn
     from the client's own layout numbers;
@@ -73,8 +75,9 @@ whether a tell can be seen from the booth. It is not Roblox's renderer.
   - Light brightness is tuned by eye, and there is no global illumination.
   - Water is a flat reflective plane.
   - Particles are a still frame replayed from the emitter's settings.
-  - Text measured by the game (`TextBounds`) is the simulator's estimate, so a
-    bubble can wrap a word differently from Roblox.
+  - Text measured by the game (`TextBounds`) comes from the simulator, which
+    adds up each character's width in the font (no kerning), so a line can
+    come out a pixel or two different from Roblox's.
   - Roblox's buttons in the top-left corner are a sketch of Roblox's. ScreenGuis
     with `TopbarSafeInsets` are drawn beside them, in the part of the row the
     simulator's `GuiService.TopbarInset` leaves, which is an estimate.

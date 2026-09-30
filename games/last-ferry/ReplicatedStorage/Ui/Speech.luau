@@ -16,9 +16,11 @@
 	screen the HUD leaves free (the `room` HudController gives it): sideways or up
 	as far as it needs, but down only as far as the top of their head, so it never
 	covers their face. If there's no room at all, it goes over the top bar rather
-	than under it.
+	than under it. Something in the way lower down (the ticket's page tab) it goes
+	beside, or over if there's no room beside it.
 ]]
 
+local ContentProvider = game:GetService("ContentProvider")
 local GuiService = game:GetService("GuiService")
 local RunService = game:GetService("RunService")
 
@@ -52,6 +54,7 @@ local PAD_X, PAD_Y = 16, 8
 local ABOVE = 0.4 -- studs from the top of their head (or hat) to the tip of the tail
 local LINGER = 1.5 -- seconds a line stays up once they've left the window
 local MIN_TEXT = 120 -- the narrowest a line is wrapped at, however little room there is
+local NARROWEST = MIN_TEXT + 2 * PAD_X -- so the narrowest a bubble gets
 
 local Speech = {}
 
@@ -60,15 +63,16 @@ local Speech = {}
 -- tail should touch, just over the speaker's head; `head` is the top of their head; `tail`
 -- is how far the tail reaches below the bubble. All in pixels, in one coordinate system.
 --
--- Centred over the tip, like Roblox's own bubbles, then kept inside `room`: moved along
--- or up as far as it takes, and down only until the tail touches the top of their head.
+-- Centred over the tip, like Roblox's own bubbles, then kept inside `room`, tail and all:
+-- moved along or up as far as it takes, and down only until the tail touches the top of
+-- their head.
 function Speech.place(tip: Vector2, head: Vector2, size: Vector2, tail: number, room: Area): (Vector2, number?)
 	local width = room.right - room.left
 	local x = tip.X - size.X / 2
 	x = if size.X <= width then math.clamp(x, room.left, room.right - size.X) else room.left + (width - size.X) / 2
 	local over = tip.Y - tail - size.Y -- sitting on the tip
 	local lowest = head.Y - tail - size.Y -- sitting on their head
-	local y = math.max(math.min(over, room.bottom - size.Y), math.min(room.top, lowest))
+	local y = math.max(math.min(over, room.bottom - tail - size.Y), math.min(room.top, lowest))
 	local along = tip.X - x
 	if along < 0 or along > size.X then
 		return Vector2.new(x, y), nil
@@ -78,20 +82,57 @@ function Speech.place(tip: Vector2, head: Vector2, size: Vector2, tail: number, 
 	return Vector2.new(x, y), math.clamp(along, inset, size.X - inset)
 end
 
+-- Whether two parts of the screen overlap.
+local function overlap(a: Area, b: Area): boolean
+	return a.left < b.right and b.left < a.right and a.top < b.bottom and b.top < a.bottom
+end
+
+-- Where a bubble goes in `room`: as Speech.place puts it in the whole area, unless that
+-- covers one of the obstacles. Then it goes beside the obstacle, on the side the tip is on
+-- if even the narrowest bubble fits there and on the other side if not, or above it if
+-- neither side has room. `sizeFor` gives the bubble's size in a part of the room (its line
+-- wraps to fit). Returns its size, its top-left corner, and where along it its tail goes.
+function Speech.placeInRoom(
+	tip: Vector2,
+	head: Vector2,
+	tail: number,
+	room: Room,
+	sizeFor: (Area) -> Vector2
+): (Vector2, Vector2, number?)
+	local area = room.area
+	local size = sizeFor(area)
+	local at, along = Speech.place(tip, head, size, tail, area)
+	for _, block in room.obstacles do
+		local spot = { left = at.X, top = at.Y, right = at.X + size.X, bottom = at.Y + size.Y + tail }
+		if overlap(spot, block) then
+			local roomLeft, roomRight = block.left - area.left, area.right - block.right
+			local tipRight = (block.left + block.right) / 2 < tip.X
+			area = table.clone(area)
+			if math.max(roomLeft, roomRight) < NARROWEST then
+				area.bottom = math.min(area.bottom, block.top)
+			elseif if tipRight then roomRight >= NARROWEST else roomLeft < NARROWEST then
+				area.left = math.max(area.left, block.right)
+			else
+				area.right = math.min(area.right, block.left)
+			end
+			size = sizeFor(area)
+			at, along = Speech.place(tip, head, size, tail, area)
+		end
+	end
+	return size, at, along
+end
+
 -- How far above `root` the top of `model` is, hat and all.
 local function heightAbove(model: Model, root: BasePart): number
 	local box, size = model:GetBoundingBox()
 	return size.Y / 2 - box:PointToObjectSpace(root.Position).Y
 end
 
--- Whether two parts of the screen overlap.
-local function overlap(a: Area, b: Area): boolean
-	return a.left < b.right and b.left < a.right and a.top < b.bottom and b.top < a.bottom
-end
-
 -- `room` gives the part of the screen the bubble may use, or nil to hide it for now.
 function Speech.new(parent: Instance, room: () -> Room?): Speech
-	local tv = GuiService:IsTenFootInterface()
+	-- Bigger on a TV, read from across the room (Roblox's docs say to tell a TV by the
+	-- display's size, not by whether it's a console).
+	local tv = GuiService.ViewportDisplaySize == Enum.DisplaySize.Large
 	local textSize = if tv then 24 else 16
 	local maxWidth = if tv then 420 else 300 -- widest a line runs before it wraps
 	local caretSize = if tv then Vector2.new(14, 9) else Vector2.new(9, 6)
@@ -157,6 +198,17 @@ function Speech.new(parent: Instance, room: () -> Room?): Speech
 	local timed = false
 	-- The tail overlaps the bubble by a pixel, so it reaches that much less below it.
 	local tail = caretSize.Y - 1
+
+	-- Roblox loads a font the first time it's needed, and text measured before then comes
+	-- out the size of a stand-in font's. So the line is measured again once the bubble's
+	-- font has loaded, and whenever the player changes their text size.
+	task.spawn(function()
+		ContentProvider:PreloadAsync({ measure })
+		table.clear(measured)
+	end)
+	GuiService:GetPropertyChangedSignal("PreferredTextSize"):Connect(function()
+		table.clear(measured)
+	end)
 
 	-- How big the bubble is with its line wrapped for `area`: as wide as Roblox's bubbles
 	-- go, or as the area is (but never too narrow to read).
@@ -225,27 +277,12 @@ function Speech.new(parent: Instance, room: () -> Room?): Speech
 		local headPoint = camera:WorldToScreenPoint(top)
 		local tip = Vector2.new(tipPoint.X, tipPoint.Y) - origin
 		local head = Vector2.new(headPoint.X, headPoint.Y) - origin
-		local area = onLayer(free.area)
-		local size = sizeFor(area)
-		local at, along = Speech.place(tip, head, size, tail, area)
-		-- Something lower down in the way (the page tab)? Keep to the side of it that's clear.
-		local narrowed = area
+		local obstacles: { Area } = {}
 		for _, obstacle in free.obstacles do
-			local block = onLayer(obstacle)
-			local spot = { left = at.X, top = at.Y, right = at.X + size.X, bottom = at.Y + size.Y + tail }
-			if overlap(spot, block) then
-				narrowed = table.clone(narrowed)
-				if (block.left + block.right) / 2 < tip.X then
-					narrowed.left = math.max(narrowed.left, block.right)
-				else
-					narrowed.right = math.min(narrowed.right, block.left)
-				end
-			end
+			table.insert(obstacles, onLayer(obstacle))
 		end
-		if narrowed ~= area then
-			size = sizeFor(narrowed)
-			at, along = Speech.place(tip, head, size, tail, narrowed)
-		end
+		local size, at, along =
+			Speech.placeInRoom(tip, head, tail, { area = onLayer(free.area), obstacles = obstacles }, sizeFor)
 		if size ~= bubbleSize then
 			bubbleSize = size
 			stack.Size = UDim2.fromOffset(size.X, size.Y + tail)

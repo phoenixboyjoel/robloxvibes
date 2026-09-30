@@ -68,6 +68,8 @@ local SIDE_WIDTH = 250
 local TOP_UNDER_ROW = 16
 local TOP_UNDER_BAR = 70
 local SPEECH_GAP = 8 -- between the speech bubble and the HUD
+local HINT_WIDTH = 620 -- the widest the first night's hint gets
+local HINT_GAP = 24 -- between the hint and the rules panel
 -- Screen px kept clear above the bottom-right corner for Roblox's touch jump button
 -- (TouchJump): 70 px, 90 px up, when the screen's short side is 500 px or less, else
 -- 120 px, 210 px up; plus a margin.
@@ -394,12 +396,15 @@ function HudController.start()
 	Widgets.caption(radio, "RADIO · PIKE, AT THE LIGHTHOUSE", C.radio, 1)
 	local radioText = Widgets.paragraph(radio, "", { size = 16, order = 2 })
 
-	-- Bottom centre: how to look around, on the first night only.
+	-- Bottom centre: how to look around, on the first night only. As wide as it can be
+	-- without running under the rules panel (layoutSide), and as tall as its lines.
 	local hint = Ui.label(play, "Hint", {
 		font = F.bodyBold,
 		size = 16,
 		xAlign = Enum.TextXAlignment.Center,
-		frameSize = UDim2.fromOffset(620, 22),
+		wrap = true,
+		frameSize = UDim2.fromOffset(HINT_WIDTH, 0),
+		autoSize = Enum.AutomaticSize.Y,
 		position = UDim2.new(0.5, 0, 1, -12),
 		anchor = Vector2.new(0.5, 1),
 	})
@@ -590,6 +595,11 @@ function HudController.start()
 			bottom += math.ceil(clearance / uiScale.Scale)
 		end
 		desk.Position = UDim2.fromOffset(16, topY)
+		-- The hint is centred along the bottom, so it's as wide as twice the room between
+		-- the middle of the screen and the rules panel.
+		local canvas = hud.AbsoluteSize.X / uiScale.Scale
+		local clear = canvas - 16 - SIDE_WIDTH - HINT_GAP - canvas / 2
+		hint.Size = UDim2.fromOffset(math.min(HINT_WIDTH, 2 * clear), 0)
 		side.Position = UDim2.new(1, -16, 0, topY)
 		side.Size = UDim2.new(0, SIDE_WIDTH, 1, -(topY + bottom))
 		ledger.Position = side.Position
@@ -622,11 +632,10 @@ function HudController.start()
 		if input == Enum.PreferredInput.Touch then
 			hint.Text = "Drag to look around · Pinch to lean in"
 		elseif input == Enum.PreferredInput.Gamepad then
-			hint.Text = "Right stick to look · Hold R2 to lean in · A board · B turn away · X take a page"
+			hint.Text = "Right stick to look · Hold R2 to lean in\nA board · B turn away · X take a page"
 			boardKey, denyKey = "A", "B"
 		else
-			hint.Text =
-				"Hold the right mouse button to look · Scroll to lean in · B board · T turn away · P take a page"
+			hint.Text = "Hold right-click to look around · Scroll to lean in\nB board · T turn away · P take a page"
 			boardKey, denyKey = "B", "T"
 		end
 		keyHints[boardButton].Text = boardKey

@@ -497,7 +497,115 @@ T.test("GUI layout: where things are on screen, as Roblox lays them out", functi
 		"straight ahead is the screen's middle, in viewport terms"
 	)
 	near(V2(screenPoint.X, screenPoint.Y), V2(844 / 2 - 47, 390 / 2 - 58), "and in GUI terms")
+	-- IgnoreGuiInset moves a ScreenGui between the two safe areas, as Roblox's docs say.
+	local ignoring = sim:execute([[
+		local gui = Instance.new("ScreenGui")
+		gui.IgnoreGuiInset = true
+		gui.Parent = game:GetService("StarterGui")
+		return gui
+	]])
+	T.equal(ignoring.ScreenInsets, roblox.Enum.ScreenInsets.DeviceSafeInsets, "IgnoreGuiInset: over the top bar")
+	near(ignoring.AbsolutePosition, V2(0, -58), "from the top of the screen")
+	ignoring.IgnoreGuiInset = false
+	T.equal(ignoring.ScreenInsets, roblox.Enum.ScreenInsets.CoreUISafeInsets, "and back below it")
 	T.equal(#sim.errors, 0, table.concat(sim.errors, "\n"))
+end)
+
+-- A label's TextBounds for `text` in `font` (Luau that makes the Font) at `size`, wrapped at
+-- `width` if given.
+local function textBounds(sim, font: string, size: number, text: string, width: number?, rich: boolean?)
+	return sim:execute(string.format(
+		[[
+		local gui = Instance.new("ScreenGui")
+		local label = Instance.new("TextLabel")
+		label.FontFace = %s
+		label.TextSize = %d
+		label.Text = %q
+		label.RichText = %s
+		label.TextWrapped = %s
+		label.Size = UDim2.fromOffset(%d, 1000)
+		label.Parent = gui
+		gui.Parent = game:GetService("StarterGui")
+		return label.TextBounds
+	]],
+		font,
+		size,
+		text,
+		tostring(rich == true),
+		tostring(width ~= nil),
+		width or 1000
+	))
+end
+
+local GOTHAM = 'Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium)'
+local BUILDER_BOLD = "Font.fromEnum(Enum.Font.BuilderSansBold)"
+
+T.test("text is as wide as it is in Roblox's own fonts, and wraps as Roblox wraps it", function()
+	local sim = Sim.new({ root = "." })
+	local V2 = roblox.Vector2.new
+	T.equal(textBounds(sim, GOTHAM, 16, "Evening, clerk."), V2(119, 16), "Gotham, which Roblox draws as Montserrat")
+	T.equal(textBounds(sim, BUILDER_BOLD, 18, "NIGHT 1 / 5"), V2(93, 18), "Builder Sans Bold")
+	T.equal(textBounds(sim, BUILDER_BOLD, 16, "TAKE\nPAGE").Y, 32, "a line break starts a new line")
+	local name = textBounds(sim, GOTHAM, 16, string.rep("W", 20), 300)
+	T.equal(name.Y, 32, "a word wider than the line is broken across two")
+	T.expect(name.X <= 300, `and neither line is wider than the label ({name.X})`)
+	T.equal(
+		textBounds(sim, BUILDER_BOLD, 18, "<b>NIGHT</b> 1 / 5", nil, true),
+		V2(93, 18),
+		"rich text's tags take no room"
+	)
+	local line = textBounds(sim, GOTHAM, 16, "Petrel's a good boat. Better than the old one.", 300)
+	T.equal(line.Y, 32, "a line longer than the label wraps between words")
+	-- Wrapped text too tall for its label: the lines that don't fit aren't drawn.
+	local fits, bounds = sim:execute([[
+		local gui = Instance.new("ScreenGui")
+		local label = Instance.new("TextLabel")
+		label.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium)
+		label.TextSize = 16
+		label.TextWrapped = true
+		label.Text = "Petrel's a good boat. Better than the old one."
+		label.Size = UDim2.fromOffset(300, 20)
+		label.Parent = gui
+		gui.Parent = game:GetService("StarterGui")
+		return label.TextFits, label.TextBounds
+	]])
+	T.equal(fits, false, "text too tall for its label doesn't fit")
+	T.equal(bounds.Y, 16, "and only the line that fits is measured")
+	T.equal(#sim.errors, 0, table.concat(sim.errors, "\n"))
+end)
+
+T.test("fonts load late: text measures as a stand-in font's until then, and PreloadAsync waits", function()
+	local sim = Sim.new({ root = ".", fontsLoadAt = 5 })
+	local label = sim:execute([[
+		local gui = Instance.new("ScreenGui")
+		local label = Instance.new("TextLabel")
+		label.FontFace = Font.fromEnum(Enum.Font.BuilderSansBold)
+		label.TextSize = 18
+		label.Text = "NIGHT 1 / 5"
+		label.Parent = gui
+		gui.Parent = game:GetService("StarterGui")
+		task.spawn(function()
+			game:GetService("ContentProvider"):PreloadAsync({ label })
+			label:SetAttribute("Loaded", true)
+		end)
+		return label
+	]])
+	sim:run(4)
+	T.equal(label:GetAttribute("Loaded"), nil, "PreloadAsync is still waiting for the font")
+	local early = label.TextBounds.X
+	T.expect(early < 93, `measured as a stand-in font's meanwhile ({early})`)
+	sim:run(1.5)
+	T.equal(label:GetAttribute("Loaded"), true, "then it returns")
+	T.equal(label.TextBounds.X, 93, "and the text measures as its own font's")
+	T.equal(#sim.errors, 0, table.concat(sim.errors, "\n"))
+end)
+
+T.test("GuiService.ViewportDisplaySize: small on a phone, medium on a computer, large on a TV", function()
+	local sizes = roblox.Enum.DisplaySize
+	local phone = Sim.new({ root = ".", preferredInput = roblox.Enum.PreferredInput.Touch })
+	T.equal(phone.game:GetService("GuiService").ViewportDisplaySize, sizes.Small)
+	T.equal(Sim.new({ root = "." }).game:GetService("GuiService").ViewportDisplaySize, sizes.Medium)
+	T.equal(Sim.new({ root = ".", tenFoot = true }).game:GetService("GuiService").ViewportDisplaySize, sizes.Large)
 end)
 
 return nil

@@ -20,6 +20,8 @@
 local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
 
+local Sounds = require("../../ReplicatedStorage/Shared/Sounds")
+
 export type Markers = {
 	camera: CFrame,
 	pier: Vector3, -- where players arrive, on the pier behind the booth
@@ -90,6 +92,9 @@ local marigoldTween: Tween? = nil
 local marigoldFades: { Tween } = {}
 local sceneToken = 0 -- bumped on reset, so a late ending effect can't leak into the next run
 local flood: BasePart
+local floodSplash: Sound
+local floodSlosh: Sound
+local doorThud: Sound
 local passengers: Folder
 
 local function part(props: PartProps): Part
@@ -738,6 +743,8 @@ local function buildBooth(parent: Folder): CFrame
 	doorWeld.Part1 = doorSign
 	doorWeld.Parent = doorSign
 	doorSign.Anchored = false
+	doorThud = Sounds.make(Sounds.Thud, door, "Thud")
+	doorThud.PlaybackSpeed = 0.6 -- a heavier thunk than the stamp
 
 	-- The time clock on the pier side of the back wall, right of the door: where a shift
 	-- starts. Roblox's own "E" prompt, held for a moment so nobody clocks in by accident.
@@ -1184,6 +1191,8 @@ local function buildFlood(parent: Folder)
 		castShadow = false,
 		parent = parent,
 	})
+	floodSplash = Sounds.make(Sounds.Splash, flood, "Splash")
+	floodSlosh = Sounds.make(Sounds.Paddle, flood, "Slosh")
 end
 
 local function moveFerry(target: CFrame, seconds: number, style: Enum.EasingStyle, direction: Enum.EasingDirection)
@@ -1291,6 +1300,11 @@ function WorldService.setDoor(open: boolean)
 	TweenService:Create(door, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
 		CFrame = if open then DOOR_OPEN else DOOR_SHUT,
 	}):Play()
+	if not open then
+		task.delay(0.4, function()
+			doorThud:Play()
+		end)
+	end
 end
 
 -- During a shift the door is shut and anyone who (re)spawns appears in the booth;
@@ -1366,13 +1380,20 @@ function WorldService.endingScene(ending: string)
 	end)
 end
 
--- The tide rises in the booth, over the counter, where the camera can see it.
+-- The tide rises in the booth, over the counter, where the camera can see it: a splash
+-- as it pours in, then water sloshing round the clerks' legs until it drains.
 function WorldService.setFlood(on: boolean)
 	local cframe = if on then CFrame.new(0, 3.1, 4) else CFrame.new(0, 0.1, 4)
 	TweenService:Create(flood, TweenInfo.new(if on then 4 else 1, Enum.EasingStyle.Sine), {
 		CFrame = cframe,
 		Transparency = if on then 0.25 else 1,
 	}):Play()
+	if on then
+		floodSplash:Play()
+		floodSlosh:Play()
+	else
+		floodSlosh:Stop()
+	end
 end
 
 -- Back to the start of a run: lanterns lit, the Petrel moored and empty, the lighthouse

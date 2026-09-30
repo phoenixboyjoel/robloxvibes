@@ -44,6 +44,7 @@ local Config = require("../Shared/Config")
 local Net = require("../Shared/Net")
 local View = require("../Shared/Types")
 local Overlay = require("../Ui/Overlay")
+local Sfx = require("../Ui/Sfx")
 local Theme = require("../Ui/Theme")
 local Ticket = require("../Ui/Ticket")
 local Ui = require("../Ui/Ui")
@@ -810,6 +811,7 @@ function HudController.start()
 		elseif fx.kind == "lanternOut" then
 			showAlert("A LANTERN GOES OUT", text, "bang", C.bad, Color3.fromRGB(70, 20, 22), 6)
 			EffectsController.lanternOut()
+			Sfx.gust()
 			CameraController.shake(1.4, 0.5)
 			flash.BackgroundTransparency = 0.55
 			TweenService:Create(flash, TweenInfo.new(0.7, Enum.EasingStyle.Sine), { BackgroundTransparency = 1 }):Play()
@@ -925,16 +927,19 @@ function HudController.start()
 	player:GetAttributeChangedSignal("OnShift"):Connect(onShiftChanged)
 	cursor.Visible = player:GetAttribute("OnShift") == true
 	rulesTab.Activated:Connect(function()
+		Sfx.click()
 		showingManifest = false
 		refreshSide()
 	end)
 	manifestTab.Activated:Connect(function()
+		Sfx.click()
 		if manifestTab.Interactable then
 			showingManifest = true
 			refreshSide()
 		end
 	end)
 	hideTab.Activated:Connect(function()
+		Sfx.click()
 		sideHidden = true
 		refreshSide()
 	end)

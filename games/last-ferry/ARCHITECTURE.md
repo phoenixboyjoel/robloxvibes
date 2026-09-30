@@ -40,14 +40,16 @@ something.
 | `ReplicatedStorage/Shared/Config.luau` | Remote names and tunables both sides read (timers, walk speed, rate limits) |
 | `ReplicatedStorage/Shared/Net.luau` | Creates and finds RemoteEvents; per-player rate limiter |
 | `ReplicatedStorage/Shared/Types.luau` | The screen state, effects and progress payloads the server sends |
+| `ReplicatedStorage/Shared/Sounds.luau` | Every sound in the game, all Roblox built-ins (`rbxasset://sounds/`): footsteps, splash, slosh, thud, click, gust |
 | `ReplicatedStorage/Client.client.luau` | Client entry: starts the effects, camera, crowd and HUD controllers |
 | `ReplicatedStorage/Controllers/CameraController.luau` | Roblox's own cameras: Classic on the pier, LockFirstPerson on shift (one eye height for every avatar, lean in by field of view, shake, both through `Humanoid.CameraOffset`), Scriptable views of the flood and the endings |
-| `ReplicatedStorage/Controllers/CrowdController.luau` | Animates passengers on each client: the classic Roblox walk, idle sway and look-about, via `Motor6D.Transform` in `PreSimulation` |
+| `ReplicatedStorage/Controllers/CrowdController.luau` | Animates passengers on each client: the classic Roblox walk, idle sway and look-about, via `Motor6D.Transform` in `PreSimulation`, with Roblox's plastic footsteps while they walk |
 | `ReplicatedStorage/Controllers/EffectsController.luau` | Blur behind cards, flood tint, lantern-out pulse, client-side lighthouse spin |
 | `ReplicatedStorage/Controllers/HudController.luau` | The whole HUD and its wiring to the remotes: the lobby banner on the pier, the shift HUD, passengers' lines as chat bubbles and chat-log lines, `ContextActionService` shortcuts that give way to Roblox's controls, the Modal button that frees the mouse in first person |
 | `ReplicatedStorage/Ui/Theme.luau` | Colours and fonts in Roblox's chunky house style (Fredoka One titles, Builder Sans ExtraBold controls, Special Elite and Oswald only on paper), design canvas and scale limits |
 | `ReplicatedStorage/Ui/Ui.luau` | Typed UI builders: frames, labels, layout, text strokes, hard shadows (`UIShadow`), gloss, drawn icons (check, cross, play, bang, page) and chunky buttons that squash and spring back |
 | `ReplicatedStorage/Ui/Widgets.luau` | Shared pieces: captions, paragraphs, tags, rule rows with number badges, lantern icons, text outlines |
+| `ReplicatedStorage/Ui/Sfx.luau` | Sounds only this player hears (clicks, the stamp, a lantern's gust), made in SoundService on the client |
 | `ReplicatedStorage/Ui/Ticket.luau` | The ticket card, its drawn stamps, the torn-page tab, the BOARDED / TURNED AWAY stamp |
 | `ReplicatedStorage/Ui/Overlay.luau` | Intro, summary, tide-came-in and ending cards, with the co-op Continue |
 | `tests/` | Lune test suite (`lune run tests/run.luau`) and the headless simulator in `tests/sim/` |

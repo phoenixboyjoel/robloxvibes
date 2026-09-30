@@ -9,6 +9,7 @@
 
 local TweenService = game:GetService("TweenService")
 
+local Sfx = require("./Sfx")
 local Theme = require("./Theme")
 
 local C = Theme.Colors
@@ -241,7 +242,7 @@ end
 
 -- A chunky Roblox button: saturated fill, thick outline, gloss, a hard shadow, an
 -- optional drawn icon and a stroked label. It squashes when pressed and springs back,
--- grows a little under the mouse, and fades when it can't be pressed.
+-- grows a little under the mouse, clicks, and fades when it can't be pressed.
 --
 -- The TextButton itself is invisible and takes the input and the layout; everything
 -- you see is on its "Face", which is centred so it scales from the middle.
@@ -315,6 +316,7 @@ function Ui.button(parent: Instance, name: string, text: string, size: UDim2, st
 	button.MouseButton1Up:Connect(function()
 		springTo(if hovering then 1.05 else 1, 0.3, Enum.EasingStyle.Back)
 	end)
+	button.Activated:Connect(Sfx.click)
 	button:GetPropertyChangedSignal("Interactable"):Connect(function()
 		local on = button.Interactable
 		face.BackgroundTransparency = if on then 0 else 0.5

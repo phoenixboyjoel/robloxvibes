@@ -23,6 +23,7 @@
 
 local TweenService = game:GetService("TweenService")
 
+local Sounds = require("../../ReplicatedStorage/Shared/Sounds")
 local Types = require("../Shift/Types")
 local Robloxian = require("./Robloxian")
 
@@ -426,6 +427,7 @@ function PassengerService.vanish(model: Model, seconds: number, sink: boolean?)
 			TweenService:Create(figure.root, TweenInfo.new(seconds, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
 				CFrame = figure.root.CFrame * CFrame.new(0, -8, 0),
 			}):Play()
+			Sounds.make(Sounds.Splash, figure.root, "Splash"):Play()
 		end
 	end
 	for _, descendant in model:GetDescendants() do

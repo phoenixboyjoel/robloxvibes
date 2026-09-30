@@ -375,6 +375,20 @@ local HAT = [[
 	return handle
 ]]
 
+-- The sounds played so far, by name, and where from ("server" or "client").
+local function soundsPlayed(sim)
+	local names = {}
+	for _, entry in sim.sounds do
+		local side = if entry.context == "server" then "server" else "client"
+		names[`{side}:{entry.name}`] = true
+		assert(
+			string.sub(entry.id, 1, 18) == "rbxasset://sounds/",
+			`{entry.name} plays {entry.id}: every sound must be one of Roblox's built-in ones`
+		)
+	end
+	return names
+end
+
 T.test("a clerk playing from the HUD finishes five nights clean", function()
 	local sim = boot()
 	local alice = sim:addPlayer("Alice", 101)
@@ -408,6 +422,12 @@ T.test("a clerk playing from the HUD finishes five nights clean", function()
 	T.expect(saved and saved.endings.CLEAN_SHIFT and saved.runs == 1, "progress saved to the DataStore")
 	T.equal(alice.leaderstats.Endings.Value, 1, "the player list shows one ending found")
 	T.equal(alice.leaderstats.Shifts.Value, 1, "and one shift worked")
+	local sounds = soundsPlayed(sim)
+	T.expect(sounds["client:Footsteps"], "passengers' footsteps while they walk")
+	T.expect(sounds["client:LastFerryStamp"], "the stamp thuds onto the ticket")
+	T.expect(sounds["client:LastFerryClick"], "buttons click")
+	T.expect(sounds["server:Thud"], "the booth door thunks shut")
+	T.expect(sounds["server:Splash"], "the drowned splash as they sink")
 	print(
 		`    (a clean run took {math.floor(sim.now / 60)} min {math.floor(sim.now % 60)} s of game time, {bot.calls} calls)`
 	)
@@ -734,6 +754,10 @@ T.test("an idle clerk: windows close, lanterns go out, the tide comes in, the ni
 	T.expect(bot.sawFailed, "the tide came in")
 	T.expect(bot.sawRetry, "the night started again")
 	T.equal(sim.workspace.World.Flood.Transparency, 1, "the flood drained for the retry")
+	local sounds = soundsPlayed(sim)
+	T.expect(sounds["client:LastFerryGust"], "a gust as each lantern blows out")
+	T.expect(sounds["server:Slosh"], "water sloshing round the booth")
+	T.expect(not sim.workspace.World.Flood.Slosh.IsPlaying, "and it stops when the flood drains")
 end)
 
 T.test("on phones the HUD scales down but the main buttons stay at least 44 px", function()

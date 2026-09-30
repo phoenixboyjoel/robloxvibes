@@ -5,14 +5,17 @@
 	Passengers are classic Robloxians whose limbs hang on Roblox's standard R6
 	joints. This swings those joints with the classic Roblox walk (arms and legs
 	in opposite pairs, faster and wider the faster they go) while a passenger
-	moves, and a slow idle sway and look-around while they stand. Animation
-	isn't a tell: everyone moves the same way whatever they are.
+	moves, and a slow idle sway and look-around while they stand. While they walk
+	you hear Roblox's plastic footsteps. None of it is a tell: everyone moves and
+	sounds the same whatever they are.
 
 	It sets Motor6D.Transform in PreSimulation, as Roblox recommends for custom
 	animation. Transforms are local to each client, so the server does nothing.
 ]]
 
 local RunService = game:GetService("RunService")
+
+local Sounds = require("../Shared/Sounds")
 
 local CrowdController = {}
 
@@ -23,6 +26,7 @@ local STRIDE_RATE = 1.25 -- radians of the walk cycle per stud travelled
 type Walker = {
 	root: BasePart,
 	torso: BasePart,
+	footsteps: Sound,
 	last: Vector3,
 	speed: number,
 	phase: number,
@@ -59,6 +63,8 @@ function CrowdController.start()
 		walkers[model] = {
 			root = root,
 			torso = torso,
+			-- Made here on the client, so it's this player's alone and costs the server nothing.
+			footsteps = Sounds.make(Sounds.Footsteps, root, "Footsteps"),
 			last = root.Position,
 			speed = 0,
 			phase = 0,
@@ -88,6 +94,16 @@ function CrowdController.start()
 			local speed = moved.Magnitude / dt
 			walker.speed += (speed - walker.speed) * (1 - math.exp(-dt * 10))
 			local torso = walker.torso
+			local walking = walker.speed > 0.8
+			local footsteps = walker.footsteps
+			if walking then
+				footsteps.PlaybackSpeed = Sounds.Footsteps.speed * math.clamp(walker.speed / STRIDE_SPEED, 0.6, 1.3)
+				if not footsteps.IsPlaying then
+					footsteps:Play()
+				end
+			elseif footsteps.IsPlaying then
+				footsteps:Stop()
+			end
 			if walker.speed > 0.4 then
 				walker.phase += dt * walker.speed * STRIDE_RATE
 				local swing = WALK_SWING * math.min(1, walker.speed / STRIDE_SPEED) * math.sin(walker.phase)

@@ -147,7 +147,11 @@ otherwise. Don't weaken or skip a test to get green.
   z ≈ −4.1, and a passenger's body hides everything straight behind them.
   Check new cues with `tools/preview` (export, then render) before a Studio
   playtest.
-- Every cue is visual; the first build has no audio.
+- Every tell is visual. Sound is feedback only (footsteps, the stamp, clicks, a
+  lantern's gust, splashes), and only Roblox's built-in sounds
+  (`rbxasset://sounds/...`, see `Shared/Sounds.luau`), so there's nothing to
+  upload. Every passenger sounds the same whatever they are; `Game.spec` checks
+  that every sound played is a built-in one.
 
 ## Definition of done
 

@@ -1595,6 +1595,40 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		end,
 	}
 
+	-- Sounds: nothing is heard, but every Play is recorded (sim.sounds) with the context
+	-- that played it, so tests can check what a player would hear and from where.
+	sim.sounds = {}
+	methods.Sound = {
+		Play = function(self)
+			local st = state[self]
+			st.playing = true
+			st.props.TimePosition = 0
+			table.insert(sim.sounds, {
+				time = sim.now,
+				context = currentContext(),
+				name = st.props.Name,
+				id = st.props.SoundId,
+				sound = self,
+			})
+		end,
+		Stop = function(self)
+			local st = state[self]
+			st.playing = false
+			st.props.TimePosition = 0
+		end,
+		Pause = function(self)
+			state[self].playing = false
+		end,
+		Resume = function(self)
+			state[self].playing = true
+		end,
+	}
+	computed.Sound = {
+		IsPlaying = function(_instance, st)
+			return st.playing == true
+		end,
+	}
+
 	-- Remotes -------------------------------------------------------------------------
 	local function copyArgument(value: any, depth: number, seen)
 		local kind = type(value)

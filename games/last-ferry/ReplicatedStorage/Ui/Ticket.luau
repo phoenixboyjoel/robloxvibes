@@ -13,6 +13,7 @@
 local TweenService = game:GetService("TweenService")
 
 local View = require("../Shared/Types")
+local Sfx = require("./Sfx")
 local Theme = require("./Theme")
 local Ui = require("./Ui")
 
@@ -254,6 +255,7 @@ function Ticket.new(parent: Instance, home: UDim2): Ticket
 
 	tab.Activated:Connect(function()
 		if takePage and tab.Visible then
+			Sfx.click()
 			takePage()
 		end
 	end)
@@ -302,6 +304,7 @@ function Ticket.new(parent: Instance, home: UDim2): Ticket
 			callStamp.TextColor3 = color
 			callStroke.Color = color
 			callStamp.Visible = true
+			Sfx.stamp()
 			callScale.Scale = 1.5
 			TweenService:Create(callScale, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
 				Scale = 1,

@@ -22,6 +22,8 @@ local TweenService = game:GetService("TweenService")
 
 export type Markers = {
 	camera: CFrame,
+	pier: Vector3, -- where players arrive, on the pier behind the booth
+	stands: { CFrame }, -- where players stand in the booth for a shift, facing the window
 	window: Vector3,
 	queue: { Vector3 },
 	spawn: Vector3,
@@ -45,10 +47,16 @@ type PartProps = {
 	parent: Instance,
 }
 
-local WOOD = Color3.fromRGB(74, 60, 48)
-local BOOTH_PAINT = Color3.fromRGB(52, 86, 84)
-local TRIM = Color3.fromRGB(214, 205, 180)
+-- A Roblox night: bold, saturated colours that still read on phones, where the
+-- engine drops shadows and most of the lighting at low graphics quality.
+local WOOD = Color3.fromRGB(110, 82, 58)
+local BOOTH_PAINT = Color3.fromRGB(24, 128, 120) -- harbor teal ("It was blue then.")
+local TRIM = Color3.fromRGB(242, 243, 243)
+local ROOF = Color3.fromRGB(196, 40, 28)
 local METAL = Color3.fromRGB(58, 60, 64)
+local BUOY_RED = Color3.fromRGB(214, 36, 30)
+local BUOY_GREEN = Color3.fromRGB(40, 160, 70)
+local SIGN_NEON = Color3.fromRGB(255, 176, 72)
 local LAMP_WARM = Color3.fromRGB(255, 198, 132)
 local LANTERN_LIT = Color3.fromRGB(255, 170, 70)
 local LANTERN_OUT = Color3.fromRGB(40, 36, 32)
@@ -141,6 +149,198 @@ local function sign(parent: BasePart, face: Enum.NormalId, text: string, textCol
 	padding.Parent = label
 end
 
+-- An invisible wall that keeps players where they belong (taller than a jump).
+local function barrier(parent: Instance, size: Vector3, cframe: CFrame)
+	local wall = part({
+		name = "Barrier",
+		size = size,
+		cframe = cframe,
+		transparency = 1,
+		castShadow = false,
+		collide = true,
+		parent = parent,
+	})
+	wall.CanQuery = false
+end
+
+-- A white rail fence from `a` to `b` (on the planks), with posts every few studs.
+local function railing(parent: Instance, a: Vector3, b: Vector3, color: Color3?)
+	local span = b - a
+	local length = span.Magnitude
+	local steps = math.max(1, math.floor(length / 3))
+	for i = 0, steps do
+		local at = a + span * (i / steps)
+		part({
+			name = "RailPost",
+			size = Vector3.new(0.3, 1.8, 0.3),
+			cframe = CFrame.new(at + Vector3.new(0, 0.9, 0)),
+			color = color or TRIM,
+			parent = parent,
+		})
+	end
+	for _, y in { 0.9, 1.7 } do
+		part({
+			name = "Rail",
+			size = Vector3.new(0.18, 0.18, length),
+			cframe = CFrame.lookAt((a + b) / 2 + Vector3.new(0, y, 0), b + Vector3.new(0, y, 0)),
+			color = color or TRIM,
+			parent = parent,
+		})
+	end
+end
+
+-- A red-and-white lifebuoy ring, standing on its edge, facing `facing`.
+local function lifebuoy(parent: Instance, centre: Vector3, facing: Vector3)
+	local frame = CFrame.lookAt(centre, centre + facing)
+	for i = 0, 7 do
+		local angle = i * math.pi / 4
+		part({
+			name = "Lifebuoy",
+			size = Vector3.new(0.55, 0.62, 0.34),
+			cframe = frame * CFrame.Angles(0, 0, angle) * CFrame.new(0, 0.62, 0),
+			color = if i % 2 == 0 then BUOY_RED else TRIM,
+			parent = parent,
+		})
+	end
+end
+
+local function bollard(parent: Instance, at: Vector3)
+	part({
+		name = "Bollard",
+		size = Vector3.new(1.1, 0.9, 0.9),
+		cframe = upright(at + Vector3.new(0, 0.55, 0)),
+		color = Color3.fromRGB(34, 36, 40),
+		shape = Enum.PartType.Cylinder,
+		parent = parent,
+	})
+	part({
+		name = "BollardCap",
+		size = Vector3.new(0.25, 1.2, 1.2),
+		cframe = upright(at + Vector3.new(0, 1.15, 0)),
+		color = Color3.fromRGB(34, 36, 40),
+		shape = Enum.PartType.Cylinder,
+		parent = parent,
+	})
+end
+
+-- A channel buoy bobbing out on the water, with a blinking top.
+local function channelBuoy(parent: Instance, at: Vector3, color: Color3)
+	part({
+		name = "Buoy",
+		size = Vector3.new(2.6, 1.6, 1.6),
+		cframe = upright(at + Vector3.new(0, 0.6, 0)),
+		color = color,
+		shape = Enum.PartType.Cylinder,
+		parent = parent,
+	})
+	part({
+		name = "BuoyCone",
+		size = Vector3.new(1.4, 0.9, 0.9),
+		cframe = upright(at + Vector3.new(0, 2.5, 0)),
+		color = color,
+		shape = Enum.PartType.Cylinder,
+		parent = parent,
+	})
+	local light = part({
+		name = "BuoyLight",
+		size = Vector3.new(0.5, 0.5, 0.5),
+		cframe = CFrame.new(at + Vector3.new(0, 3.4, 0)),
+		color = color,
+		material = Enum.Material.Neon,
+		shape = Enum.PartType.Ball,
+		castShadow = false,
+		parent = parent,
+	})
+	local glow = Instance.new("PointLight")
+	glow.Color = color
+	glow.Brightness = 1.5
+	glow.Range = 10
+	glow.Parent = light
+	light:SetAttribute("Blink", true)
+end
+
+-- A blocky gull perched at `at`, looking along `facing`. Pure decoration: no shadow.
+local function seagull(parent: Instance, at: Vector3, facing: Vector3)
+	local frame = CFrame.lookAt(at, at + facing)
+	local pieces = {
+		{ "GullBody", Vector3.new(0.7, 0.6, 1.2), CFrame.new(0, 0.55, 0), TRIM },
+		{ "GullHead", Vector3.new(0.45, 0.45, 0.45), CFrame.new(0, 1.0, -0.5), TRIM },
+		{ "GullBeak", Vector3.new(0.14, 0.14, 0.34), CFrame.new(0, 0.95, -0.85), Color3.fromRGB(245, 205, 48) },
+		{ "GullWing", Vector3.new(0.12, 0.42, 0.95), CFrame.new(-0.4, 0.6, 0.05), Color3.fromRGB(163, 162, 165) },
+		{ "GullWing", Vector3.new(0.12, 0.42, 0.95), CFrame.new(0.4, 0.6, 0.05), Color3.fromRGB(163, 162, 165) },
+		{ "GullTail", Vector3.new(0.5, 0.12, 0.45), CFrame.new(0, 0.7, 0.75), Color3.fromRGB(27, 42, 53) },
+		{ "GullLeg", Vector3.new(0.08, 0.3, 0.08), CFrame.new(-0.15, 0.15, 0), Color3.fromRGB(218, 133, 65) },
+		{ "GullLeg", Vector3.new(0.08, 0.3, 0.08), CFrame.new(0.15, 0.15, 0), Color3.fromRGB(218, 133, 65) },
+	}
+	for _, piece in pieces do
+		part({
+			name = piece[1],
+			size = piece[2],
+			cframe = frame * piece[3],
+			color = piece[4],
+			castShadow = false,
+			parent = parent,
+		})
+	end
+end
+
+local function lampPost(parent: Instance, at: Vector3)
+	part({
+		name = "LampPost",
+		size = Vector3.new(7, 0.35, 0.35),
+		cframe = upright(at + Vector3.new(0, 3.5, 0)),
+		color = Color3.fromRGB(34, 36, 40),
+		shape = Enum.PartType.Cylinder,
+		parent = parent,
+	})
+	local lamp = part({
+		name = "LampGlobe",
+		size = Vector3.new(0.9, 0.9, 0.9),
+		cframe = CFrame.new(at + Vector3.new(0, 7.3, 0)),
+		color = Color3.fromRGB(255, 214, 150),
+		material = Enum.Material.Neon,
+		shape = Enum.PartType.Ball,
+		castShadow = false,
+		parent = parent,
+	})
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(255, 198, 132)
+	light.Brightness = 1.4
+	light.Range = 18
+	light.Parent = lamp
+end
+
+local function bench(parent: Instance, at: Vector3, facing: Vector3)
+	local frame = CFrame.lookAt(at, at + facing)
+	part({
+		name = "BenchSeat",
+		size = Vector3.new(4, 0.3, 1.3),
+		cframe = frame * CFrame.new(0, 1.3, 0),
+		color = WOOD,
+		material = Enum.Material.WoodPlanks,
+		collide = true,
+		parent = parent,
+	})
+	part({
+		name = "BenchBack",
+		size = Vector3.new(4, 1.2, 0.25),
+		cframe = frame * CFrame.new(0, 2.1, 0.55),
+		color = WOOD,
+		material = Enum.Material.WoodPlanks,
+		collide = true,
+		parent = parent,
+	})
+	for _, x in { -1.7, 1.7 } do
+		part({
+			name = "BenchLeg",
+			size = Vector3.new(0.25, 1.2, 1.2),
+			cframe = frame * CFrame.new(x, 0.6, 0),
+			color = Color3.fromRGB(34, 36, 40),
+			parent = parent,
+		})
+	end
+end
+
 -- Moves a model by tweening a CFrameValue and pivoting the model to it.
 local function mover(model: Model): CFrameValue
 	local value = Instance.new("CFrameValue")
@@ -154,13 +354,15 @@ local function mover(model: Model): CFrameValue
 end
 
 local function setUpLighting()
-	Lighting.ClockTime = 2
-	Lighting.Brightness = 1.2
-	Lighting.Ambient = Color3.fromRGB(26, 30, 38)
-	Lighting.OutdoorAmbient = Color3.fromRGB(46, 54, 70)
-	Lighting.EnvironmentDiffuseScale = 0.25
+	-- Three in the morning under a big moon: dark, but bright enough that faces,
+	-- coats and colours read at every graphics quality.
+	Lighting.ClockTime = 3
+	Lighting.Brightness = 2
+	Lighting.Ambient = Color3.fromRGB(62, 68, 92)
+	Lighting.OutdoorAmbient = Color3.fromRGB(92, 106, 142)
+	Lighting.EnvironmentDiffuseScale = 0.4
 	Lighting.EnvironmentSpecularScale = 0.6
-	Lighting.ExposureCompensation = 0.25
+	Lighting.ExposureCompensation = 0.35
 	Lighting.GlobalShadows = true
 	-- The shadow rule needs crisp local-light shadows, and needs them kept when a
 	-- device lowers its quality level. (The project file sets these too.)
@@ -174,12 +376,34 @@ local function setUpLighting()
 		atmosphere.Parent = Lighting
 	end
 	local fog = atmosphere :: Atmosphere
-	fog.Density = 0.36
-	fog.Offset = 0.12
-	fog.Color = Color3.fromRGB(150, 165, 182)
-	fog.Decay = Color3.fromRGB(74, 84, 100)
-	fog.Glare = 0
-	fog.Haze = 2.4
+	fog.Density = 0.3
+	fog.Offset = 0.2
+	fog.Color = Color3.fromRGB(118, 146, 186)
+	fog.Decay = Color3.fromRGB(56, 76, 118)
+	fog.Glare = 0.15
+	fog.Haze = 1.2
+
+	-- Stars and a big moon; the sky textures are Roblox's built-in ones.
+	local sky = Lighting:FindFirstChildOfClass("Sky")
+	if sky == nil then
+		sky = Instance.new("Sky")
+		sky.Parent = Lighting
+	end
+	local night = sky :: Sky
+	night.StarCount = 3000
+	night.MoonAngularSize = 16
+	night.CelestialBodiesShown = true
+
+	-- Neon signs, lanterns and lit windows glow.
+	local bloom = Lighting:FindFirstChildOfClass("BloomEffect")
+	if bloom == nil then
+		bloom = Instance.new("BloomEffect")
+		bloom.Parent = Lighting
+	end
+	local glow = bloom :: BloomEffect
+	glow.Intensity = 0.7
+	glow.Size = 28
+	glow.Threshold = 1.4
 end
 
 local function setUpWater()
@@ -284,7 +508,122 @@ local function buildDock(parent: Folder)
 		material = Enum.Material.DiamondPlate,
 		parent = dock,
 	})
+
+	-- Harbor furniture, in bold colours that read from the booth even on phones.
+	-- None of it stands in the queue lane or on a passenger's way to the ferry,
+	-- the fog or the water.
+	lifebuoy(dock, Vector3.new(5.9, 3.4, -8.72), Vector3.zAxis)
+	lifebuoy(dock, Vector3.new(-12, 2.2, -5.2), Vector3.new(1, 0, 0.6))
+	part({
+		name = "BuoyStand",
+		size = Vector3.new(0.3, 3, 0.3),
+		cframe = CFrame.new(-12.3, 1.5, -5.4),
+		color = TRIM,
+		parent = dock,
+	})
+	for z = -6, -54, -8 do
+		if z > -14 or z < -28 then
+			bollard(dock, Vector3.new(23.8, 0, z))
+		end
+	end
+	seagull(dock, Vector3.new(-20, 1, -10), Vector3.new(1, 0, 0.3))
+	seagull(dock, Vector3.new(25, 1, -42), Vector3.new(-1, 0, 0.5))
+	channelBuoy(dock, Vector3.new(-34, -2.3, -46), BUOY_RED)
+	channelBuoy(dock, Vector3.new(-40, -2.3, -84), BUOY_GREEN)
+	channelBuoy(dock, Vector3.new(44, -2.3, -70), BUOY_GREEN)
 end
+
+-- The pier behind the booth, where players arrive as their avatars before a shift
+-- (the "lobby"). Railings and invisible walls keep them off the passengers' dock and
+-- out of the water; the booth's back door is the way in.
+local function buildPier(parent: Folder): Vector3
+	local pier = folder("Pier", parent)
+	for x = -14, 12, 2 do
+		part({
+			name = "Plank",
+			size = Vector3.new(1.9, 1, 38),
+			cframe = CFrame.new(x + 1, -0.5, 27),
+			color = WOOD:Lerp(Color3.new(0, 0, 0), ((x // 2) % 3) * 0.06),
+			material = Enum.Material.WoodPlanks,
+			collide = true,
+			parent = pier,
+		})
+	end
+	for _, x in { -14.5, 14.5 } do
+		for z = 14, 46, 8 do
+			part({
+				name = "Piling",
+				size = Vector3.new(12, 1.4, 1.4),
+				cframe = upright(Vector3.new(x, -5, z)),
+				color = WOOD:Lerp(Color3.new(0, 0, 0), 0.35),
+				material = Enum.Material.Wood,
+				shape = Enum.PartType.Cylinder,
+				parent = pier,
+			})
+		end
+	end
+	-- Rails round the edges, and along the line that separates the pier from the dock.
+	railing(pier, Vector3.new(-13.8, 0, 5), Vector3.new(-13.8, 0, 45.8))
+	railing(pier, Vector3.new(13.8, 0, 5), Vector3.new(13.8, 0, 45.8))
+	railing(pier, Vector3.new(-13.8, 0, 45.8), Vector3.new(13.8, 0, 45.8))
+	railing(pier, Vector3.new(-19.5, 0, 4.6), Vector3.new(-5.3, 0, 4.6))
+	railing(pier, Vector3.new(5.3, 0, 4.6), Vector3.new(24.5, 0, 4.6))
+	barrier(pier, Vector3.new(1, 16, 42), CFrame.new(-14.4, 8, 25.3))
+	barrier(pier, Vector3.new(1, 16, 42), CFrame.new(14.4, 8, 25.3))
+	barrier(pier, Vector3.new(30, 16, 1), CFrame.new(0, 8, 46.4))
+	barrier(pier, Vector3.new(15.2, 16, 1), CFrame.new(-12.6, 8, 4.4))
+	barrier(pier, Vector3.new(20.2, 16, 1), CFrame.new(15.1, 8, 4.4))
+
+	for _, z in { 16, 30, 43 } do
+		lampPost(pier, Vector3.new(-12, 0, z))
+		lampPost(pier, Vector3.new(12, 0, z))
+	end
+	bench(pier, Vector3.new(-10.5, 0, 23), Vector3.new(1, 0, 0))
+	bench(pier, Vector3.new(10.5, 0, 23), Vector3.new(-1, 0, 0))
+	lifebuoy(pier, Vector3.new(-13.6, 1.8, 36), Vector3.new(1, 0, 0))
+	seagull(pier, Vector3.new(14.5, 1, 38), Vector3.new(-1, 0, 0.2))
+
+	-- A notice board facing the booth, so the first thing a new player reads is what
+	-- to do.
+	local board = part({
+		name = "NoticeBoard",
+		size = Vector3.new(9, 4.4, 0.4),
+		cframe = CFrame.new(0, 3.6, 44.6) * CFrame.Angles(0, math.rad(180), 0),
+		color = Color3.fromRGB(33, 52, 96),
+		parent = pier,
+	})
+	for _, x in { -4, 4 } do
+		part({
+			name = "BoardPost",
+			size = Vector3.new(0.4, 6, 0.4),
+			cframe = CFrame.new(x, 3, 44.9),
+			color = TRIM,
+			parent = pier,
+		})
+	end
+	sign(board, Enum.NormalId.Front, "NIGHT FERRY · STAFF WANTED\nClock in at the ticket office door", TRIM)
+
+	-- Players appear here, facing the booth.
+	local spawn = Instance.new("SpawnLocation")
+	spawn.Name = "PierSpawn"
+	spawn.Size = Vector3.new(8, 0.2, 8)
+	spawn.CFrame = CFrame.new(0, 0.1, 30) * CFrame.Angles(0, math.rad(180), 0)
+	spawn.Anchored = true
+	spawn.CanCollide = false
+	spawn.CanTouch = false
+	spawn.CanQuery = false
+	spawn.Transparency = 1
+	spawn.CastShadow = false
+	spawn.Neutral = true
+	spawn.Duration = 0
+	spawn.Parent = pier
+	return spawn.Position
+end
+
+local DOOR_HINGE = CFrame.new(-1.3, 3.45, 8)
+local DOOR_SHUT = DOOR_HINGE * CFrame.new(1.3, 0, 0)
+local DOOR_OPEN = DOOR_HINGE * CFrame.Angles(0, math.rad(-100), 0) * CFrame.new(1.3, 0, 0)
+local door: BasePart
 
 local function buildBooth(parent: Folder): CFrame
 	local booth = folder("Booth", parent)
@@ -292,8 +631,8 @@ local function buildBooth(parent: Folder): CFrame
 		name = "Floor",
 		size = Vector3.new(10, 0.2, 8),
 		cframe = CFrame.new(0, 0.1, 4),
-		color = Color3.fromRGB(60, 52, 46),
-		material = Enum.Material.Wood,
+		color = Color3.fromRGB(96, 70, 52),
+		material = Enum.Material.WoodPlanks,
 		collide = true,
 		parent = booth,
 	})
@@ -304,7 +643,10 @@ local function buildBooth(parent: Folder): CFrame
 		{ Vector3.new(1.8, 4.4, 0.4), Vector3.new(4.1, 4.7, 0) },
 		{ Vector3.new(0.4, 8.2, 8), Vector3.new(-5, 4.1, 4) },
 		{ Vector3.new(0.4, 8.2, 8), Vector3.new(5, 4.1, 4) },
-		{ Vector3.new(10, 8.2, 0.4), Vector3.new(0, 4.1, 8) },
+		-- The back wall, either side of and above the staff door.
+		{ Vector3.new(3.6, 8.2, 0.4), Vector3.new(-3.2, 4.1, 8) },
+		{ Vector3.new(3.6, 8.2, 0.4), Vector3.new(3.2, 4.1, 8) },
+		{ Vector3.new(2.8, 1.3, 0.4), Vector3.new(0, 7.55, 8) },
 	}
 	for _, wall in walls do
 		part({
@@ -313,17 +655,92 @@ local function buildBooth(parent: Folder): CFrame
 			cframe = CFrame.new(wall[2]),
 			color = BOOTH_PAINT,
 			material = Enum.Material.WoodPlanks,
+			collide = true,
 			parent = booth,
 		})
+	end
+	-- White corner trim, the classic harbor-kiosk look.
+	for _, x in { -5.05, 5.05 } do
+		for _, z in { -0.05, 8.05 } do
+			part({
+				name = "CornerTrim",
+				size = Vector3.new(0.5, 8.2, 0.5),
+				cframe = CFrame.new(x, 4.1, z),
+				color = TRIM,
+				parent = booth,
+			})
+		end
 	end
 	part({
 		name = "Roof",
 		size = Vector3.new(11.5, 0.6, 9.6),
 		cframe = CFrame.new(0, 8.5, 3.8),
-		color = Color3.fromRGB(38, 42, 48),
-		material = Enum.Material.Slate,
+		color = ROOF,
+		material = Enum.Material.SmoothPlastic,
 		parent = booth,
 	})
+	part({
+		name = "RoofTrim",
+		size = Vector3.new(11.7, 0.25, 9.8),
+		cframe = CFrame.new(0, 8.12, 3.8),
+		color = TRIM,
+		parent = booth,
+	})
+
+	-- The staff door at the back, from the pier. Open between shifts, shut during one.
+	door = part({
+		name = "Door",
+		size = Vector3.new(2.6, 6.9, 0.25),
+		cframe = DOOR_OPEN,
+		color = TRIM,
+		collide = false,
+		parent = booth,
+	})
+	local doorSign = part({
+		name = "DoorSign",
+		size = Vector3.new(1.8, 0.5, 0.05),
+		cframe = DOOR_OPEN * CFrame.new(0, 1.6, 0.16),
+		color = Color3.fromRGB(33, 52, 96),
+		castShadow = false,
+		parent = booth,
+	})
+	sign(doorSign, Enum.NormalId.Back, "STAFF ONLY", TRIM)
+	local doorWeld = Instance.new("WeldConstraint")
+	doorWeld.Part0 = door
+	doorWeld.Part1 = doorSign
+	doorWeld.Parent = doorSign
+	doorSign.Anchored = false
+
+	-- Inside, for anyone who turns round: a clock and the rules in poster form.
+	part({
+		name = "Clock",
+		size = Vector3.new(0.2, 1.4, 1.4),
+		cframe = CFrame.new(3.2, 6.2, 7.75) * CFrame.Angles(0, math.rad(90), 0), -- a disc on the wall
+		color = TRIM,
+		shape = Enum.PartType.Cylinder,
+		parent = booth,
+	})
+	for _, hand in { { 0.55, 0 }, { 0.38, 90 } } do
+		part({
+			name = "ClockHand",
+			size = Vector3.new(0.08, hand[1], 0.05),
+			cframe = CFrame.new(3.2, 6.2, 7.62)
+				* CFrame.Angles(0, 0, math.rad(hand[2]))
+				* CFrame.new(0, hand[1] / 2, 0),
+			color = Color3.fromRGB(27, 42, 53),
+			castShadow = false,
+			parent = booth,
+		})
+	end
+	local poster = part({
+		name = "Poster",
+		size = Vector3.new(2.4, 3, 0.05),
+		cframe = CFrame.new(-3.2, 4.8, 7.77),
+		color = Color3.fromRGB(245, 233, 196),
+		castShadow = false,
+		parent = booth,
+	})
+	sign(poster, Enum.NormalId.Front, "CHECK\nEVERY\nTICKET", Color3.fromRGB(196, 40, 28))
 	-- Window frame and glass.
 	for _, trim in
 		{
@@ -343,6 +760,7 @@ local function buildBooth(parent: Folder): CFrame
 		transparency = 0.93,
 		reflectance = 0.04,
 		castShadow = false,
+		collide = true, -- nobody climbs out of the window
 		parent = booth,
 	})
 	-- Counter, with the booth's own warm light.
@@ -350,8 +768,18 @@ local function buildBooth(parent: Folder): CFrame
 		name = "Counter",
 		size = Vector3.new(9.2, 0.3, 1.6),
 		cframe = CFrame.new(0, 2.5, 0.95),
-		color = Color3.fromRGB(96, 74, 58),
+		color = Color3.fromRGB(128, 90, 60),
 		material = Enum.Material.Wood,
+		collide = true,
+		parent = booth,
+	})
+	part({
+		name = "CounterFront",
+		size = Vector3.new(9.2, 2.35, 0.3),
+		cframe = CFrame.new(0, 1.2, 1.6),
+		color = BOOTH_PAINT:Lerp(Color3.new(0, 0, 0), 0.2),
+		material = Enum.Material.WoodPlanks,
+		collide = true,
 		parent = booth,
 	})
 	local interior = Instance.new("PointLight")
@@ -406,6 +834,25 @@ local function buildBooth(parent: Folder): CFrame
 		parent = booth,
 	})
 	sign(boothSign, Enum.NormalId.Front, "GULL HARBOR · NIGHT FERRY TICKETS", TRIM)
+	-- A neon frame round the sign, the brightest thing on the harbor.
+	for _, bar in
+		{
+			{ Vector3.new(8.3, 0.14, 0.14), Vector3.new(0, 9.52, -0.5) },
+			{ Vector3.new(8.3, 0.14, 0.14), Vector3.new(0, 8.28, -0.5) },
+			{ Vector3.new(0.14, 1.38, 0.14), Vector3.new(-4.08, 8.9, -0.5) },
+			{ Vector3.new(0.14, 1.38, 0.14), Vector3.new(4.08, 8.9, -0.5) },
+		}
+	do
+		part({
+			name = "SignNeon",
+			size = bar[1],
+			cframe = CFrame.new(bar[2]),
+			color = SIGN_NEON,
+			material = Enum.Material.Neon,
+			castShadow = false,
+			parent = booth,
+		})
+	end
 	part({
 		name = "LampArm",
 		size = Vector3.new(0.2, 0.2, 0.8),
@@ -665,6 +1112,7 @@ function WorldService.build(): Markers
 	setUpLighting()
 	setUpWater()
 	buildDock(world)
+	local pier = buildPier(world)
 	local cameraCFrame = buildBooth(world)
 	buildFerry(world)
 	buildLighthouse(world)
@@ -676,6 +1124,14 @@ function WorldService.build(): Markers
 	-- posts (z = -7), so nobody walks through the ropes.
 	markers = {
 		camera = cameraCFrame,
+		pier = pier,
+		-- Behind the counter, facing the window: the front spot first.
+		stands = {
+			CFrame.lookAt(Vector3.new(0, 0.2, 2.7), Vector3.new(0, 0.2, -1)),
+			CFrame.lookAt(Vector3.new(-2.8, 0.2, 3), Vector3.new(-2.8, 0.2, -1)),
+			CFrame.lookAt(Vector3.new(2.8, 0.2, 3), Vector3.new(2.8, 0.2, -1)),
+			CFrame.lookAt(Vector3.new(0, 0.2, 5.4), Vector3.new(0, 0.2, -1)),
+		},
 		window = Vector3.new(0, 0, -3.2),
 		queue = { Vector3.new(-2, 0, -11), Vector3.new(0.5, 0, -17), Vector3.new(-1.5, 0, -23) },
 		spawn = Vector3.new(-0.5, 0, -50), -- the middle of the rope lane
@@ -718,6 +1174,14 @@ end
 
 function WorldService.passengerFolder(): Folder
 	return passengers
+end
+
+-- The staff door swings open onto the pier between shifts, and shuts for one.
+function WorldService.setDoor(open: boolean)
+	door.CanCollide = not open
+	TweenService:Create(door, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		CFrame = if open then DOOR_OPEN else DOOR_SHUT,
+	}):Play()
 end
 
 function WorldService.setLanterns(lit: number)

@@ -15,7 +15,10 @@ local TweenService = game:GetService("TweenService")
 
 local EffectsController = {}
 
-local NORMAL_TINT = Color3.fromRGB(255, 255, 255)
+-- A cool, slightly saturated night: colours read on phones, where the engine drops
+-- shadows and much of the lighting.
+local NORMAL_TINT = Color3.fromRGB(242, 247, 255)
+local NORMAL_SATURATION = 0.14
 local FLOOD_TINT = Color3.fromRGB(170, 222, 214)
 local ALARM_TINT = Color3.fromRGB(255, 150, 140)
 
@@ -47,13 +50,13 @@ function EffectsController.setFlooded(on: boolean)
 	if on then
 		tweenGrade(FLOOD_TINT, -0.45, 2)
 	else
-		tweenGrade(NORMAL_TINT, -0.08, 1)
+		tweenGrade(NORMAL_TINT, NORMAL_SATURATION, 1)
 	end
 end
 
 function EffectsController.lanternOut()
 	grade.TintColor = ALARM_TINT
-	tweenGrade(if flooded then FLOOD_TINT else NORMAL_TINT, if flooded then -0.45 else -0.08, 0.9)
+	tweenGrade(if flooded then FLOOD_TINT else NORMAL_TINT, if flooded then -0.45 else NORMAL_SATURATION, 0.9)
 end
 
 local function spinLighthouse()
@@ -77,8 +80,8 @@ end
 function EffectsController.start()
 	grade = Instance.new("ColorCorrectionEffect")
 	grade.Name = "LastFerryGrade"
-	grade.Saturation = -0.08
-	grade.Contrast = 0.06
+	grade.Saturation = NORMAL_SATURATION
+	grade.Contrast = 0.1
 	grade.TintColor = NORMAL_TINT
 	grade.Parent = Lighting
 

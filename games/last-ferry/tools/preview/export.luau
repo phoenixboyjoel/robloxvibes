@@ -13,6 +13,7 @@
 		intro  - the night 1 title card, before the window opens
 		queue  - between passengers, with the queue walking up
 		lineup - the whole wardrobe in daylight (no player, no HUD)
+		pier   - the pier behind the booth, where players arrive (no player, no HUD)
 
 	--screen and --safe set the screen and its safe area in pixels (default 1280x720,
 	safe 1280x684). --touch makes the game see a phone.
@@ -55,7 +56,7 @@ local sim = Sim.new({
 sim:startServer()
 sim:run(1)
 -- The lineup frames its own camera, so no player (whose camera script would move it).
-local player = if scenario == "lineup" then nil else sim:addPlayer("Preview", 1)
+local player = if scenario == "lineup" or scenario == "pier" then nil else sim:addPlayer("Preview", 1)
 
 local function hud()
 	return player.PlayerGui.LastFerryHud.Root
@@ -145,9 +146,22 @@ local function lineup()
 	return camera
 end
 
+-- The pier behind the booth at night, where players arrive, from a player's-eye height.
+local function pier()
+	sim:execute([[
+		local camera = workspace.CurrentCamera
+		camera.CFrame = CFrame.lookAt(Vector3.new(6, 6.5, 38), Vector3.new(-1, 4, 6))
+		camera.FieldOfView = 70
+	]])
+	sim:run(1)
+	return true
+end
+
 local done
 if scenario == "lineup" then
 	done = lineup() ~= nil
+elseif scenario == "pier" then
+	done = pier()
 elseif scenario == "intro" then
 	done = playUntil(function()
 		local overlay = hud().Overlay

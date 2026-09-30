@@ -1,7 +1,8 @@
 --!strict
 --[[
 	ProgressService: which endings each player has found, kept in a DataStore
-	and shown on the intro and ending screens.
+	and shown on the pier, on the ending screen and in Roblox's player list
+	(leaderstats: Endings found and Shifts worked).
 
 	Saving happens once per ending, with UpdateAsync merging into whatever is
 	stored (a union of endings), so a failed load or a second server can never
@@ -104,6 +105,29 @@ local function retry<T>(label: string, call: () -> T): (boolean, T?)
 	return false, nil
 end
 
+-- Roblox's player list shows the values in a folder named "leaderstats", in the order
+-- they're added.
+local function makeLeaderstats(player: Player)
+	local stats = Instance.new("Folder")
+	stats.Name = "leaderstats"
+	for _, name in { "Endings", "Shifts" } do
+		local value = Instance.new("IntValue")
+		value.Name = name
+		value.Parent = stats
+	end
+	stats.Parent = player
+end
+
+local function setStat(player: Player, name: string, value: number)
+	local stats = player:FindFirstChild("leaderstats")
+	local stat = if stats then stats:FindFirstChild(name) else nil
+	if stat and stat:IsA("IntValue") then
+		stat.Value = value
+	end
+end
+
+-- Shows a player their progress: the endings found (to their client) and the stats in
+-- the player list (to everyone).
 local function send(player: Player)
 	local data = progress[player]
 	if data == nil or player.Parent == nil then
@@ -115,6 +139,8 @@ local function send(player: Player)
 			table.insert(found, Content.Endings[id].title)
 		end
 	end
+	setStat(player, "Endings", #found)
+	setStat(player, "Shifts", data.runs)
 	local payload: View.Progress = { found = found, total = #Content.EndingOrder }
 	remote:FireClient(player, payload)
 end
@@ -218,9 +244,11 @@ function ProgressService.start()
 	end
 
 	Players.PlayerAdded:Connect(function(player)
+		makeLeaderstats(player)
 		task.spawn(load, player)
 	end)
 	for _, player in Players:GetPlayers() do
+		makeLeaderstats(player)
 		task.spawn(load, player)
 	end
 	Players.PlayerRemoving:Connect(function(player)

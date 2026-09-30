@@ -36,7 +36,7 @@ something.
 | `ServerScriptService/Services/PassengerService.luau` | Dresses a Robloxian for each passenger and adds the visible tells from their facts: breath emitter; drips from cuffs and hem, a wide puddle, footprints; pale skin and seaweed; CastShadow plus a shadow mark on the planks. Walks and vanishes them |
 | `ServerScriptService/Services/CrewService.luau` | The players' own avatars: the pier between shifts, the time clock's "Clock in" prompt, a stand each in the booth, the clerk's cap (their own hats hidden under it), late joiners, clocking out |
 | `ServerScriptService/Services/ShiftService.luau` | The Roblox `Stage` for the Director (queue on the dock, remotes, world calls) and the action handler |
-| `ServerScriptService/Services/ProgressService.luau` | Endings found per player (DataStore) and badges |
+| `ServerScriptService/Services/ProgressService.luau` | Endings found per player (DataStore), badges, and the player list's `leaderstats` (Endings, Shifts) |
 | `ReplicatedStorage/Shared/Config.luau` | Remote names and tunables both sides read (timers, walk speed, rate limits) |
 | `ReplicatedStorage/Shared/Net.luau` | Creates and finds RemoteEvents; per-player rate limiter |
 | `ReplicatedStorage/Shared/Types.luau` | The screen state, effects and progress payloads the server sends |
@@ -45,9 +45,9 @@ something.
 | `ReplicatedStorage/Controllers/CrowdController.luau` | Animates passengers on each client: the classic Roblox walk, idle sway and look-about, via `Motor6D.Transform` in `PreSimulation` |
 | `ReplicatedStorage/Controllers/EffectsController.luau` | Blur behind cards, flood tint, lantern-out pulse, client-side lighthouse spin |
 | `ReplicatedStorage/Controllers/HudController.luau` | The whole HUD and its wiring to the remotes: the lobby banner on the pier, the shift HUD, passengers' lines as chat bubbles and chat-log lines, `ContextActionService` shortcuts that give way to Roblox's controls, the Modal button that frees the mouse in first person |
-| `ReplicatedStorage/Ui/Theme.luau` | Colours, fonts, design canvas and scale limits |
-| `ReplicatedStorage/Ui/Ui.luau` | Typed UI builders (frames, labels, buttons, layout) |
-| `ReplicatedStorage/Ui/Widgets.luau` | Shared pieces: captions, paragraphs, rule rows, text outlines |
+| `ReplicatedStorage/Ui/Theme.luau` | Colours and fonts in Roblox's chunky house style (Fredoka One titles, Builder Sans ExtraBold controls, Special Elite and Oswald only on paper), design canvas and scale limits |
+| `ReplicatedStorage/Ui/Ui.luau` | Typed UI builders: frames, labels, layout, text strokes, hard shadows (`UIShadow`), gloss, drawn icons (check, cross, play, bang, page) and chunky buttons that squash and spring back |
+| `ReplicatedStorage/Ui/Widgets.luau` | Shared pieces: captions, paragraphs, tags, rule rows with number badges, lantern icons, text outlines |
 | `ReplicatedStorage/Ui/Ticket.luau` | The ticket card, its drawn stamps, the torn-page tab, the BOARDED / TURNED AWAY stamp |
 | `ReplicatedStorage/Ui/Overlay.luau` | Intro, summary, tide-came-in and ending cards, with the co-op Continue |
 | `tests/` | Lune test suite (`lune run tests/run.luau`) and the headless simulator in `tests/sim/` |

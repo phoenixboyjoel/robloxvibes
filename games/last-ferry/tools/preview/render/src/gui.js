@@ -3,7 +3,8 @@
 // enough to judge a HUD: UDim2 sizes and positions, AnchorPoint, UIListLayout,
 // UIPadding, AutomaticSize, UIScale, UIAspectRatioConstraint, UISizeConstraint, text
 // wrapping and TextScaled, rich text, UIStroke (text outlines and borders), UICorner,
-// UIGradient, ScrollingFrame clipping, ZIndex (Sibling), Rotation and CanvasGroup.
+// UIGradient, UIShadow, ScrollingFrame clipping, ZIndex (Sibling), Rotation and
+// CanvasGroup.
 //
 // Images (rbxassetid://...) can't be fetched here; known built-in rbxasset:// textures
 // are drawn when a loader provides them, anything else is skipped.
@@ -533,6 +534,24 @@ function drawNode(ctx, node, images) {
     ctx.translate(-cx, -cy);
   }
   const radius = cornerRadius(node);
+  // UIShadow: a copy of the element's rounded shape behind it, offset, spread and blurred.
+  for (const shadow of node.children.filter((c) => c.class === 'UIShadow' && c.props.Enabled !== false)) {
+    const s = shadow.props;
+    const offset = s.Offset ?? [0, 0, 0, 0];
+    const spread = s.Spread ?? [0, 0, 0, 0];
+    const dx = offset[0] * node._w + offset[1] * node._k;
+    const dy = offset[2] * node._h + offset[3] * node._k;
+    const gx = spread[0] * node._w + spread[1] * node._k;
+    const gy = spread[2] * node._h + spread[3] * node._k;
+    const blurValue = s.BlurRadius ?? [0, 0];
+    const blur = blurValue[0] * Math.min(node._w, node._h) + blurValue[1] * node._k;
+    ctx.save();
+    if (blur > 0) ctx.filter = `blur(${(blur / 2).toFixed(1)}px)`;
+    roundedRect(ctx, node._x + dx - gx / 2, node._y + dy - gy / 2, node._w + gx, node._h + gy, radius);
+    ctx.fillStyle = rgba(s.Color ?? [0, 0, 0], s.Transparency ?? 0);
+    ctx.fill();
+    ctx.restore();
+  }
   const bgT = p.BackgroundTransparency ?? 0;
   if (bgT < 1) {
     roundedRect(ctx, node._x, node._y, node._w, node._h, radius);

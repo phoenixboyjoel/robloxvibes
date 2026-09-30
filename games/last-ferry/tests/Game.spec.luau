@@ -18,7 +18,6 @@ local T = require("./TestLib")
 T.suite("Game (headless)")
 
 local ROOT = "."
-local LAMP = roblox.Color3.fromRGB(255, 198, 132)
 
 type Bot = {
 	sim: any,
@@ -219,7 +218,7 @@ local function tick(bot: Bot)
 	-- Count lanterns going out from the top bar (they're relit each night).
 	local lit = 0
 	for _, lantern in root.Play.TopBar.Right.Lanterns:GetChildren() do
-		if lantern:IsA("Frame") and lantern.BackgroundColor3 == LAMP then
+		if lantern:IsA("Frame") and lantern.Visible and lantern:GetAttribute("Lit") then
 			lit += 1
 		end
 	end
@@ -407,6 +406,8 @@ T.test("a clerk playing from the HUD finishes five nights clean", function()
 	T.expect(string.find(bot.endingText, "Endings found: 1 of 4 · The Petrel Sails", 1, true) ~= nil, bot.endingText)
 	local saved = sim.stores.LastFerryProgress_v1.u_101
 	T.expect(saved and saved.endings.CLEAN_SHIFT and saved.runs == 1, "progress saved to the DataStore")
+	T.equal(alice.leaderstats.Endings.Value, 1, "the player list shows one ending found")
+	T.equal(alice.leaderstats.Shifts.Value, 1, "and one shift worked")
 	print(
 		`    (a clean run took {math.floor(sim.now / 60)} min {math.floor(sim.now % 60)} s of game time, {bot.calls} calls)`
 	)

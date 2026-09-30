@@ -59,7 +59,7 @@ local function drawGull(stamp: Frame)
 	bar(stamp, Vector2.new(19, 4), Vector2.new(8, -5), -24, red)
 	Ui.label(stamp, "Word", {
 		text = "GULL",
-		font = Theme.Fonts.title,
+		font = Theme.Fonts.print,
 		size = 12,
 		color = red,
 		xAlign = Enum.TextXAlignment.Center,
@@ -91,7 +91,7 @@ local function drawEmpty(stamp: Frame)
 	end
 	Ui.label(stamp, "Word", {
 		text = "STAMP",
-		font = Theme.Fonts.title,
+		font = Theme.Fonts.print,
 		size = 11,
 		color = C.paperMuted,
 		xAlign = Enum.TextXAlignment.Center,
@@ -105,7 +105,7 @@ end
 local function field(parent: Instance, name: string, caption: string, y: number, valueSize: number): TextLabel
 	Ui.label(parent, name .. "Caption", {
 		text = caption,
-		font = Theme.Fonts.title,
+		font = Theme.Fonts.print,
 		size = 12,
 		color = C.paperMuted,
 		frameSize = UDim2.new(1, -80, 0, 14),
@@ -161,14 +161,14 @@ function Ticket.new(parent: Instance, home: UDim2): Ticket
 
 	Ui.label(body, "Company", {
 		text = "GULL HARBOR FERRY CO.",
-		font = Theme.Fonts.title,
+		font = Theme.Fonts.print,
 		size = 14,
 		color = C.paperMuted,
 		frameSize = UDim2.new(1, 0, 0, 18),
 	})
 	Ui.label(body, "Admit", {
 		text = "ADMIT ONE",
-		font = Theme.Fonts.title,
+		font = Theme.Fonts.print,
 		size = 14,
 		color = C.paperMuted,
 		xAlign = Enum.TextXAlignment.Right,
@@ -196,7 +196,7 @@ function Ticket.new(parent: Instance, home: UDim2): Ticket
 
 	-- The rubber stamp slammed onto the ticket after a call.
 	local callStamp = Ui.label(paper, "CallStamp", {
-		font = Theme.Fonts.title,
+		font = Theme.Fonts.print,
 		size = 34,
 		xAlign = Enum.TextXAlignment.Center,
 		frameSize = UDim2.fromOffset(220, 52),

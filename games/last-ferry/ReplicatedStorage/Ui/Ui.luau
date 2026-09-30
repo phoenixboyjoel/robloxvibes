@@ -1,13 +1,17 @@
 --!strict
 --[[
-	Small typed builders for the HUD. Every property is set through a typed
-	assignment, so luau-lsp catches a misspelt property or a wrong value type
-	before the game ever runs.
+	Small typed builders for the HUD, in Roblox's chunky house style: rounded
+	corners, thick dark outlines, a hard drop shadow (UIShadow), a light-to-dark
+	gloss (UIGradient) and white bold type with a dark stroke. Every property is
+	set through a typed assignment, so luau-lsp catches a misspelt property or a
+	wrong value type before the game ever runs.
 ]]
 
 local TweenService = game:GetService("TweenService")
 
 local Theme = require("./Theme")
+
+local C = Theme.Colors
 
 export type TextProps = {
 	text: string?,
@@ -56,6 +60,39 @@ function Ui.stroke(parent: Instance, color: Color3, thickness: number, transpare
 	return stroke
 end
 
+-- A dark outline round the letters of a label or button, so white text reads on
+-- anything: fog, lamplight or a bright button.
+function Ui.textStroke(label: GuiObject, thickness: number?, color: Color3?): UIStroke
+	local stroke = Instance.new("UIStroke")
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+	stroke.Color = color or C.outline
+	stroke.Thickness = thickness or 2
+	stroke.LineJoinMode = Enum.LineJoinMode.Round
+	stroke.Parent = label
+	return stroke
+end
+
+-- A hard drop shadow straight below, in Roblox's cartoon style (no blur).
+function Ui.shadow(parent: GuiObject, depth: number, color: Color3?): UIShadow
+	local shadow = Instance.new("UIShadow")
+	shadow.Offset = UDim2.fromOffset(0, depth)
+	shadow.Color = color or C.shadow
+	shadow.BlurRadius = UDim.new(0, 0)
+	shadow.Transparency = 0
+	shadow.Parent = parent
+	return shadow
+end
+
+-- Lighter at the top, darker at the bottom: the gloss on chunky Roblox buttons.
+function Ui.gloss(parent: GuiObject, strength: number?): UIGradient
+	local dark = 1 - (strength or 0.22)
+	local gradient = Instance.new("UIGradient")
+	gradient.Rotation = 90
+	gradient.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.new(dark, dark, dark))
+	gradient.Parent = parent
+	return gradient
+end
+
 function Ui.padding(parent: Instance, top: number, right: number?, bottom: number?, left: number?)
 	local padding = Instance.new("UIPadding")
 	padding.PaddingTop = UDim.new(0, top)
@@ -82,26 +119,29 @@ function Ui.list(
 	return list
 end
 
--- A dark rounded panel that swallows clicks, so dragging on it doesn't turn the camera.
+-- A dark rounded panel with a thick outline and a hard shadow. It swallows clicks, so
+-- dragging on it doesn't turn the camera.
 function Ui.panel(parent: Instance, name: string, size: UDim2, position: UDim2?, anchor: Vector2?): Frame
 	local panel = Ui.frame(parent, name, size, position, anchor)
-	panel.BackgroundColor3 = Theme.Colors.panel
-	panel.BackgroundTransparency = 0.12
+	panel.BackgroundColor3 = C.panel
+	panel.BackgroundTransparency = 0.06
 	panel.Active = true
-	Ui.corner(panel, UDim.new(0, 10))
-	Ui.stroke(panel, Theme.Colors.line, 1, 0.3)
+	Ui.corner(panel, UDim.new(0, 14))
+	Ui.stroke(panel, C.outline, 3)
+	Ui.gloss(panel, 0.3)
+	Ui.shadow(panel, 5)
 	return panel
 end
 
 -- Typed as TextLabel so every property below is checked. TextButton has the same text
--- properties, so buttons go through here too (see Ui.button).
+-- properties, so the tab buttons go through here too.
 local function applyText(label: TextLabel, props: TextProps)
 	label.BackgroundTransparency = 1
 	label.BorderSizePixel = 0
 	label.Text = props.text or ""
 	label.FontFace = props.font or Theme.Fonts.body
 	label.TextSize = props.size or 18
-	label.TextColor3 = props.color or Theme.Colors.text
+	label.TextColor3 = props.color or C.text
 	label.TextXAlignment = props.xAlign or Enum.TextXAlignment.Left
 	label.TextYAlignment = props.yAlign or Enum.TextYAlignment.Center
 	label.TextWrapped = props.wrap == true
@@ -122,56 +162,167 @@ function Ui.label(parent: Instance, name: string, props: TextProps): TextLabel
 	return label
 end
 
+function Ui.applyText(button: TextButton, props: TextProps)
+	applyText((button :: any) :: TextLabel, props)
+end
+
+-- Icons drawn from rounded bars, so they need no image assets.
+-- check ✓, cross ✕, play ▶ (as a chevron), bang !, and page (a sheet with lines).
+function Ui.icon(parent: Instance, kind: string, size: number, color: Color3): Frame
+	local holder = Ui.frame(parent, "Icon", UDim2.fromOffset(size, size))
+	local thick = math.max(3, math.floor(size * 0.2 + 0.5))
+	-- A bar from (x1, y1) to (x2, y2), in fractions of the icon's size.
+	local function bar(x1: number, y1: number, x2: number, y2: number)
+		local dx, dy = (x2 - x1) * size, (y2 - y1) * size
+		local b = Ui.frame(
+			holder,
+			"Stroke",
+			UDim2.fromOffset(math.sqrt(dx * dx + dy * dy) + thick, thick),
+			UDim2.fromOffset((x1 + x2) / 2 * size, (y1 + y2) / 2 * size),
+			Vector2.new(0.5, 0.5)
+		)
+		b.BackgroundTransparency = 0
+		b.BackgroundColor3 = color
+		b.Rotation = math.deg(math.atan2(dy, dx))
+		Ui.corner(b, UDim.new(0.5, 0))
+	end
+	if kind == "check" then
+		bar(0.14, 0.54, 0.4, 0.8)
+		bar(0.4, 0.8, 0.88, 0.22)
+	elseif kind == "cross" then
+		bar(0.2, 0.2, 0.8, 0.8)
+		bar(0.8, 0.2, 0.2, 0.8)
+	elseif kind == "play" then
+		bar(0.32, 0.18, 0.74, 0.5)
+		bar(0.74, 0.5, 0.32, 0.82)
+	elseif kind == "bang" then
+		bar(0.5, 0.14, 0.5, 0.58)
+		bar(0.5, 0.86, 0.5, 0.86)
+	elseif kind == "page" then
+		local sheet =
+			Ui.frame(holder, "Sheet", UDim2.fromScale(0.7, 0.9), UDim2.fromScale(0.5, 0.5), Vector2.new(0.5, 0.5))
+		sheet.BackgroundTransparency = 0
+		sheet.BackgroundColor3 = color
+		Ui.corner(sheet, UDim.new(0, 3))
+		for i = 1, 3 do
+			local line = Ui.frame(
+				sheet,
+				"Line",
+				UDim2.new(0.6, 0, 0, math.max(2, math.floor(size * 0.08))),
+				UDim2.fromScale(0.5, 0.18 + i * 0.18),
+				Vector2.new(0.5, 0)
+			)
+			line.BackgroundTransparency = 0
+			line.BackgroundColor3 = C.ink
+		end
+	end
+	return holder
+end
+
 export type ButtonStyle = {
 	fill: Color3,
+	deep: Color3?, -- the colour of its drop shadow (defaults to the fill, darkened)
 	text: Color3?,
 	font: Font?,
 	textSize: number?,
+	icon: string?, -- see Ui.icon
+	stack: boolean?, -- the icon above the label rather than beside it
 }
 
--- A solid rounded button with a hover and press response.
+-- The label inside a button made by Ui.button.
+function Ui.buttonLabel(button: GuiButton): TextLabel
+	return button:FindFirstChild("Label", true) :: TextLabel
+end
+
+-- The visible body of a button made by Ui.button (a frame that scales from its centre).
+function Ui.buttonFace(button: GuiButton): Frame
+	return button:FindFirstChild("Face") :: Frame
+end
+
+-- A chunky Roblox button: saturated fill, thick outline, gloss, a hard shadow, an
+-- optional drawn icon and a stroked label. It squashes when pressed and springs back,
+-- grows a little under the mouse, and fades when it can't be pressed.
+--
+-- The TextButton itself is invisible and takes the input and the layout; everything
+-- you see is on its "Face", which is centred so it scales from the middle.
 function Ui.button(parent: Instance, name: string, text: string, size: UDim2, style: ButtonStyle): TextButton
 	local button = Instance.new("TextButton")
 	button.Name = name
-	applyText((button :: any) :: TextLabel, {
-		text = text,
-		font = style.font or Theme.Fonts.title,
-		size = style.textSize or 22,
-		color = style.text or Theme.Colors.text,
-		xAlign = Enum.TextXAlignment.Center,
-		frameSize = size,
-	})
-	button.BackgroundTransparency = 0
-	button.BackgroundColor3 = style.fill
+	button.Size = size
+	button.BackgroundTransparency = 1
+	button.BorderSizePixel = 0
+	button.Text = ""
 	button.AutoButtonColor = false
 	button.Selectable = true
-	Ui.corner(button, UDim.new(0, 10))
-	local stroke = Ui.stroke(button, style.fill:Lerp(Color3.new(1, 1, 1), 0.25), 1.5, 0.2)
 
-	local base = style.fill
-	local function tint(color: Color3)
-		TweenService:Create(button, TweenInfo.new(0.12), { BackgroundColor3 = color }):Play()
+	local face = Ui.frame(button, "Face", UDim2.fromScale(1, 1), UDim2.fromScale(0.5, 0.5), Vector2.new(0.5, 0.5))
+	face.BackgroundTransparency = 0
+	face.BackgroundColor3 = style.fill
+	Ui.corner(face, UDim.new(0, 14))
+	local outline = Ui.stroke(face, C.outline, 3)
+	Ui.gloss(face)
+	Ui.shadow(face, 5, style.deep or style.fill:Lerp(Color3.new(0, 0, 0), 0.45))
+	local scale = Instance.new("UIScale")
+	scale.Parent = face
+
+	local content = Ui.frame(face, "Content", UDim2.fromScale(1, 1))
+	Ui.list(
+		content,
+		if style.stack then Enum.FillDirection.Vertical else Enum.FillDirection.Horizontal,
+		if style.stack then 2 else 8,
+		Enum.HorizontalAlignment.Center,
+		Enum.VerticalAlignment.Center
+	)
+	local textSize = style.textSize or 22
+	local textColor = style.text or C.text
+	if style.icon then
+		local icon = Ui.icon(content, style.icon, math.floor(textSize * 1.15), textColor)
+		icon.LayoutOrder = 1
+	end
+	local label = Ui.label(content, "Label", {
+		text = text,
+		font = style.font or Theme.Fonts.title,
+		size = textSize,
+		color = textColor,
+		xAlign = Enum.TextXAlignment.Center,
+		frameSize = UDim2.fromOffset(0, textSize + 6),
+		autoSize = Enum.AutomaticSize.X,
+		order = 2,
+	})
+	if textColor == C.text then
+		Ui.textStroke(label, 2)
+	end
+
+	local hovering = false
+	local function springTo(target: number, seconds: number, easing: Enum.EasingStyle)
+		TweenService:Create(scale, TweenInfo.new(seconds, easing, Enum.EasingDirection.Out), { Scale = target }):Play()
 	end
 	button.MouseEnter:Connect(function()
+		hovering = true
 		if button.Interactable then
-			tint(base:Lerp(Color3.new(1, 1, 1), 0.12))
+			springTo(1.05, 0.12, Enum.EasingStyle.Quad)
 		end
 	end)
 	button.MouseLeave:Connect(function()
-		tint(base)
+		hovering = false
+		springTo(1, 0.15, Enum.EasingStyle.Quad)
 	end)
 	button.MouseButton1Down:Connect(function()
 		if button.Interactable then
-			tint(base:Lerp(Color3.new(0, 0, 0), 0.2))
+			springTo(0.92, 0.06, Enum.EasingStyle.Quad)
 		end
 	end)
 	button.MouseButton1Up:Connect(function()
-		tint(base)
+		springTo(if hovering then 1.05 else 1, 0.3, Enum.EasingStyle.Back)
 	end)
 	button:GetPropertyChangedSignal("Interactable"):Connect(function()
-		button.BackgroundTransparency = if button.Interactable then 0 else 0.55
-		button.TextTransparency = if button.Interactable then 0 else 0.45
-		stroke.Transparency = if button.Interactable then 0.2 else 0.7
+		local on = button.Interactable
+		face.BackgroundTransparency = if on then 0 else 0.5
+		label.TextTransparency = if on then 0 else 0.45
+		outline.Transparency = if on then 0 else 0.5
+		if not on then
+			scale.Scale = 1
+		end
 	end)
 	button.Parent = parent
 	return button

@@ -74,9 +74,9 @@ local KEYS = {
 
 -- How to start a shift, by input: the time clock's ProximityPrompt keys.
 local CLOCK_IN_HOW: { [string]: string } = {
-	Touch = "Walk to the time clock by the booth door and hold <b>Clock in</b>.",
-	Gamepad = "Walk to the time clock by the booth door and hold <b>X</b>.",
-	KeyboardAndMouse = "Walk to the time clock by the booth door and hold <b>E</b>.",
+	Touch = "Tap <b>Clock in</b> at the time clock by the booth door.",
+	Gamepad = "Hold <b>X</b> at the time clock by the booth door to clock in.",
+	KeyboardAndMouse = "Hold <b>E</b> at the time clock by the booth door to clock in.",
 }
 
 -- Looking down into the booth while the tide comes in (degrees).
@@ -125,28 +125,35 @@ local function screenGui(parent: Instance, name: string, order: number, insets: 
 	return gui
 end
 
+-- A tab at the top of the rules panel: a lamp-bright pill when selected.
 local function tabButton(parent: Instance, text: string, width: number, order: number): TextButton
 	local button = Instance.new("TextButton")
 	button.Name = text
-	button.Size = UDim2.fromOffset(width, 56)
-	button.BackgroundColor3 = C.panelLight
-	button.BackgroundTransparency = 1
-	button.BorderSizePixel = 0
+	Ui.applyText(button, {
+		text = text,
+		font = F.title,
+		size = 16,
+		color = C.muted,
+		xAlign = Enum.TextXAlignment.Center,
+		frameSize = UDim2.fromOffset(width, 56),
+		order = order,
+	})
+	button.BackgroundColor3 = C.lamp
 	button.AutoButtonColor = false
-	button.Text = text
-	button.FontFace = F.title
-	button.TextSize = 17
-	button.TextColor3 = C.muted
-	button.LayoutOrder = order
 	button.Selectable = true
-	Ui.corner(button, UDim.new(0, 6))
+	Ui.corner(button, UDim.new(0, 12))
+	Ui.stroke(button, C.outline, 2.5, 1)
 	button.Parent = parent
 	return button
 end
 
 local function setTabSelected(button: TextButton, selected: boolean)
 	button.BackgroundTransparency = if selected then 0 else 1
-	button.TextColor3 = if selected then C.lamp else C.muted
+	button.TextColor3 = if selected then C.ink else C.muted
+	local stroke = button:FindFirstChildOfClass("UIStroke")
+	if stroke then
+		stroke.Transparency = if selected then 0 else 1
+	end
 end
 
 function HudController.start()
@@ -198,26 +205,25 @@ function HudController.start()
 	overlay.root.ZIndex = 5
 
 	-- The pier: the game's name, how to start a shift, and the endings found so far.
-	local lobby = Ui.panel(root, "Lobby", UDim2.fromOffset(560, 0), UDim2.new(0.5, 0, 0, 10), Vector2.new(0.5, 0))
+	local lobby = Ui.panel(root, "Lobby", UDim2.fromOffset(520, 0), UDim2.new(0.5, 0, 0, 8), Vector2.new(0.5, 0))
 	lobby.AutomaticSize = Enum.AutomaticSize.Y
-	lobby.BackgroundColor3 = C.ink
-	lobby.BackgroundTransparency = 0.2
+	lobby.BackgroundTransparency = 0.12
 	lobby.Visible = false
-	Ui.padding(lobby, 10, 18)
-	Ui.list(lobby, Enum.FillDirection.Vertical, 2, Enum.HorizontalAlignment.Center)
+	Ui.padding(lobby, 8, 18, 12, 18)
+	Ui.list(lobby, Enum.FillDirection.Vertical, 4, Enum.HorizontalAlignment.Center)
 	local lobbyTitle = Ui.label(lobby, "Title", {
 		text = "LAST FERRY",
-		font = F.title,
-		size = 34,
+		font = F.display,
+		size = 40,
 		color = C.lamp,
 		xAlign = Enum.TextXAlignment.Center,
-		frameSize = UDim2.new(1, 0, 0, 40),
+		frameSize = UDim2.new(1, 0, 0, 44),
 		order = 1,
 	})
-	Widgets.outline(lobbyTitle)
+	Ui.textStroke(lobbyTitle, 3)
 	local lobbyHow = Ui.label(lobby, "How", {
 		font = F.body,
-		size = 18,
+		size = 17,
 		rich = true,
 		wrap = true,
 		xAlign = Enum.TextXAlignment.Center,
@@ -225,82 +231,92 @@ function HudController.start()
 		autoSize = Enum.AutomaticSize.Y,
 		order = 2,
 	})
-	local lobbyFound = Ui.label(lobby, "Found", {
-		font = F.body,
-		size = 15,
-		color = C.muted,
-		xAlign = Enum.TextXAlignment.Center,
-		frameSize = UDim2.new(1, 0, 0, 20),
-		order = 3,
-	})
+	Ui.textStroke(lobbyHow, 1.5)
+	local lobbyFound = Widgets.tag(lobby, "Found", "", C.panelLight, C.muted, 14)
+	lobbyFound.LayoutOrder = 3
 
 	-- Top bar -------------------------------------------------------------------
+	-- Left: the night in a pill, then the clock and the date. Right: the ledger, the
+	-- queue and the three lanterns.
 	local topBar = Ui.frame(play, "TopBar", UDim2.new(1, -32, 0, 56), UDim2.fromOffset(16, 6))
 	local topLeft = Ui.frame(topBar, "Left", UDim2.fromScale(0.62, 1))
 	Ui.list(topLeft, Enum.FillDirection.Horizontal, 12, Enum.HorizontalAlignment.Left, Enum.VerticalAlignment.Center)
-	local nightLabel = Ui.label(topLeft, "Night", {
+	local nightLabel = Widgets.tag(topLeft, "Night", "", C.panel, C.lamp, 22)
+	nightLabel.FontFace = F.display
+	nightLabel.LayoutOrder = 1
+	Ui.textStroke(nightLabel, 2)
+	Ui.shadow(nightLabel, 4)
+	local clockLabel = Ui.label(topLeft, "Clock", {
 		font = F.title,
-		size = 26,
-		color = C.lamp,
-		frameSize = UDim2.fromScale(0, 1),
-		autoSize = Enum.AutomaticSize.X,
-		order = 1,
-	})
-	local whenLabel = Ui.label(topLeft, "When", {
-		font = F.body,
-		size = 17,
+		size = 28,
 		frameSize = UDim2.fromScale(0, 1),
 		autoSize = Enum.AutomaticSize.X,
 		order = 2,
 	})
-	Widgets.outline(nightLabel)
-	Widgets.outline(whenLabel)
+	Ui.textStroke(clockLabel, 2.5)
+	local dateLabel = Ui.label(topLeft, "Date", {
+		font = F.bodyBold,
+		size = 16,
+		color = C.muted,
+		frameSize = UDim2.fromScale(0, 1),
+		autoSize = Enum.AutomaticSize.X,
+		order = 3,
+	})
+	Ui.textStroke(dateLabel, 2)
 
 	local topRight = Ui.frame(topBar, "Right", UDim2.fromScale(0.38, 1), UDim2.fromScale(1, 0), Vector2.new(1, 0))
-	Ui.list(topRight, Enum.FillDirection.Horizontal, 14, Enum.HorizontalAlignment.Right, Enum.VerticalAlignment.Center)
-	local ledgerButton = Ui.button(topRight, "Ledger", "LEDGER", UDim2.fromOffset(130, 56), {
-		fill = C.panelLight,
+	Ui.list(topRight, Enum.FillDirection.Horizontal, 12, Enum.HorizontalAlignment.Right, Enum.VerticalAlignment.Center)
+	local ledgerButton = Ui.button(topRight, "Ledger", "LEDGER", UDim2.fromOffset(150, 56), {
+		fill = C.paper,
+		deep = C.paperMuted,
+		text = C.paperInk,
 		textSize = 17,
+		icon = "page",
 	})
 	ledgerButton.LayoutOrder = 1
 	ledgerButton.Visible = false
-	local queueLabel = Ui.label(topRight, "Queue", {
-		font = F.title,
-		size = 18,
-		frameSize = UDim2.fromScale(0, 1),
-		autoSize = Enum.AutomaticSize.X,
-		order = 2,
-	})
-	Widgets.outline(queueLabel)
-	local lanternRow = Ui.frame(topRight, "Lanterns", UDim2.fromOffset(64, 24))
+	local queueLabel = Widgets.tag(topRight, "Queue", "", C.panel, C.text, 16)
+	queueLabel.LayoutOrder = 2
+	Ui.shadow(queueLabel, 4)
+	local lanternRow = Ui.frame(topRight, "Lanterns", UDim2.fromOffset(86, 34))
 	lanternRow.LayoutOrder = 3
-	Ui.list(lanternRow, Enum.FillDirection.Horizontal, 8, Enum.HorizontalAlignment.Left, Enum.VerticalAlignment.Center)
-	local lanterns: { { frame: Frame, glow: UIStroke } } = {}
+	Ui.list(lanternRow, Enum.FillDirection.Horizontal, 7, Enum.HorizontalAlignment.Left, Enum.VerticalAlignment.Center)
+	local lanterns: { Frame } = {}
 	for i = 1, 3 do
-		local lantern = Ui.frame(lanternRow, `Lantern{i}`, UDim2.fromOffset(16, 22))
-		lantern.BackgroundTransparency = 0
-		lantern.LayoutOrder = i
-		Ui.corner(lantern, UDim.new(0, 5))
-		table.insert(lanterns, { frame = lantern, glow = Ui.stroke(lantern, C.lamp, 2, 0.35) })
+		table.insert(lanterns, Widgets.lantern(lanternRow, i))
 	end
 
-	-- A banner over the top bar: a lantern going out, or a page someone found.
+	-- A banner over the top bar: a lantern going out, or a page someone found. A round
+	-- badge on the left says which at a glance.
 	local alert = Ui.panel(play, "Alert", UDim2.new(1, -32, 0, 0), UDim2.fromOffset(16, 6))
 	alert.AutomaticSize = Enum.AutomaticSize.Y
-	alert.BackgroundTransparency = 0.04
+	alert.BackgroundTransparency = 0
 	alert.ZIndex = 3
 	alert.Visible = false
-	Ui.padding(alert, 8, 14)
-	Ui.list(alert, Enum.FillDirection.Vertical, 2)
+	Ui.padding(alert, 8, 16, 10, 64)
+	local alertBadge =
+		Ui.frame(alert, "Badge", UDim2.fromOffset(40, 40), UDim2.new(0, -52, 0.5, 0), Vector2.new(0, 0.5))
+	alertBadge.BackgroundTransparency = 0
+	Ui.corner(alertBadge, UDim.new(0.5, 0))
+	Ui.stroke(alertBadge, C.outline, 3)
+	local alertIcons: { [string]: Frame } = {}
+	for _, kind in { "bang", "page" } do
+		local icon = Ui.icon(alertBadge, kind, 24, C.text)
+		icon.AnchorPoint = Vector2.new(0.5, 0.5)
+		icon.Position = UDim2.fromScale(0.5, 0.5)
+		alertIcons[kind] = icon
+	end
 	local alertTitle = Widgets.caption(alert, "", C.bad, 1)
+	alertTitle.Size = UDim2.new(1, 0, 0, 20)
 	local alertText = Widgets.paragraph(alert, "", { size = 16, order = 2 })
+	alertText.Position = UDim2.fromOffset(0, 22)
 
 	-- Desk: ticket, countdown, and the two calls -----------------------------------
-	local desk = Ui.frame(play, "Desk", UDim2.fromOffset(DESK_WIDTH, 300), UDim2.fromOffset(16, TOP))
+	local desk = Ui.frame(play, "Desk", UDim2.fromOffset(DESK_WIDTH, 320), UDim2.fromOffset(16, TOP))
 	local ticket = Ticket.new(desk, UDim2.fromOffset(0, 0))
 	local idle = Ui.label(desk, "Idle", {
 		text = "The next passenger is coming up the dock...",
-		font = F.body,
+		font = F.bodyBold,
 		size = 17,
 		color = C.muted,
 		wrap = true,
@@ -308,56 +324,74 @@ function HudController.start()
 		frameSize = UDim2.fromOffset(DESK_WIDTH, 44),
 		position = UDim2.fromOffset(0, 70),
 	})
-	Widgets.outline(idle)
+	Ui.textStroke(idle, 2)
 
-	local track = Ui.frame(desk, "Countdown", UDim2.fromOffset(DESK_WIDTH, 6), UDim2.fromOffset(0, 200))
-	track.BackgroundTransparency = 0.35
+	-- The window's countdown: a chunky bar that runs down and turns red at the end.
+	local track = Ui.frame(desk, "Countdown", UDim2.fromOffset(DESK_WIDTH, 14), UDim2.fromOffset(0, 198))
+	track.BackgroundTransparency = 0
 	track.BackgroundColor3 = C.panel
-	Ui.corner(track, UDim.new(0, 3))
+	Ui.corner(track, UDim.new(0.5, 0))
+	Ui.stroke(track, C.outline, 2.5)
 	local trackFill = Ui.frame(track, "Fill", UDim2.fromScale(1, 1))
 	trackFill.BackgroundTransparency = 0
 	trackFill.BackgroundColor3 = C.lamp
-	Ui.corner(trackFill, UDim.new(0, 3))
+	Ui.corner(trackFill, UDim.new(0.5, 0))
+	Ui.gloss(trackFill, 0.3)
 	local countdownLabel = Ui.label(desk, "CountdownLabel", {
 		font = F.title,
 		size = 15,
-		frameSize = UDim2.fromOffset(DESK_WIDTH, 18),
-		position = UDim2.fromOffset(0, 210),
+		frameSize = UDim2.fromOffset(DESK_WIDTH, 20),
+		position = UDim2.fromOffset(0, 214),
 	})
-	Widgets.outline(countdownLabel)
+	Ui.textStroke(countdownLabel, 2)
 
-	local half = (DESK_WIDTH - 12) / 2
-	local boardButton = Ui.button(desk, "Board", "BOARD", UDim2.fromOffset(half, 64), { fill = C.board, textSize = 26 })
-	boardButton.Position = UDim2.fromOffset(0, 236)
-	local denyButton =
-		Ui.button(desk, "Deny", "TURN AWAY", UDim2.fromOffset(half, 64), { fill = C.deny, textSize = 22 })
-	denyButton.Position = UDim2.fromOffset(half + 12, 236)
+	local half = (DESK_WIDTH - 14) / 2
+	local boardButton = Ui.button(desk, "Board", "BOARD", UDim2.fromOffset(half, 76), {
+		fill = C.board,
+		deep = C.boardDeep,
+		textSize = 22,
+		icon = "check",
+		stack = true,
+	})
+	boardButton.Position = UDim2.fromOffset(0, 240)
+	local denyButton = Ui.button(desk, "Deny", "TURN AWAY", UDim2.fromOffset(half, 76), {
+		fill = C.deny,
+		deep = C.denyDeep,
+		textSize = 19,
+		icon = "cross",
+		stack = true,
+	})
+	denyButton.Position = UDim2.fromOffset(half + 14, 240)
+	-- The keyboard or gamepad key for each call, as a little key cap in the corner.
 	local keyHints: { [TextButton]: TextLabel } = {}
 	for _, button in { boardButton, denyButton } do
-		local key = Ui.label(button, "Key", {
+		local key = Ui.label(Ui.buttonFace(button), "Key", {
 			font = F.title,
-			size = 14,
+			size = 13,
 			color = C.text,
-			xAlign = Enum.TextXAlignment.Right,
-			frameSize = UDim2.new(1, -8, 0, 16),
-			position = UDim2.new(0, 0, 1, -18),
+			xAlign = Enum.TextXAlignment.Center,
+			frameSize = UDim2.fromOffset(22, 22),
+			position = UDim2.new(1, -5, 0, 5),
+			anchor = Vector2.new(1, 0),
 		})
-		key.TextTransparency = 0.35
+		key.BackgroundTransparency = 0.35
+		key.BackgroundColor3 = C.outline
+		Ui.corner(key, UDim.new(0, 6))
 		keyHints[button] = key
 	end
 
 	-- Side panel: rules and manifest -----------------------------------------------
 	local side =
 		Ui.panel(play, "Side", UDim2.new(0, SIDE_WIDTH, 1, -(TOP + 16)), UDim2.new(1, -16, 0, TOP), Vector2.new(1, 0))
-	local tabs = Ui.frame(side, "Tabs", UDim2.new(1, -16, 0, 56), UDim2.fromOffset(8, 8))
-	Ui.list(tabs, Enum.FillDirection.Horizontal, 6, Enum.HorizontalAlignment.Left, Enum.VerticalAlignment.Center)
-	local rulesTab = tabButton(tabs, "RULES", 72, 1)
-	local manifestTab = tabButton(tabs, "MANIFEST", 100, 2)
+	local tabs = Ui.frame(side, "Tabs", UDim2.new(1, -16, 0, 56), UDim2.fromOffset(8, 6))
+	Ui.list(tabs, Enum.FillDirection.Horizontal, 4, Enum.HorizontalAlignment.Left, Enum.VerticalAlignment.Center)
+	local rulesTab = tabButton(tabs, "RULES", 76, 1)
+	local manifestTab = tabButton(tabs, "MANIFEST", 104, 2)
 	local hideTab = tabButton(tabs, "HIDE", 50, 3)
 	local scroller = Instance.new("ScrollingFrame")
 	scroller.Name = "Scroller"
-	scroller.Position = UDim2.fromOffset(10, 72)
-	scroller.Size = UDim2.new(1, -16, 1, -80)
+	scroller.Position = UDim2.fromOffset(12, 68)
+	scroller.Size = UDim2.new(1, -18, 1, -78)
 	scroller.BackgroundTransparency = 1
 	scroller.BorderSizePixel = 0
 	scroller.CanvasSize = UDim2.new()
@@ -373,14 +407,16 @@ function HudController.start()
 	manifestList.AutomaticSize = Enum.AutomaticSize.Y
 	manifestList.Visible = false
 	Ui.list(manifestList, Enum.FillDirection.Vertical, 4)
-	local showSide =
-		Ui.button(play, "ShowRules", "RULES", UDim2.fromOffset(110, 64), { fill = C.panelLight, textSize = 18 })
+	local showSide = Ui.button(play, "ShowRules", "RULES", UDim2.fromOffset(116, 64), {
+		fill = C.panelLight,
+		textSize = 18,
+	})
 	showSide.AnchorPoint = Vector2.new(1, 0)
 	showSide.Position = UDim2.new(1, -16, 0, TOP)
 	showSide.Visible = false
 
 	-- Top centre: Pike's radio -----------------------------------------------------------
-	local center = Ui.frame(play, "Center", UDim2.fromOffset(300, 0), UDim2.new(0.5, 30, 0, 56), Vector2.new(0.5, 0))
+	local center = Ui.frame(play, "Center", UDim2.fromOffset(300, 0), UDim2.new(0.5, 30, 0, 60), Vector2.new(0.5, 0))
 	center.AutomaticSize = Enum.AutomaticSize.Y
 	Ui.list(center, Enum.FillDirection.Vertical, 8, Enum.HorizontalAlignment.Center)
 
@@ -400,14 +436,14 @@ function HudController.start()
 
 	-- Bottom centre: how to look around, on the first night only.
 	local hint = Ui.label(play, "Hint", {
-		font = F.body,
+		font = F.bodyBold,
 		size = 16,
 		xAlign = Enum.TextXAlignment.Center,
-		frameSize = UDim2.fromOffset(560, 22),
+		frameSize = UDim2.fromOffset(620, 22),
 		position = UDim2.new(0.5, 0, 1, -12),
 		anchor = Vector2.new(0.5, 1),
 	})
-	Widgets.outline(hint)
+	Ui.textStroke(hint, 2)
 
 	-- Ledger: the harbormaster's torn pages found this run. It opens over the rules
 	-- panel and blocks nothing else, so the window can still be worked.
@@ -424,13 +460,13 @@ function HudController.start()
 	local sheet = ledger
 	Ui.label(sheet, "Heading", {
 		text = "HARBORMASTER'S LEDGER",
-		font = F.title,
-		size = 18,
+		font = F.print,
+		size = 19,
 		color = C.paperInk,
 		frameSize = UDim2.new(1, 0, 0, 24),
 	})
 	local ledgerCount = Ui.label(sheet, "Count", {
-		font = F.title,
+		font = F.print,
 		size = 14,
 		color = C.paperMuted,
 		frameSize = UDim2.new(1, 0, 0, 18),
@@ -450,8 +486,8 @@ function HudController.start()
 	pages.Parent = sheet
 	local closeLedger = Ui.button(sheet, "Close", "PUT IT AWAY", UDim2.new(1, 0, 0, 64), {
 		fill = C.paperInk,
-		text = C.paper,
 		textSize = 20,
+		icon = "cross",
 	})
 	closeLedger.AnchorPoint = Vector2.new(0, 1)
 	closeLedger.Position = UDim2.fromScale(0, 1)
@@ -559,6 +595,9 @@ function HudController.start()
 		keyHints[boardButton].Text = boardKey
 		keyHints[denyButton].Text = denyKey
 		lobbyHow.Text = CLOCK_IN_HOW[input.Name] or CLOCK_IN_HOW.KeyboardAndMouse
+		for _, key in keyHints do
+			key.Visible = key.Text ~= ""
+		end
 		layoutSide()
 	end
 
@@ -569,11 +608,22 @@ function HudController.start()
 		lobbyFound.Visible = total > 0
 	end
 
-	local function showAlert(title: string, text: string, color: Color3, background: Color3, seconds: number)
+	local function showAlert(
+		title: string,
+		text: string,
+		icon: string,
+		color: Color3,
+		background: Color3,
+		seconds: number
+	)
 		alertTitle.Text = title
 		alertTitle.TextColor3 = color
 		alertText.Text = text
 		alert.BackgroundColor3 = background
+		alertBadge.BackgroundColor3 = color:Lerp(Color3.new(0, 0, 0), 0.25)
+		for kind, frame in alertIcons do
+			frame.Visible = kind == icon
+		end
 		alertUntil = os.clock() + seconds
 	end
 
@@ -716,17 +766,16 @@ function HudController.start()
 		end
 
 		-- Top bar.
-		nightLabel.Text = `NIGHT {state.night} OF {state.finalNight}`
-		whenLabel.Text = `{state.date} · {state.clock}`
-		queueLabel.Text = `IN LINE: {state.waiting}`
+		nightLabel.Text = `NIGHT {state.night} / {state.finalNight}`
+		clockLabel.Text = state.clock
+		dateLabel.Text = state.date
+		queueLabel.Text = `IN LINE {state.waiting}`
 		for i, lantern in lanterns do
-			local lit = i <= state.lanterns
-			lantern.frame.BackgroundColor3 = if lit then C.lamp else C.panel
-			lantern.glow.Transparency = if lit then 0.35 else 0.85
-			lantern.frame.Visible = i <= state.maxLanterns
+			Widgets.setLantern(lantern, i <= state.lanterns)
+			lantern.Visible = i <= state.maxLanterns
 		end
 		ledgerButton.Visible = #state.ledger > 0
-		ledgerButton.Text = `LEDGER {#state.ledger}/{state.finalNight}`
+		Ui.buttonLabel(ledgerButton).Text = `LEDGER {#state.ledger}/{state.finalNight}`
 		if ledger.Visible then
 			renderLedger(state)
 		end
@@ -759,7 +808,7 @@ function HudController.start()
 		if fx.kind == "call" then
 			ticket.stamp(text, CALL_INK[text] or C.paperMuted)
 		elseif fx.kind == "lanternOut" then
-			showAlert("A LANTERN GOES OUT", text, C.bad, Color3.fromRGB(58, 18, 18), 6)
+			showAlert("A LANTERN GOES OUT", text, "bang", C.bad, Color3.fromRGB(70, 20, 22), 6)
 			EffectsController.lanternOut()
 			CameraController.shake(1.4, 0.5)
 			flash.BackgroundTransparency = 0.55
@@ -791,6 +840,7 @@ function HudController.start()
 				showAlert(
 					"A TORN PAGE",
 					"Someone found a page tucked behind a ticket. It's in the LEDGER.",
+					"page",
 					C.lamp,
 					C.panel,
 					5

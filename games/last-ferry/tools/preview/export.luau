@@ -15,13 +15,15 @@
 		wet    - the first dripping passenger of night 1 (one of the drowned)
 		intro  - the night 1 title card, just after clocking in
 		queue  - between passengers, with the queue walking up
+		summary - the end-of-night card after night 1, boarding everyone (so some calls
+		         are wrong)
 		crew   - three clerks at the counter in their caps, seen from the dock over the head
 		         of the passenger at the window (no HUD)
 		lineup - the whole wardrobe in daylight (no player, no HUD)
 		pier   - the empty pier behind the booth (no player, no HUD)
 
 	--screen and --safe set the screen and its safe area in pixels (default 1280x720,
-	safe 1280x684). --touch makes the game see a phone.
+	safe 1280x662: below Roblox's 58 px top bar). --touch makes the game see a phone.
 
 	The simulator stands in for Roblox's default camera (sim.cameraFollows), so the
 	first-person and third-person views are where Roblox would put them.
@@ -59,7 +61,8 @@ local screen = pair(flags.screen)
 local sim = Sim.new({
 	root = ".",
 	screen = screen,
-	safeArea = pair(flags.safe) or (screen and roblox.Vector2.new(screen.X, screen.Y - 36)),
+	-- Roblox's top bar is 58 px tall; ScreenGuis with CoreUISafeInsets start below it.
+	safeArea = pair(flags.safe) or (screen and roblox.Vector2.new(screen.X, screen.Y - 58)),
 	preferredInput = if flags.touch then roblox.Enum.PreferredInput.Touch else nil,
 })
 sim:startServer()
@@ -246,6 +249,22 @@ elseif scenario == "queue" then
 		return not root.Overlay.Visible and root.Play.Desk.Idle.Visible
 	end, 300)
 	sim:run(2)
+elseif scenario == "summary" then
+	-- Board everyone: the drowned get through, so the card has right and wrong calls.
+	done = playUntil(function()
+		local root = hud()
+		local overlay = root.Overlay
+		if overlay.Visible then
+			local title = overlay.Card.Header.Title.Text
+			return string.find(title, "survived", 1, true) ~= nil or title == "The Tide Came In"
+		end
+		local board = root.Play.Desk.Board
+		if atWindow() and board.Interactable and sim:shown(root.Play.Desk.TicketHolder) then
+			sim:click(board)
+		end
+		return false
+	end, 900)
+	sim:run(1)
 elseif scenario == "crew" then
 	done = untilPassenger("first")
 	settle()

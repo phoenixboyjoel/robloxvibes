@@ -66,17 +66,22 @@ local function summaryRow(parent: Instance, index: number, row: View.SummaryRow)
 	local frame = Ui.frame(parent, "Call", UDim2.fromScale(1, 0))
 	frame.AutomaticSize = Enum.AutomaticSize.Y
 	frame.LayoutOrder = index
-	frame.BackgroundTransparency = 0.4
+	frame.BackgroundTransparency = 0.3
 	frame.BackgroundColor3 = C.panelLight
-	Ui.corner(frame, UDim.new(0, 6))
+	Ui.corner(frame, UDim.new(0, 10))
+	Ui.stroke(frame, C.outline, 2)
 
-	-- Green or red bar down the left edge: was the call right?
-	local mark = Ui.frame(frame, "Mark", UDim2.new(0, 4, 1, -12), UDim2.fromOffset(6, 6))
+	-- A round green check or red cross: was the call right?
+	local mark = Ui.frame(frame, "Mark", UDim2.fromOffset(30, 30), UDim2.fromOffset(8, 8))
 	mark.BackgroundTransparency = 0
-	mark.BackgroundColor3 = if row.correct then C.good else C.bad
-	Ui.corner(mark, UDim.new(0, 2))
+	mark.BackgroundColor3 = if row.correct then C.board else C.deny
+	Ui.corner(mark, UDim.new(0.5, 0))
+	Ui.stroke(mark, C.outline, 2.5)
+	local icon = Ui.icon(mark, if row.correct then "check" else "cross", 18, C.text)
+	icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	icon.Position = UDim2.fromScale(0.5, 0.5)
 
-	local lines = Ui.frame(frame, "Lines", UDim2.new(1, -26, 0, 0), UDim2.fromOffset(18, 0))
+	local lines = Ui.frame(frame, "Lines", UDim2.new(1, -54, 0, 0), UDim2.fromOffset(46, 0))
 	lines.AutomaticSize = Enum.AutomaticSize.Y
 	Ui.padding(lines, 6, 0, 8, 0)
 	Ui.list(lines, Enum.FillDirection.Vertical, 2)
@@ -95,21 +100,21 @@ function Overlay.new(parent: Instance): Overlay
 	root.Visible = false
 
 	local card = Ui.panel(root, "Card", UDim2.fromOffset(760, 440), UDim2.fromScale(0.5, 0.5), Vector2.new(0.5, 0.5))
-	card.BackgroundColor3 = C.ink
-	card.BackgroundTransparency = 0.06
+	card.BackgroundTransparency = 0.02
 	Ui.padding(card, PAD)
 
 	local header = Ui.frame(card, "Header", UDim2.new(1, 0, 0, HEADER))
 	Ui.list(header, Enum.FillDirection.Vertical, 0)
 	local kicker = Ui.label(header, "Kicker", { font = F.title, size = 15, color = C.muted, order = 1 })
 	local title = Ui.label(header, "Title", {
-		font = F.title,
-		size = 40,
+		font = F.display,
+		size = 42,
 		color = C.lamp,
 		order = 2,
 		frameSize = UDim2.new(1, 0, 0, 50),
 	})
 	title.TextTruncate = Enum.TextTruncate.AtEnd
+	Ui.textStroke(title, 3)
 	local subtitle = Ui.label(header, "Subtitle", { font = F.body, size = 17, color = C.muted, order = 3 })
 
 	local body = Instance.new("ScrollingFrame")
@@ -133,17 +138,19 @@ function Overlay.new(parent: Instance): Overlay
 		wrap = true,
 		frameSize = UDim2.new(1, -250, 1, 0),
 	})
-	local continue = Ui.button(footer, "Continue", "CONTINUE", UDim2.fromOffset(240, 64), {
+	local continue = Ui.button(footer, "Continue", "CONTINUE", UDim2.fromOffset(250, 64), {
 		fill = C.board,
-		textSize = 22,
+		deep = C.boardDeep,
+		textSize = 21,
+		icon = "play",
 	})
+	local continueLabel = Ui.buttonLabel(continue)
 	continue.AnchorPoint = Vector2.new(1, 1)
 	continue.Position = UDim2.fromScale(1, 1)
 
 	-- The ending's title alone, shown while its scene plays.
 	local strip = Ui.panel(root, "EndingStrip", UDim2.fromOffset(560, 0), UDim2.new(0.5, 0, 0, 14), Vector2.new(0.5, 0))
 	strip.AutomaticSize = Enum.AutomaticSize.Y
-	strip.BackgroundColor3 = C.ink
 	strip.Visible = false
 	Ui.padding(strip, 10, 16)
 	Ui.list(strip, Enum.FillDirection.Vertical, 2, Enum.HorizontalAlignment.Center)
@@ -156,13 +163,14 @@ function Overlay.new(parent: Instance): Overlay
 		order = 1,
 	})
 	local stripTitle = Ui.label(strip, "Title", {
-		font = F.title,
-		size = 34,
+		font = F.display,
+		size = 36,
 		color = C.lamp,
 		xAlign = Enum.TextXAlignment.Center,
 		frameSize = UDim2.new(1, 0, 0, 44),
 		order = 2,
 	})
+	Ui.textStroke(stripTitle, 3)
 
 	local contentKey = ""
 	local phase = ""
@@ -221,7 +229,8 @@ function Overlay.new(parent: Instance): Overlay
 				local tip = paragraph(
 					rules,
 					"<b>HOW TO WORK THE WINDOW</b>\nRead the ticket, look at the passenger, check the rules, "
-						.. "then press BOARD or TURN AWAY. Drag to look around; scroll, pinch or hold R2 to lean in.\n"
+						.. "then press BOARD or TURN AWAY. Look around with the right mouse button, a finger or "
+						.. "the right stick; scroll, pinch or hold R2 to lean in.\n"
 						.. "Each wrong call puts out a lantern. Lose all three and the tide comes in.",
 					{ size = 15, color = C.text, order = 60, rich = true }
 				)
@@ -306,7 +315,7 @@ function Overlay.new(parent: Instance): Overlay
 				label = "SEE THE MORNING"
 			end
 			local pressed = pressedFor ~= nil and pressedFor == state.phaseEnds
-			continue.Text = if pressed then "WAITING..." else label
+			continueLabel.Text = if pressed then "WAITING..." else label
 			continue.Interactable = not pressed
 		end
 

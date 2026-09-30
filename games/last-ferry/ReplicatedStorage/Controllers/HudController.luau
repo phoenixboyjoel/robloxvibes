@@ -19,9 +19,10 @@
 	While on shift an invisible Modal button keeps the mouse cursor free, so the HUD
 	can be clicked in first person (hold the right button to look around).
 
-	Passengers talk the Roblox way: each line is a chat bubble over their head
-	(TextChatService:DisplayBubble) and a line in the chat window, so it can be
-	read again. "{name}" becomes the local player's display name.
+	Passengers talk the Roblox way: each line is a bubble over their head in Roblox's
+	chat-bubble style (Ui/Speech), up for as long as they're at the window, and a
+	line in the chat window, so it can be read again. "{name}" becomes the local
+	player's display name.
 
 	Keys, bound with ContextActionService above Roblox's own controls, and only taken
 	when they do something (otherwise gamepad A still jumps): B / gamepad A board,
@@ -45,6 +46,7 @@ local Net = require("../Shared/Net")
 local View = require("../Shared/Types")
 local Overlay = require("../Ui/Overlay")
 local Sfx = require("../Ui/Sfx")
+local Speech = require("../Ui/Speech")
 local Theme = require("../Ui/Theme")
 local Ticket = require("../Ui/Ticket")
 local Ui = require("../Ui/Ui")
@@ -58,7 +60,11 @@ local F = Theme.Fonts
 local DESK_WIDTH = 250
 local SIDE_WIDTH = 250
 local TOP = 70 -- below the top bar
-local JUMP_CLEARANCE = 112 -- screen px kept clear above the bottom-right corner (Roblox's jump button)
+-- Screen px kept clear above the bottom-right corner for Roblox's touch jump button
+-- (TouchJump): 70 px, 90 px up, when the screen's short side is 500 px or less, else
+-- 120 px, 210 px up; plus a margin.
+local JUMP_CLEARANCE_SMALL = 112
+local JUMP_CLEARANCE_BIG = 232
 
 local CALL_INK: { [string]: Color3 } = {
 	BOARDED = Color3.fromRGB(38, 112, 70),
@@ -75,7 +81,7 @@ local KEYS = {
 
 -- How to start a shift, by input: the time clock's ProximityPrompt keys.
 local CLOCK_IN_HOW: { [string]: string } = {
-	Touch = "Tap <b>Clock in</b> at the time clock by the booth door.",
+	Touch = "Touch and hold <b>Clock in</b> at the time clock by the booth door.",
 	Gamepad = "Hold <b>X</b> at the time clock by the booth door to clock in.",
 	KeyboardAndMouse = "Hold <b>E</b> at the time clock by the booth door to clock in.",
 }
@@ -97,22 +103,24 @@ local HudController = {}
 local function setUpCoreGui()
 	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
 	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Health, false)
-	-- The chat window opens top left by default, right over the ticket.
-	local chat = TextChatService:FindFirstChildOfClass("ChatWindowConfiguration")
-	if chat then
-		chat.HorizontalAlignment = Enum.HorizontalAlignment.Left
-		chat.VerticalAlignment = Enum.VerticalAlignment.Bottom
-		chat.HeightScale = 0.6
-	end
-	-- Passengers' lines stay up a while (the engine default is 15 s), and a passenger at
-	-- the window is never far enough away to shrink to "...".
-	local bubbles = TextChatService:FindFirstChildOfClass("BubbleChatConfiguration")
-	if bubbles then
-		bubbles.Enabled = true
-		bubbles.BubbleDuration = 20
-		bubbles.MaxDistance = 100
-		bubbles.MinimizeDistance = 60
-	end
+	-- The engine makes the chat's settings objects as the game starts, so they may not be
+	-- there yet. Waits up to 10 s for each (they never come on consoles, which have no chat).
+	task.spawn(function()
+		-- The chat window opens top left by default, right over the ticket.
+		local chat = TextChatService:WaitForChild("ChatWindowConfiguration", 10)
+		if chat and chat:IsA("ChatWindowConfiguration") then
+			chat.HorizontalAlignment = Enum.HorizontalAlignment.Left
+			chat.VerticalAlignment = Enum.VerticalAlignment.Bottom
+			chat.HeightScale = 0.6
+		end
+	end)
+	task.spawn(function()
+		-- Friends in the booth chat in bubbles, the Roblox way.
+		local bubbles = TextChatService:WaitForChild("BubbleChatConfiguration", 10)
+		if bubbles and bubbles:IsA("BubbleChatConfiguration") then
+			bubbles.Enabled = true
+		end
+	end)
 end
 
 local function screenGui(parent: Instance, name: string, order: number, insets: Enum.ScreenInsets): ScreenGui
@@ -199,6 +207,9 @@ function HudController.start()
 	cursor.Modal = true
 	cursor.Visible = false
 	cursor.Parent = hud
+
+	-- What the passenger at the window says, over their head.
+	local speech = Speech.new(playerGui)
 
 	local play = Ui.frame(root, "Play", UDim2.fromScale(1, 1))
 	play.ZIndex = 1
@@ -537,14 +548,13 @@ function HudController.start()
 		end
 	end
 
-	-- A passenger says something: a bubble over them, and a line in the chat. The bubble goes
-	-- on the whole model (always the same instance for the same passenger), so Roblox floats
-	-- it above their hat.
-	local function speak(passengerId: number?, who: string, text: string)
+	-- A passenger says something: a bubble over their head (above their hat), until they
+	-- leave the window or for `seconds`, and a line in the chat.
+	local function speak(passengerId: number?, who: string, text: string, seconds: number?)
 		local line = personalize(text)
 		local model = if passengerId then passengers:FindFirstChild(`Passenger{passengerId}`) else nil
 		if model and model:IsA("Model") then
-			TextChatService:DisplayBubble(model, line)
+			speech.say(model, line, seconds)
 		end
 		logToChat(who, "#FFC684", line)
 	end
@@ -558,7 +568,9 @@ function HudController.start()
 	local function layoutSide()
 		local bottom = 16
 		if touchControls() then
-			bottom += math.ceil(JUMP_CLEARANCE / uiScale.Scale)
+			local size = hud.AbsoluteSize
+			local clearance = if math.min(size.X, size.Y) <= 500 then JUMP_CLEARANCE_SMALL else JUMP_CLEARANCE_BIG
+			bottom += math.ceil(clearance / uiScale.Scale)
 		end
 		side.Size = UDim2.new(0, SIDE_WIDTH, 1, -(TOP + bottom))
 		ledger.Size = side.Size
@@ -577,6 +589,9 @@ function HudController.start()
 		uiScale.Scale = scale
 		root.Size = UDim2.fromScale(1 / scale, 1 / scale)
 		overlay.resize(size / scale)
+		-- On a phone the passenger's speech bubble floats up beside the clock, so the date
+		-- (on the rules card too) makes room for it.
+		dateLabel.Visible = scale >= 0.9
 		layoutSide()
 	end
 
@@ -793,6 +808,7 @@ function HudController.start()
 			end
 		else
 			ticket.clear()
+			speech.release()
 		end
 		idle.Visible = phase == "queue" and passenger == nil and not ticket.root.Visible
 		track.Visible = passenger ~= nil
@@ -817,7 +833,7 @@ function HudController.start()
 			TweenService:Create(flash, TweenInfo.new(0.7, Enum.EasingStyle.Sine), { BackgroundTransparency = 1 }):Play()
 		elseif fx.kind == "say" then
 			-- What the passenger just called says as they leave the window.
-			speak(speechPassenger, speaker, text)
+			speak(speechPassenger, speaker, text, 5)
 		elseif fx.kind == "radio" then
 			logToChat("Radio · Pike", "#AAD6BE", text)
 			radioText.Text = text

@@ -8,7 +8,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { drawScreenGuis, loadFontsFor } from './gui.js';
+import { drawLayer, drawScreenGuis, loadFontsFor } from './gui.js';
 import { buildWorld, cframeMatrix } from './world.js';
 
 const params = new URLSearchParams(location.search);
@@ -279,6 +279,38 @@ async function drawBubbles(ctx, bubbles, partsById, nodesById, camera, W, H) {
   }
 }
 
+// BillboardGuis in the PlayerGui with an Adornee (like the passengers' speech bubbles),
+// drawn over the scene where the adornee is on screen: StudsOffsetWorldSpace in world
+// axes, StudsOffset in the camera's (x right, y up, z towards the camera), then moved by
+// SizeOffset in units of their own size (y up). Their Size is in pixels.
+function drawBillboards(ctx, playerGui, partsById, camera, W, H, images) {
+  if (!playerGui) return;
+  const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+  const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
+  const back = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 2);
+  for (const gui of playerGui.children) {
+    const p = gui.props;
+    if (gui.class !== 'BillboardGui' || p.Enabled === false || p.Adornee == null) continue;
+    const part = partsById.get(p.Adornee);
+    if (!part) continue;
+    const [wx, wy, wz] = p.StudsOffsetWorldSpace ?? [0, 0, 0];
+    const [sx, sy, sz] = p.StudsOffset ?? [0, 0, 0];
+    const point = new THREE.Vector3()
+      .setFromMatrixPosition(part.world)
+      .add(new THREE.Vector3(wx, wy, wz))
+      .addScaledVector(right, sx)
+      .addScaledVector(up, sy)
+      .addScaledVector(back, sz);
+    const ndc = point.project(camera);
+    if (ndc.z > 1) continue;
+    const [, width, , height] = p.Size ?? [0, 0, 0, 0];
+    const [ox, oy] = p.SizeOffset ?? [0, 0];
+    const cx = ((ndc.x + 1) / 2) * W + ox * width;
+    const cy = ((1 - ndc.y) / 2) * H - oy * height;
+    drawLayer(ctx, gui, { x: cx - width / 2, y: cy - height / 2, w: width, h: height }, images);
+  }
+}
+
 async function main() {
   const data = await (await fetch(params.get('scene'))).json();
   normalize(data.workspace);
@@ -363,6 +395,7 @@ async function main() {
   await drawPrompts(ctx, data, world.partsById, nodesById, camera, W, H);
   if (data.playerGui) {
     await loadFontsFor(data.playerGui);
+    drawBillboards(ctx, data.playerGui, world.partsById, camera, W, H, imageFor);
     drawScreenGuis(ctx, data.playerGui, { w: W, h: H }, safe, imageFor);
   }
   if (params.get('topbar') !== '0') drawTopBar(ctx, { w: W, h: H });

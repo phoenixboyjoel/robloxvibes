@@ -5,8 +5,9 @@ simulator (`tests/sim`), using a three.js approximation of Roblox's renderer.
 
 1. **Export a scene.** The game runs until the scenario is on screen, then the
    whole scene is written to JSON: every part, light, decal, particle emitter and
-   SurfaceGui, the Lighting settings, the camera, the player's ScreenGuis, the
-   chat bubbles they can see, and their character (for prompts in reach).
+   SurfaceGui, the Lighting settings, the camera, the player's ScreenGuis and
+   BillboardGuis (like the passenger's speech bubble), Roblox chat bubbles they
+   can see, and their character (for prompts in reach).
    The simulator stands in for Roblox's default camera (`sim.cameraFollows`):
    third person behind the avatar on the pier, first person at the head in the
    booth (with Humanoid.CameraOffset, and the avatar hidden from its own
@@ -41,7 +42,7 @@ simulator (`tests/sim`), using a three.js approximation of Roblox's renderer.
    cd tools/preview/render
    npm install                   # three.js, fonts, Playwright
    npx playwright install chromium   # skip if Chromium is already installed for Playwright
-   python3 fetch_content.py      # Roblox's built-in face and particle textures (needs Pillow)
+   python3 fetch_content.py      # Roblox's built-in face, particle and chat-tail textures (needs Pillow)
    node shot.mjs ../../../preview/first.json ../../../preview/first.png
    ```
 
@@ -62,12 +63,17 @@ whether a tell can be seen from the booth. It is not Roblox's renderer.
     Gotham aren't public, so Inter and Montserrat stand in for them;
   - Roblox's own chat bubbles (anchored over a model's bounding box, as the
     client's ExperienceChat does) and its default ProximityPrompt, both drawn
-    from the client's own layout numbers.
+    from the client's own layout numbers;
+  - BillboardGuis in the PlayerGui, drawn where their Adornee is on screen
+    (StudsOffset, StudsOffsetWorldSpace, SizeOffset), with the HUD over them
+    as in Roblox.
 - **Approximate:**
   - Materials are procedural stand-ins for Roblox's textures.
   - Light brightness is tuned by eye, and there is no global illumination.
   - Water is a flat reflective plane.
   - Particles are a still frame replayed from the emitter's settings.
+  - Text measured by the game (`TextBounds`) is the simulator's estimate, so a
+    bubble can wrap a word differently from Roblox.
   - The top bar in the corner is a sketch of Roblox's, there only to show what the
     safe area keeps clear.
 - **Not drawn:** uploaded assets (`rbxassetid://` meshes, images and sounds),

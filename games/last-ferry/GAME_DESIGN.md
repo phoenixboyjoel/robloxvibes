@@ -126,6 +126,8 @@ Not in the first build. Planned:
   the old fixed camera's), so a small avatar still sees over the counter and
   everyone sees the planks the tells are tuned for.
 - **Cinematic views** turn you to the scene for the flood and the endings.
+- **Friends never block the view:** a clerk standing between you and the window
+  turns see-through on your screen, and nobody can stand on the counter.
 - **The lamp hangs front-left of the window,** so each passenger's shadow falls
   back and to the right across the planks, clear of their own body. A lamp
   straight overhead would hide the shadow behind the passenger, and the shadow
@@ -138,7 +140,7 @@ Not in the first build. Planned:
   | Left, the "desk" | ticket, countdown, BOARD / TURN AWAY |
   | Right | rules card and manifest, which you can hide |
   | Top centre | Pike's radio |
-  | Over each passenger | what they say, as a Roblox chat bubble (and in the chat window) |
+  | Over each passenger | what they say, in a bubble drawn like Roblox's chat bubble, up for the whole window and on every device (and in the chat window) |
   | Bottom centre | kept clear, because that's where the shadows fall |
 
 - In Roblox's chunky house style: thick dark outlines, rounded corners, hard
@@ -185,7 +187,7 @@ Studio playtest (see `PLAYTEST.md`) before it counts as done.
 | 4 | Five nights | Rules accumulate, tells escalate, radio lines, night failure and retry | Built, tested headless |
 | 5 | Endings and secrets | Mara choice, ledger pages, four endings, saves and badges (badge IDs still to create) | Built, tested headless |
 | 6 | Phone pass | Compact layout at phone size, 44 px touch targets, readable text | Built; sizes tested, looks unchecked |
-| 7 | Looks and feels like Roblox | Classic Robloxian passengers; chat bubbles; players' own avatars on a pier lobby, clocking in to a first-person booth; the chunky Roblox HUD; the player list; Roblox's built-in sounds | Built, tested headless; previews rendered |
+| 7 | Looks and feels like Roblox | Classic Robloxian passengers; chat bubbles; players' own avatars on a pier lobby, clocking in to a first-person booth; the chunky Roblox HUD; the player list; Roblox's built-in sounds; everything moving smoothly on every screen | Built, tested headless; previews rendered |
 
 ## Kill or continue
 

@@ -91,14 +91,16 @@ local function readDesk(root)
 end
 
 -- The latest chat bubble this player saw over `model` (bubbles go on the whole model).
+-- What the bubble over this passenger says on the bot's screen, or "" if there's none.
+local function speechBubble(player)
+	return player.PlayerGui:FindFirstChild("PassengerSpeech")
+end
 local function heard(bot: Bot, model): string
-	local latest = ""
-	for _, bubble in bot.sim.bubbles do
-		if bubble.player == bot.player and bubble.adornee == model then
-			latest = bubble.message
-		end
+	local bubble = speechBubble(bot.player)
+	if bubble and bubble.Enabled and bubble.Adornee and bubble.Adornee.Parent == model then
+		return bubble.Stack.Bubble.Line.Text
 	end
-	return latest
+	return ""
 end
 
 local CLOCK_SPOT = roblox.Vector3.new(2.7, 0, 11) -- on the pier, in front of the time clock
@@ -371,9 +373,30 @@ local HAT = [[
 	attachment.Name = "HatAttachment"
 	attachment.Position = Vector3.new(0, -0.6, 0)
 	attachment.Parent = handle
+	-- A hat with a logo and a sparkle on it.
+	local logo = Instance.new("Decal")
+	logo.Name = "Logo"
+	logo.Parent = handle
+	local sparkle = Instance.new("ParticleEmitter")
+	sparkle.Name = "Sparkle"
+	sparkle.Parent = handle
 	player.Character.Humanoid:AddAccessory(accessory)
 	return handle
 ]]
+
+-- The built-in sounds every Roblox client has on every device: the ones Roblox's own
+-- characters make (RbxCharacterSounds). Other files in rbxasset://sounds/ may not ship
+-- on phones and consoles.
+local SHIPPED_SOUNDS = {
+	["rbxasset://sounds/action_footsteps_plastic.mp3"] = true,
+	["rbxasset://sounds/action_falling.ogg"] = true,
+	["rbxasset://sounds/action_get_up.mp3"] = true,
+	["rbxasset://sounds/action_jump.mp3"] = true,
+	["rbxasset://sounds/action_jump_land.mp3"] = true,
+	["rbxasset://sounds/action_swim.mp3"] = true,
+	["rbxasset://sounds/impact_water.mp3"] = true,
+	["rbxasset://sounds/uuhhh.mp3"] = true,
+}
 
 -- The sounds played so far, by name, and where from ("server" or "client").
 local function soundsPlayed(sim)
@@ -382,8 +405,8 @@ local function soundsPlayed(sim)
 		local side = if entry.context == "server" then "server" else "client"
 		names[`{side}:{entry.name}`] = true
 		assert(
-			string.sub(entry.id, 1, 18) == "rbxasset://sounds/",
-			`{entry.name} plays {entry.id}: every sound must be one of Roblox's built-in ones`
+			SHIPPED_SOUNDS[entry.id],
+			`{entry.name} plays {entry.id}: every sound must be one Roblox's characters make, so every device has it`
 		)
 	end
 	return names
@@ -404,11 +427,11 @@ T.test("a clerk playing from the HUD finishes five nights clean", function()
 		function()
 			tick(bot)
 			if alice:GetAttribute("OnShift") and alice.Character:FindFirstChild("ClerkCap") then
-				hatHidden = hat.Transparency == 1
+				hatHidden = hat.Transparency == 1 and hat.Logo.Transparency == 1 and not hat.Sparkle.Enabled
 			end
 		end
 	)
-	T.expect(hatHidden, "her own hat goes under the clerk's cap for the shift")
+	T.expect(hatHidden, "her own hat goes under the clerk's cap for the shift, logo, sparkle and all")
 	sim:run(3) -- the save finishes just after the ending card appears
 	clean(sim, "clean run")
 	T.expect(finished, `the run never ended (stuck at {math.floor(sim.now)}s on "{bot.lastCard}")`)
@@ -445,10 +468,13 @@ T.test("a clerk playing from the HUD finishes five nights clean", function()
 	T.expect(alice.Character:FindFirstChild("ClerkCap") == nil, "the cap comes off")
 	T.equal(alice.Character.Humanoid.WalkSpeed, 16, "walking at Roblox's usual pace again")
 	T.equal(hat.Transparency, 0.1, "her own hat comes back as it was")
+	T.equal(hat.Logo.Transparency, 0, "logo and all")
+	T.expect(hat.Sparkle.Enabled, "sparkling again")
 	T.expect(clockPrompt(sim).Enabled, "the time clock is ready for the next shift")
 	T.equal(sim.workspace.World.Booth.Door.CanCollide, false, "the door is open")
 	T.equal(root.Lobby.Found.Text, "Endings found: 1 of 4")
 	T.equal(alice.CameraMode, roblox.Enum.CameraMode.Classic, "Roblox's third-person camera on the pier")
+	T.equal(alice.DevEnableMouseLock, true, "Shift Lock is back, as the place allows it")
 end)
 
 T.test("players arrive on the pier as their avatars and clock in together", function()
@@ -486,6 +512,11 @@ T.test("players arrive on the pier as their avatars and clock in together", func
 		T.expect(player.Character:FindFirstChild("ClerkCap") ~= nil, `{player.Name} wears the clerk's cap`)
 		T.equal(player.Character.Humanoid.WalkSpeed, 10, "walking at booth pace")
 		T.equal(player.CameraMode, roblox.Enum.CameraMode.LockFirstPerson, `{player.Name}: first person on shift`)
+		T.equal(
+			player.DevEnableMouseLock,
+			false,
+			`{player.Name}: no Shift Lock on shift (it would undo the eye height)`
+		)
 		T.expect(root.Parent.FreeCursor.Visible and root.Parent.FreeCursor.Modal, "the HUD frees the mouse")
 		T.equal(root.Overlay.Card.Header.Title.Text, "Night 1", `{player.Name} sees the night 1 card`)
 		local key = tostring(feet(player))
@@ -494,16 +525,93 @@ T.test("players arrive on the pier as their avatars and clock in together", func
 	end
 	T.equal(sim.workspace.World.Booth.Door.CanCollide, true, "the door shuts behind them")
 	T.expect(not clockPrompt(sim).Enabled, "no clocking in again mid-shift")
+	-- A clerk who somehow ends up out on the pier mid-shift is put back at their stand.
+	local stand = feet(bob)
+	sim:moveCharacter(bob, roblox.Vector3.new(0, 0, 20))
+	sim:run(1.5)
+	T.expect(inBooth(bob), `Bob is back in the booth (feet at {feet(bob)})`)
+	T.expect((feet(bob) - stand).Magnitude < 1e-3, "at his own stand")
 	T.expect(sim.workspace.World.Booth.BoothSpawn.Enabled, "respawns land in the booth")
 	T.expect(not sim.workspace.World.Pier.PierSpawn.Enabled, "not on the pier")
 	-- The booth holds them: walls, glass, roof and the counter are solid.
-	for _, name in { "Wall", "Glass", "Roof", "Counter", "CounterFront", "Floor" } do
+	for _, name in { "Wall", "Glass", "Roof", "Counter", "CounterFront", "CounterGuard", "Floor" } do
 		for _, part in sim.workspace.World.Booth:GetChildren() do
 			if part.Name == name then
 				T.expect(part.CanCollide, `{name} is solid`)
 			end
 		end
 	end
+end)
+
+T.test("in co-op, a clerk in the way of your view of the window turns see-through for you", function()
+	local sim = boot()
+	local alice = sim:addPlayer("Alice", 101)
+	local bob = sim:addPlayer("Bob", 202)
+	sim:run(1)
+	T.expect(clockIn(newBot(sim, alice, { idle = true })), "Alice clocks in")
+	sim:run(1.5)
+	local window = roblox.Vector3.new(0, 0.2, -3.2)
+	local function see(player): number
+		return player.Character.Head.LocalTransparencyModifier
+	end
+	-- Alice at the back, Bob right in front of her at the counter.
+	sim:moveCharacter(alice, roblox.Vector3.new(-2, 0.2, 5.6), window)
+	sim:moveCharacter(bob, roblox.Vector3.new(0, 0.2, 2.7), window)
+	sim:run(0.5)
+	T.equal(see(bob), 0.75, "Bob, in Alice's way, is see-through")
+	T.equal(bob.Character.ClerkCap.Top.LocalTransparencyModifier, 0.75, "cap and all")
+	T.equal(see(alice), 0, "Alice, behind Bob, isn't in his way")
+	-- Bob steps aside.
+	sim:moveCharacter(bob, roblox.Vector3.new(3.5, 0.2, 3), window)
+	sim:run(0.5)
+	T.equal(see(bob), 0, "out of the way, Bob is solid again")
+	clean(sim, "co-op view")
+end)
+
+T.test("if the shift hits a bug, everyone is back on the pier and the harbor is reset", function()
+	local sim = boot()
+	local alice = sim:addPlayer("Alice", 101)
+	sim:run(1)
+	-- A night that floods the booth and then breaks.
+	sim:execute([[
+		local Director = require("./Shift/Director")
+		local WorldService = require("./Services/WorldService")
+		Director.playRun = function()
+			WorldService.setFlood(true)
+			task.wait(5)
+			error("a bug in the shift")
+		end
+	]])
+	T.expect(clockIn(newBot(sim, alice, { idle = true })), "Alice clocks in")
+	sim:run(3)
+	T.expect(sim.workspace.World.Flood.Slosh.IsPlaying, "the flood is sloshing round the booth")
+	sim:run(6)
+	T.expect(onPier(alice), `Alice is back on the pier (feet at {feet(alice)})`)
+	T.expect(not sim.workspace.World.Flood.Slosh.IsPlaying, "the slosh stops")
+	T.equal(sim.workspace.World.Flood.Transparency, 1, "the flood drains")
+	T.expect(clockPrompt(sim).Enabled, "and the time clock is ready again")
+	-- The error is reported, not hidden.
+	T.equal(#sim.warnings, 1, "one warning")
+	T.expect(string.find(sim.warnings[1], "a bug in the shift", 1, true) ~= nil, sim.warnings[1])
+	table.clear(sim.warnings)
+	clean(sim, "error path")
+end)
+
+T.test("a clerk who respawns mid-shift looks out of the window again", function()
+	local sim = boot()
+	local alice = sim:addPlayer("Alice", 101)
+	sim:run(1)
+	T.expect(clockIn(newBot(sim, alice, { idle = true })), "Alice clocks in")
+	sim:run(1.5)
+	local camera = sim.workspace.CurrentCamera
+	local outward = camera.CFrame.LookVector
+	-- She turns round to face the back wall, then resets her character.
+	camera.CFrame = roblox.CFrame.new(camera.CFrame.Position) * roblox.CFrame.Angles(0, math.pi, 0)
+	sim:execute([[game:GetService("Players"):GetPlayers()[1]:LoadCharacterAsync()]])
+	sim:run(1)
+	T.expect(camera.CFrame.LookVector:Dot(outward) > 0.99, `looking out of the window ({camera.CFrame.LookVector})`)
+	T.expect(inBooth(alice), "back at the counter")
+	clean(sim, "respawn")
 end)
 
 T.test("gamepad A boards at the window and jumps the rest of the time", function()
@@ -595,10 +703,13 @@ T.test("passengers walk smoothly on every screen, and the booth door swings on i
 	local bot = newBot(sim, alice, { idle = true })
 	T.expect(clockIn(bot), "Alice clocks in")
 	local offHinge = 0
+	local pastShut = 0 -- how far it swings the wrong way, into the booth
 	sim:run(0.8, 1 / 30, function()
 		offHinge = math.max(offHinge, (door:GetPivot().Position - hinge).Magnitude)
+		pastShut = math.max(pastShut, -door:GetPivot().LookVector.X)
 	end)
 	T.expect(offHinge < 1e-3, `the door turns on its hinge as it shuts (drifted {offHinge})`)
+	T.expect(pastShut < 1e-3, `it slams shut without swinging into the booth ({pastShut})`)
 	T.expect((door.Position - roblox.Vector3.new(0, 3.45, 8)).Magnitude < 1e-3, `the door is shut ({door.Position})`)
 
 	-- The night starts and the first passengers walk out of the fog to the queue.
@@ -636,30 +747,32 @@ T.test("passengers walk smoothly on every screen, and the booth door swings on i
 	clean(sim, "smooth walking")
 end)
 
-T.test("passengers speak in chat bubbles over their heads, and in the chat log", function()
+T.test("passengers speak in Roblox-style bubbles for the whole window, and in the chat log", function()
 	local sim = boot()
 	local alice = sim:addPlayer("Alice", 101)
 	local bob = sim:addPlayer("Bob", 202)
 	local bot = newBot(sim, alice, { idle = true, pressContinue = false })
 	local friend = newBot(sim, bob, { idle = true, pressContinue = false })
-	local seen = sim:runUntil(
-		function()
-			return #sim.bubbles >= 2
-		end,
-		300,
-		1 / 20,
-		function()
-			-- Both press Continue so the first window opens.
-			for _, player in { alice, bob } do
-				local continue = player.PlayerGui.LastFerryHud.Root.Overlay.Card.Footer.Continue
-				if sim:shown(continue) and continue.Interactable then
-					sim:click(continue)
-				end
+	local function bothSee(): boolean
+		for _, player in { alice, bob } do
+			local bubble = speechBubble(player)
+			if not (bubble and bubble.Enabled) then
+				return false
 			end
-			tick(bot)
-			tick(friend)
 		end
-	)
+		return true
+	end
+	local seen = sim:runUntil(bothSee, 300, 1 / 20, function()
+		-- Both press Continue so the first window opens.
+		for _, player in { alice, bob } do
+			local continue = player.PlayerGui.LastFerryHud.Root.Overlay.Card.Footer.Continue
+			if sim:shown(continue) and continue.Interactable then
+				sim:click(continue)
+			end
+		end
+		tick(bot)
+		tick(friend)
+	end)
 	clean(sim, "speech")
 	T.expect(seen, "bubbles appeared")
 	local tells = lookAtPassenger(sim)
@@ -667,6 +780,26 @@ T.test("passengers speak in chat bubbles over their heads, and in the chat log",
 	local line = heard(bot, tells.model)
 	T.expect(line ~= "", "Alice sees the passenger's line over their head")
 	T.equal(heard(friend, tells.model), line, "Bob sees the same line")
+
+	-- Roblox's own bubble look, over their hat, drawn over the wall above the window.
+	local bubble = speechBubble(alice)
+	local label = bubble.Stack.Bubble.Line
+	T.equal(label.FontFace.Family, "rbxasset://fonts/families/GothamSSm.json", "Roblox's bubble font")
+	T.equal(label.TextSize, 16, "at Roblox's bubble size")
+	T.equal(bubble.Stack.Bubble.BackgroundColor3, roblox.Color3.fromRGB(250, 250, 250), "white")
+	T.equal(bubble.Stack.Caret.Image, "rbxasset://textures/ui/InGameChat/Caret.png", "with Roblox's tail")
+	T.expect(bubble.AlwaysOnTop, "never hidden by the booth's walls")
+	local top = bubble.Adornee.Position.Y + bubble.StudsOffsetWorldSpace.Y
+	local box, size = tells.model:GetBoundingBox()
+	T.expect(math.abs(top - (box.Position.Y + size.Y / 2)) < 1e-3, `anchored on the top of their head ({top})`)
+
+	-- Still up near the end of the window, long after Roblox's own bubbles would have gone.
+	sim:run(40, 1 / 20)
+	T.equal(heard(bot, tells.model), line, "still readable 40 s later")
+	-- Once the window closes (at 45 s) it goes with them, a moment later.
+	sim:run(7, 1 / 20)
+	T.equal(heard(bot, tells.model), "", "gone once they've left the window")
+
 	local logged = 0
 	for _, message in sim.systemMessages do
 		-- The chat line is rich text, so its quotes and ampersands are escaped.
@@ -676,6 +809,29 @@ T.test("passengers speak in chat bubbles over their heads, and in the chat log",
 		end
 	end
 	T.equal(logged, 2, "the line is in both players' chat logs")
+	clean(sim, "speech after the window")
+end)
+
+T.test("on a console, where Roblox's chat never shows, passengers' lines still do, bigger", function()
+	local sim = Sim.new({ root = ROOT, tenFoot = true, preferredInput = roblox.Enum.PreferredInput.Gamepad })
+	sim:startServer()
+	sim:run(1)
+	local alice = sim:addPlayer("Alice", 101)
+	local bot = newBot(sim, alice, { idle = true })
+	local seen = sim:runUntil(
+		function()
+			local bubble = speechBubble(alice)
+			return bubble ~= nil and bubble.Enabled
+		end,
+		300,
+		1 / 20,
+		function()
+			tick(bot)
+		end
+	)
+	clean(sim, "console")
+	T.expect(seen, "the passenger's line shows")
+	T.equal(speechBubble(alice).Stack.Bubble.Line.TextSize, 24, "in bigger type, for a TV across the room")
 end)
 
 T.test("all five torn pages reach the ledger and the epilogue", function()
@@ -837,11 +993,35 @@ T.test("on phones the HUD scales down but the main buttons stay at least 44 px",
 			T.expect(button.Size.Y.Offset * scale >= 38, `{button.Name} is {button.Size.Y.Offset * scale} px`)
 		end
 		T.expect(string.find(root.Play.Hint.Text, "Pinch", 1, true) ~= nil, "touch hint")
-		-- The rules panel stops short of Roblox's jump button (bottom right, about 90 px up).
+		-- The rules panel stops short of Roblox's jump button (bottom right, 90 px up).
 		local side = root.Play.Side
 		local gap = (-side.Size.Y.Offset - 70) * scale
 		T.expect(gap >= 112, `the rules panel ends {gap} px above the bottom, clear of the jump button`)
+		T.expect(
+			string.find(root.Lobby.How.Text, "Touch and hold", 1, true) ~= nil,
+			"the pier says to hold the prompt, as it needs"
+		)
 	end
+end)
+
+T.test("on tablets the rules panel clears Roblox's bigger jump button", function()
+	-- An iPad in landscape: the short side is over 500 px, so the jump button is 120 px, 210 px up.
+	local safeArea = roblox.Vector2.new(1024, 710)
+	local sim = boot({
+		root = ROOT,
+		screen = roblox.Vector2.new(1024, 768),
+		safeArea = safeArea,
+		preferredInput = roblox.Enum.PreferredInput.Touch,
+	})
+	local alice = sim:addPlayer("Alice", 101)
+	sim:run(3)
+	clean(sim, "tablet boot")
+	local root = alice.PlayerGui.LastFerryHud.Root
+	local scale = root.UIScale.Scale
+	local gap = (-root.Play.Side.Size.Y.Offset - 70) * scale
+	T.expect(gap >= 232, `the rules panel ends {gap} px above the bottom, clear of the jump button`)
+	local height = root.Play.Side.Size.Y.Scale * safeArea.Y + root.Play.Side.Size.Y.Offset * scale
+	T.expect(height >= 300, `and still has room for the rules ({height} px)`)
 end)
 
 T.test("co-op: a friend who joins late sees the same shift, and the Continue waits for both", function()

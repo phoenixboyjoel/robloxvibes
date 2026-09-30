@@ -21,8 +21,9 @@ queue, trying to get home.
   own avatar, with your friends; hold **E** at the time clock and the whole
   server clocks in. You work the window in first person, side by side at the
   counter in the harbor's captain's caps. Passengers are classic Robloxians who
-  talk in chat bubbles, the HUD is Roblox's chunky house style, and the player
-  list keeps your Endings and Shifts.
+  talk in Roblox-style chat bubbles and walk smoothly on every screen, the HUD
+  is Roblox's chunky house style, and the player list keeps your Endings and
+  Shifts.
 - **One to four players** share the booth, and anyone can make the call.
 - **Controls:**
   - On the pier: Roblox's usual controls, camera, chat and emotes.
@@ -56,8 +57,8 @@ the banner say what to do; the time clock by the back door has Roblox's own
 | ![First-person booth view with a living passenger](docs/preview-living.png) | ![First-person booth view with a drowned passenger](docs/preview-drowned.png) |
 
 **The window, in first person.** Passengers are classic Robloxians and talk in
-chat bubbles. The living breathe fog and cast a shadow back and to the right of
-them under the lamp. The drowned carry old tickets with the blue anchor stamp;
+bubbles drawn like Roblox's own, which stay up for the whole window. The living
+breathe fog and cast a shadow back and to the right of them under the lamp. The drowned carry old tickets with the blue anchor stamp;
 this one drips seawater and wears seaweed. The HUD is Roblox's chunky style:
 green BOARD, red TURN AWAY, lanterns top right, rules on the right.
 
@@ -66,8 +67,10 @@ green BOARD, red TURN AWAY, lanterns top right, rules on the right.
 | ![Three avatars in captain's caps behind the counter, a passenger in front](docs/preview-crew.png) | ![The booth view on a phone in landscape](docs/preview-phone.png) |
 
 **Friends share the booth** in the harbor's captain's cap, each at a stand behind
-the counter. **On a phone** the HUD scales down, stays below Roblox's top bar,
-and keeps the rules panel clear of the jump button.
+the counter; whoever stands between you and the window turns see-through on
+your screen. **On a phone** the HUD scales down, stays below Roblox's top bar,
+keeps the rules panel clear of the jump button, and makes room for the
+passenger's bubble.
 
 ## Status
 
@@ -76,15 +79,15 @@ and keeps the rules panel clear of the jump button.
 | Game logic (rules, queue generation, runs, endings) | Built, fuzz-tested over thousands of generated nights |
 | Shift flow (intro, window, summary, retry, ending, co-op Continue) | Built, simulated end to end |
 | Server (world, passengers, crew, remotes, saves) and client (cameras, HUD, crowd, sounds) | Built, run together in a headless Roblox simulator with players' characters |
-| Roblox look and feel (avatars and pier lobby, classic Robloxian passengers, chat bubbles, chunky HUD, player list, built-in sounds) | Built, tested headless, previewed with an approximate renderer |
+| Roblox look and feel (avatars and pier lobby, classic Robloxian passengers, chat bubbles, chunky HUD, player list, built-in sounds, smooth movement on every screen) | Built, tested headless, previewed with an approximate renderer |
 | Looks, lighting, feel, pacing in real Roblox | **Not yet seen.** It needs a playtest in Roblox Studio on your machine ([PLAYTEST.md](PLAYTEST.md)) |
 | Store page, badges, icon, questionnaire | To do before publishing (checklist below) |
 
 ## Play it in Studio
 
-1. Get `LastFerry.rbxl`:
-   - use the copy delivered with this build, or
-   - build it with `rojo build -o LastFerry.rbxl`.
+1. Build `LastFerry.rbxl` with `rojo build -o LastFerry.rbxl` (or download it
+   from the latest GitHub Actions run). A copy from before the Roblox-look
+   overhaul is out of date.
 2. Open it in Roblox Studio and press **Play**. Everything (the harbor, the
    booth, the pier, the ferry, the fog) is built by the server script when it
    starts, so the place looks empty in Edit mode. That's expected. You spawn on
@@ -94,8 +97,11 @@ and keeps the rules panel clear of the jump button.
 
 To work on the code with live sync, run `rojo serve` in this folder and connect
 the Rojo plugin, or use Studio's Script Sync on `ServerScriptService` and
-`ReplicatedStorage`. [AGENTS.md](AGENTS.md) explains the rules for doing that
-with Claude Code or Codex.
+`ReplicatedStorage`. The plugin can't sync two Workspace settings the game
+needs, so set them once in Studio: **SignalBehavior → Deferred** and
+**PlayerScriptsUseInputActionSystem → Disabled** (a built place has both).
+[AGENTS.md](AGENTS.md) explains the rules for doing that with Claude Code or
+Codex.
 
 ## Checks
 
@@ -117,21 +123,39 @@ GitHub Actions runs all of these on every pull request
 same pinned versions. It keeps the built place file as a download on each run.
 
 At the time of this build every check comes back clean:
-- 51 tests pass.
+- 80 tests pass.
 - There are 0 selene findings.
 - There are 0 strict type errors.
 
-An independent review then checked what the tests can't: geometry against
-Roblox's real conventions, replication, rendering and layering, and
-readability. Its fixes are in:
-- **Wet passengers:** drips and the puddle moved to where the booth can see
-  them.
-- **Lighting:** pinned for reliable shadows, with a fallback shadow mark for
-  low-quality devices.
-- **Radio and warnings:** Pike's radio pauses the queue, and lantern warnings
-  moved to a top banner, so neither covers a passenger's face.
-- **Plus:** taller cards, a delayed ending reveal, keyboard and gamepad
-  shortcuts, and a gate the passengers fit through.
+Independent reviews then checked what the tests can't, against Roblox's own
+client scripts and docs: geometry, replication, rendering and layering,
+readability, and every device. The first build's review moved the wet
+passengers' drips and puddle into view, pinned the lighting for reliable
+shadows (with a fallback shadow mark), kept the radio and warnings off
+passengers' faces, and added keyboard and gamepad shortcuts.
+
+The Roblox-look overhaul's review found, and this build fixes:
+- **Passengers' lines on every device:** Roblox's chat never shows on consoles,
+  and its bubbles fade after 20 s of a 45 s window, yet what they say is a rule.
+  Lines are now in a bubble drawn like Roblox's, for the whole window, drawn
+  over walls, everywhere.
+- **Shift Lock** dropped players to their avatar's own eye height, below the
+  planks the tells are tuned for. It's off on shift.
+- **Event timing:** the built place ran events immediately while the tests ran
+  them deferred, so late joiners could land off their stand. The place now
+  says Deferred, clerks are placed once loaded, and anyone found outside the
+  booth is put back.
+- **Co-op view:** a friend in front of you turns see-through, nobody can stand
+  on the counter, and the back stands look between the front clerks' heads.
+- **Plus:** the tablet jump button, "touch and hold" on phones, a respawn facing
+  the window, the flood cleared after a bug, the door no longer swinging into
+  the booth, hat sparkles hidden under the cap, a click sound every device has,
+  and Roblox's classic controls pinned so gamepad A doesn't board and jump.
+
+Smooth movement came out of the same research: nothing is tweened on the
+server any more. The server sends each move once and every client plays it
+smoothly (`Shared/Glide`), so passengers, the ferry and the door don't stutter,
+and the server isn't replicating every frame.
 
 The tests have three layers:
 
@@ -144,7 +168,8 @@ The tests have three layers:
    timeouts, retries, co-op Continue and ignored junk input. A bot that sees only
    the screen state plays perfectly, and nothing on screen reveals who is
    drowned.
-3. **The real game, headless** (`Game.spec`, `Passenger.spec`, `Sim.spec`):
+3. **The real game, headless** (`Game.spec`, `Glide.spec`, `Passenger.spec`,
+   `Sim.spec`):
    - The actual server and client scripts run together in `tests/sim`, a mock
      Roblox checked against the engine's API dump, on a virtual clock, with
      players' characters, spawns, accessories, ProximityPrompts,
@@ -156,7 +181,11 @@ The tests have three layers:
      late-joining co-op session, then clocks out onto the pier.
    - It checks the lobby, the booth (door, walls, stands, the cap, hats hidden
      and restored), gamepad A boarding instead of jumping, what players hear,
-     and button sizes and the jump-button gap on phone-sized screens.
+     button sizes and the jump-button gap on phones and tablets, passengers'
+     lines on a console, the co-op view, respawns, and the error path.
+   - Passengers walk a steady stride every frame on each client while the
+     server sends each leg once (`sim:countWrites` counts who moved what), and
+     glides survive late joiners, changes of course and late server moves.
    - Passengers who differ only in kind are built identically, part for part.
 
 Mutation checks confirmed each layer fails when a real bug is planted (for

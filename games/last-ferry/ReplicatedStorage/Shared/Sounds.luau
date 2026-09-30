@@ -1,14 +1,15 @@
 --!strict
 --[[
-	Sounds: the game's audio, all of it from Roblox's own built-in sounds
-	(rbxasset://sounds/..., which ship with every client), so there's nothing to
-	upload and every one of them sounds like Roblox:
+	Sounds: the game's audio, all of it from the built-in sounds Roblox's own
+	characters make (rbxasset://sounds/..., used by RbxCharacterSounds, so every
+	client on every device has them), so there's nothing to upload and every one of
+	them sounds like Roblox:
 
 		Footsteps  a passenger walking: the plastic footsteps every Roblox character makes
 		Splash     one of the drowned sinking back into the harbor; the tide coming in
 		Paddle     the water sloshing round the booth while it floods
 		Thud       the rubber stamp hitting the ticket; the booth door shutting
-		Click      pressing a button: the blip of Roblox's own settings slider
+		Click      pressing a button: a landing's tap, sped up to a short tock
 		Gust       a lantern blowing out: the rush of wind Roblox plays when you fall
 
 	Sound is only ever feedback. Every tell stays visual, and every passenger makes
@@ -36,7 +37,7 @@ local Sounds = {
 	Splash = { id = "rbxasset://sounds/impact_water.mp3", volume = 0.8, speed = 1, near = 10, far = 160 } :: Spec,
 	Paddle = { id = "rbxasset://sounds/action_swim.mp3", volume = 0.35, speed = 0.8, looped = true, near = 8 } :: Spec,
 	Thud = { id = "rbxasset://sounds/action_jump_land.mp3", volume = 0.7, speed = 0.75, near = 8, far = 80 } :: Spec,
-	Click = { id = "rbxasset://sounds/volume_slider.ogg", volume = 0.35, speed = 1.2 } :: Spec,
+	Click = { id = "rbxasset://sounds/action_jump_land.mp3", volume = 0.3, speed = 2.4 } :: Spec,
 	Gust = { id = "rbxasset://sounds/action_falling.ogg", volume = 0.6, speed = 1.4 } :: Spec,
 }
 

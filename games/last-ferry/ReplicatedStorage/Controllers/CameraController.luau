@@ -17,12 +17,15 @@
 	  sees the planks the tells are tuned for;
 	- a shake when a lantern goes out;
 	- cinematic views for the flood and the endings: a Scriptable camera that turns,
-	  from where you stand, toward the scene.
+	  from where you stand, toward the scene;
+	- other clerks turn see-through while they stand between you and the window, so
+	  nobody's head hides a passenger's face, breath or shadow.
 ]]
 
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local StarterPlayer = game:GetService("StarterPlayer")
 local UserInputService = game:GetService("UserInputService")
 
 local CameraController = {}
@@ -36,6 +39,13 @@ local TURN_TIME = 1.4 -- seconds for a cinematic view to turn toward its scene
 -- HEAD_OFFSET / R15_HEAD_OFFSET, plus half of any extra root height on scaled R15s).
 local HEAD_OFFSET = 1.5
 
+-- Other clerks between you and the window: how see-through they turn, and how near the
+-- line from you to the window they have to be (studs, sideways, from their middle).
+local SEE_THROUGH = 0.75
+local IN_THE_WAY = 1.6
+local WINDOW_Z = -3.2 -- where the passenger stands
+local CLEAR_VIEW_EVERY = 0.2 -- seconds
+
 type Cinematic = { from: CFrame, yaw: number, pitch: number, started: number }
 
 local player = Players.LocalPlayer
@@ -46,6 +56,8 @@ local eyeOffset: number? = nil
 local cinematic: Cinematic? = nil
 local base = CFrame.identity -- the booth's view out of the window
 local inBooth = false
+local seeThrough: { [Model]: boolean } = {} -- other clerks made see-through
+local pinching = false
 
 local function humanoid(): Humanoid?
 	local character = player.Character
@@ -102,6 +114,71 @@ function CameraController.shake(strength: number, seconds: number)
 	shakeUntil = os.clock() + seconds
 end
 
+local function setSeeThrough(character: Model, amount: number)
+	for _, descendant in character:GetDescendants() do
+		-- (Two checks: a part and a decal are different types with the same property.)
+		if descendant:IsA("BasePart") then
+			descendant.LocalTransparencyModifier = amount
+		end
+		if descendant:IsA("Decal") then
+			descendant.LocalTransparencyModifier = amount
+		end
+	end
+end
+
+-- Whether someone standing at `other` is in the way of `me` looking out of the window
+-- (seen from above: in front of me, and near my line to the middle of the window).
+local function inTheWay(me: Vector3, other: Vector3): boolean
+	if other.Z > me.Z - 0.3 or other.Z < WINDOW_Z then
+		return false
+	end
+	local along = (me.Z - other.Z) / (me.Z - WINDOW_Z)
+	return math.abs(other.X - me.X * (1 - along)) < IN_THE_WAY
+end
+
+-- Makes the clerks in the way of this player's view see-through (only on this screen),
+-- and everyone else solid again. With `me` nil, everyone is solid.
+local function clearView(me: Vector3?)
+	local inWay: { [Model]: boolean } = {}
+	if me then
+		for _, other in Players:GetPlayers() do
+			local character = other.Character
+			local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+			if
+				other ~= player
+				and character
+				and root
+				and root:IsA("BasePart")
+				and other:GetAttribute("OnShift") == true
+				and inTheWay(me, root.Position)
+			then
+				inWay[character] = true
+			end
+		end
+	end
+	for character in seeThrough do
+		if not inWay[character] then
+			seeThrough[character] = nil
+			setSeeThrough(character, 0)
+		end
+	end
+	-- Set again each time, so a cap or hat added since is see-through too.
+	for character in inWay do
+		seeThrough[character] = true
+		setSeeThrough(character, SEE_THROUGH)
+	end
+end
+
+-- Whether a touch is where Roblox's thumbstick takes touches (the lower left of a
+-- landscape screen), so a finger walking and one looking aren't taken for a pinch.
+local function onThumbstick(position: unknown): boolean
+	if typeof(position) ~= "Vector2" then
+		return false
+	end
+	local viewport = workspace.CurrentCamera.ViewportSize
+	return position.X < viewport.X * 0.4 and position.Y > viewport.Y / 3
+end
+
 local function applyMode()
 	local camera = workspace.CurrentCamera
 	local onShift = player:GetAttribute("OnShift") == true
@@ -132,7 +209,7 @@ local function applyMode()
 			-- the player can zoom as they like.
 			player.CameraMinZoomDistance = PIER_ZOOM
 			task.delay(0.2, function()
-				player.CameraMinZoomDistance = 0.5
+				player.CameraMinZoomDistance = StarterPlayer.CameraMinZoomDistance
 			end)
 		end
 	end
@@ -161,15 +238,22 @@ local function connectInput()
 	)
 
 	UserInputService.TouchPinch:Connect(
-		function(_positions: { any }, scale: number, _velocity: number, state: Enum.UserInputState, processed: boolean)
-			if processed or not inBooth then
-				return
-			end
+		function(positions: { any }, scale: number, _velocity: number, state: Enum.UserInputState, processed: boolean)
 			if state == Enum.UserInputState.Begin then
+				pinching = inBooth and not processed
+				for _, position in positions do
+					if onThumbstick(position) then
+						pinching = false
+					end
+				end
 				pinchFov = targetFov
-			elseif scale > 0 then
-				targetFov = pinchFov / scale
-				clampFov()
+			elseif state == Enum.UserInputState.Change then
+				if pinching and inBooth and scale > 0 then
+					targetFov = pinchFov / scale
+					clampFov()
+				end
+			else
+				pinching = false
 			end
 		end
 	)
@@ -183,9 +267,13 @@ function CameraController.start()
 	player:GetAttributeChangedSignal("OnShift"):Connect(applyMode)
 	player.CharacterAdded:Connect(function()
 		eyeOffset = nil
+		-- A new character (a respawn mid-shift) starts off looking out of the window again.
+		inBooth = false
 		task.defer(applyMode)
 	end)
 	applyMode()
+
+	local lastClear = 0
 
 	RunService:BindToRenderStep("LastFerryCamera", Enum.RenderPriority.Camera.Value + 1, function(dt: number)
 		local camera = workspace.CurrentCamera
@@ -218,6 +306,11 @@ function CameraController.start()
 		end
 
 		local h = humanoid()
+		if now - lastClear >= CLEAR_VIEW_EVERY then
+			lastClear = now
+			local root = if h and inBooth then h.RootPart else nil
+			clearView(if root then root.Position else nil)
+		end
 		if h == nil or not inBooth then
 			return
 		end

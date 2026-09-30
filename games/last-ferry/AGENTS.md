@@ -30,14 +30,23 @@ Codex reads it directly.
   properties that belong in the place:
   - `Workspace.StreamingEnabled = false`: the client needs the whole harbor in
     view from the booth;
+  - `Workspace.SignalBehavior = Deferred`: handlers run after what fired them
+    has finished (Default still means Immediate), which is what the simulator
+    runs;
+  - `Workspace.PlayerScriptsUseInputActionSystem = Disabled`: Roblox's controls
+    stay on ContextActionService, which the HUD's key bindings sit above;
   - `Lighting.LightingStyle = Realistic` with `PrioritizeLightingQuality`:
     crisp local-light shadows, which the shadow rule depends on.
     `setUpLighting` sets both again at runtime;
   - `Players.CharacterAutoLoads = true`: players are their own avatars;
   - `StarterPlayer.CameraMaxZoomDistance = 25`: a close third-person camera on
     the pier;
-  - `TextChatService.ChatVersion = TextChatService`, which the passengers' chat
-    bubbles need (scripts can't set it).
+  - `TextChatService.ChatVersion = TextChatService`, for the chat log and
+    friends' bubbles (scripts can't set it).
+
+  The Rojo plugin can't sync `SignalBehavior` or
+  `PlayerScriptsUseInputActionSystem`; with `rojo serve`, set them once in
+  Studio. The simulator refuses to run a project without them.
 - One server Script, one client Script (in ReplicatedStorage, RunContext
   Client). Everything else is a ModuleScript. Never put a `.client.luau` file in
   a Starter container: it would run twice.
@@ -143,20 +152,29 @@ otherwise. Don't weaken or skip a test to get green.
 - Nothing may cover a passenger's face while they're at the window: breath is
   a rule from night 3. That's why the radio waits for an empty window and
   warnings show as a banner over the top bar.
+- In co-op, the other clerks are in the booth too: anyone standing between you
+  and the window turns see-through on your screen (`CameraController`), and an
+  invisible guard over the counter stops anyone standing on it. Keep the space
+  between the stands and the window clear of anything else.
 - Roblox's touch controls are on (players walk the pier and the booth): the
-  thumbstick takes the lower left and the jump button the lower right. The
-  rules panel stops short of the jump button on touch screens; `Game.spec`
-  checks it.
+  thumbstick takes the lower left and the jump button the lower right (90 px
+  up on phones, 210 px on tablets). The rules panel stops short of the jump
+  button on touch screens; `Game.spec` checks both.
+- A passenger's line is in a bubble over their head for the whole window
+  (`Ui/Speech`), not Roblox's own bubble: it's a rule on night 5, and must be
+  readable on every device, consoles included. On a phone the top bar drops the
+  date to make room for it.
 - Every tell must be visible from the front stand's first-person view (the eye
   is held at y = 5.1 for every avatar). The sill hides the planks closer than
   z ≈ −4.1, and a passenger's body hides everything straight behind them.
   Check new cues with `tools/preview` (export, then render) before a Studio
   playtest.
 - Every tell is visual. Sound is feedback only (footsteps, the stamp, clicks, a
-  lantern's gust, splashes), and only Roblox's built-in sounds
-  (`rbxasset://sounds/...`, see `Shared/Sounds.luau`), so there's nothing to
-  upload. Every passenger sounds the same whatever they are; `Game.spec` checks
-  that every sound played is a built-in one.
+  lantern's gust, splashes), and only the built-in sounds Roblox's own
+  characters make (`rbxasset://sounds/...` used by RbxCharacterSounds, see
+  `Shared/Sounds.luau`), because only those are on every device. There's
+  nothing to upload. Every passenger sounds the same whatever they are;
+  `Game.spec` checks that every sound played is one of those.
 
 ## Definition of done
 

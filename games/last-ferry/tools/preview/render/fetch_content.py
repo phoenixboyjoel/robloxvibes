@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Downloads the built-in Roblox client textures the previews use (the classic face,
-particle sprites) from the Roblox Client Tracker into rbxcontent/, converting .dds
+particle sprites, the chat bubble's tail) from the Roblox Client Tracker into rbxcontent/, converting .dds
 files to .png. These are Roblox's files: they stay local and are not committed.
 
     python3 fetch_content.py
@@ -19,6 +19,7 @@ FILES = [
     "textures/particles/sparkles_main.dds",
     "textures/particles/fire_main.dds",
     "textures/sparkle.png",
+    "textures/ui/InGameChat/Caret.png",
 ]
 
 here = os.path.dirname(os.path.abspath(__file__))

@@ -193,9 +193,11 @@ function ShiftService.start(markers: WorldService.Markers)
 			CrewService.startShift()
 			local ok, err = xpcall(Director.playRun, debug.traceback, director)
 			if not ok then
-				-- A bug shouldn't strand players in a frozen booth: back to the pier.
+				-- A bug shouldn't strand players in a frozen booth: back to the pier, with the
+				-- harbor as it is between runs (no flood sloshing round the booth, say).
 				warn(`[Last Ferry] The shift hit an error and everyone is back on the pier:\n{err}`)
 				clearQueue()
+				WorldService.reset()
 			end
 			CrewService.endShift()
 		end

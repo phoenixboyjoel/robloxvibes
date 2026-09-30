@@ -9,11 +9,14 @@
 	counter, wearing the harbor's cap, and the door shuts behind them. After the ending
 	they clock out onto the pier again.
 
-	Anyone who joins or respawns mid-shift starts in the booth at a free stand.
+	Anyone who joins or respawns mid-shift starts in the booth at a free stand, and
+	anyone found outside the booth mid-shift is put back at theirs.
 
 	A player's "OnShift" attribute tells their client which camera to use (see
 	CameraController): Roblox's own third-person camera on the pier, first person in
-	the booth.
+	the booth. Shift Lock is off on shift: in first person it would only get in the
+	way, and Roblox's camera drops Humanoid.CameraOffset while the mouse is locked,
+	which would undo the booth's one eye height for every avatar.
 ]]
 
 local Players = game:GetService("Players")
@@ -25,6 +28,7 @@ local CrewService = {}
 
 local CAP = "ClerkCap"
 local SHIFT_WALK_SPEED = 10 -- the booth is ten studs wide
+local CHECK_EVERY = 1 -- seconds between checks that every clerk is in the booth
 local NAVY = Color3.fromRGB(33, 52, 96)
 local WHITE = Color3.fromRGB(242, 243, 243)
 local BRASS = Color3.fromRGB(226, 176, 72)
@@ -32,8 +36,8 @@ local BRASS = Color3.fromRGB(226, 176, 72)
 local markers: WorldService.Markers
 local onShift = false
 local stands: { [Player]: number } = {}
--- Hats hidden under the cap, with their transparency, to put back after the shift.
-local hiddenHats: { [Player]: { [BasePart]: number } } = {}
+-- What's been hidden under each player's cap, as the ways to put it all back.
+local hiddenHats: { [Player]: { () -> () } } = {}
 
 -- How far above its feet a standing character's root is.
 local function rootHeight(character: Model, humanoid: Humanoid, root: BasePart): number
@@ -142,24 +146,59 @@ local function makeCap(): Accessory
 	return accessory
 end
 
+-- Hides one piece of a hat (its parts, decals and textures, and any sparkle, flame,
+-- trail or light on it), noting how to put it back.
+local function hide(item: Instance, putBack: { () -> () })
+	if item:IsA("BasePart") then
+		local was = item.Transparency
+		item.Transparency = 1
+		table.insert(putBack, function()
+			item.Transparency = was
+		end)
+		return
+	end
+	if item:IsA("Decal") then -- Textures too
+		local was = item.Transparency
+		item.Transparency = 1
+		table.insert(putBack, function()
+			item.Transparency = was
+		end)
+		return
+	end
+	if
+		item:IsA("ParticleEmitter")
+		or item:IsA("Trail")
+		or item:IsA("Beam")
+		or item:IsA("Light")
+		or item:IsA("Fire")
+		or item:IsA("Smoke")
+		or item:IsA("Sparkles")
+	then
+		-- All of these have Enabled, but strict Luau can't set it through their union.
+		local effect = item :: any
+		local was: boolean = effect.Enabled
+		effect.Enabled = false
+		table.insert(putBack, function()
+			effect.Enabled = was
+		end)
+	end
+end
+
 -- Hats go under the cap for the shift (hair stays), and come back after.
 local function wearCap(player: Player)
 	local character, humanoid = body(player)
 	if character == nil or humanoid == nil or character:FindFirstChild(CAP) then
 		return
 	end
-	local hidden: { [BasePart]: number } = {}
+	local putBack: { () -> () } = {}
 	for _, accessory in humanoid:GetAccessories() do
 		if accessory:IsA("Accessory") and accessory.AccessoryType == Enum.AccessoryType.Hat then
 			for _, descendant in accessory:GetDescendants() do
-				if descendant:IsA("BasePart") then
-					hidden[descendant] = descendant.Transparency
-					descendant.Transparency = 1
-				end
+				hide(descendant, putBack)
 			end
 		end
 	end
-	hiddenHats[player] = hidden
+	hiddenHats[player] = putBack
 	humanoid:AddAccessory(makeCap())
 end
 
@@ -169,12 +208,10 @@ local function takeOffCap(player: Player)
 	if cap then
 		cap:Destroy()
 	end
-	local hidden = hiddenHats[player]
-	if hidden then
-		for descendant, transparency in hidden do
-			if descendant.Parent then
-				descendant.Transparency = transparency
-			end
+	local putBack = hiddenHats[player]
+	if putBack then
+		for _, restore in putBack do
+			restore()
 		end
 	end
 	hiddenHats[player] = nil
@@ -184,6 +221,7 @@ end
 local function joinShift(player: Player)
 	local _, humanoid = body(player)
 	player:SetAttribute("OnShift", true)
+	player.DevEnableMouseLock = false
 	if humanoid == nil then
 		return -- they'll be placed when their character spawns
 	end
@@ -197,6 +235,7 @@ end
 -- Sends one player back to the pier, in a loose crowd round the spawn, facing the booth.
 local function leaveShift(player: Player, slot: number)
 	player:SetAttribute("OnShift", false)
+	player.DevEnableMouseLock = StarterPlayer.EnableMouseLockOption
 	takeOffCap(player)
 	local _, humanoid = body(player)
 	if humanoid then
@@ -209,12 +248,36 @@ local function leaveShift(player: Player, slot: number)
 end
 
 local function onCharacter(player: Player, character: Model)
-	-- Handlers run after the engine has parented and placed the character, but make sure.
 	if not character:IsDescendantOf(workspace) then
 		character.AncestryChanged:Wait()
 	end
+	-- Let the engine finish loading the character (scaling it, putting it on a spawn)
+	-- before moving it, whether events here run deferred (as this place is set) or not.
+	task.wait()
 	if onShift and player.Character == character then
 		joinShift(player)
+	end
+end
+
+-- Whether a character's feet are inside the booth (seen from above).
+local function inBooth(root: BasePart): boolean
+	local at = root.Position
+	return math.abs(at.X) < 4.9 and at.Z > 0.2 and at.Z < 7.9
+end
+
+-- Mid-shift, puts any clerk who has ended up outside the booth back at their stand: a
+-- character that loaded on the pier just as the shift started, say.
+local function keepInBooth()
+	while true do
+		task.wait(CHECK_EVERY)
+		if onShift then
+			for _, player in Players:GetPlayers() do
+				local _, humanoid, root = body(player)
+				if humanoid and root and player:GetAttribute("OnShift") == true and not inBooth(root) then
+					joinShift(player)
+				end
+			end
+		end
 	end
 end
 
@@ -240,6 +303,7 @@ function CrewService.start(worldMarkers: WorldService.Markers)
 		stands[player] = nil
 		hiddenHats[player] = nil
 	end)
+	task.spawn(keepInBooth)
 end
 
 -- Yields until someone who `canClockIn` presses the time clock's prompt, and returns them.

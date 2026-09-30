@@ -13,7 +13,9 @@
     },
     "Workspace": {
       "$properties": {
-        "StreamingEnabled": false
+        "StreamingEnabled": false,
+        "SignalBehavior": "Deferred",
+        "PlayerScriptsUseInputActionSystem": "Disabled"
       }
     },
     "Lighting": {

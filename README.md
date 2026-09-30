@@ -16,8 +16,9 @@ agents: Claude Code with Claude Opus 5.5, or Codex with GPT-6 Astra.
   - Five nights and four endings, for one to four players.
   - Made to look and feel like Roblox: players arrive on a pier as their own
     avatars and clock in together; passengers are classic Robloxians who talk
-    in chat bubbles; a chunky Roblox HUD; the player list; Roblox's built-in
-    sounds. Why and how is in [research/09–11](research/README.md).
+    in chat bubbles and move smoothly on every screen; a chunky Roblox HUD; the
+    player list; Roblox's built-in sounds. Why and how is in
+    [research/09–11](research/README.md).
   - Built entirely from code: the world, the HUD, and a test suite that runs the
     real server and client headlessly, with players' characters, while a bot
     plays.

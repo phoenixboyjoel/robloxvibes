@@ -788,7 +788,8 @@ local function buildBooth(parent: Folder): CFrame
 	clockPrompt.Parent = promptPoint
 
 	-- Clerks who join (or respawn) mid-shift appear inside, facing the window.
-	boothSpawn = spawnPad("BoothSpawn", Vector3.new(4, 0.2, 2), CFrame.new(0, 0.1, 5.6), booth)
+	-- In the back corner, clear of every stand: whoever spawns here is walked to one.
+	boothSpawn = spawnPad("BoothSpawn", Vector3.new(3, 0.2, 1.2), CFrame.new(3.3, 0.1, 7.1), booth)
 	boothSpawn.Enabled = false
 
 	-- Inside, for anyone who turns round: a clock and the rules in poster form.
@@ -859,6 +860,17 @@ local function buildBooth(parent: Folder): CFrame
 		cframe = CFrame.new(0, 1.2, 1.6),
 		color = BOOTH_PAINT:Lerp(Color3.new(0, 0, 0), 0.2),
 		material = Enum.Material.WoodPlanks,
+		collide = true,
+		parent = booth,
+	})
+	-- An invisible wall over the counter, up to the top of the window, so nobody can
+	-- jump up and stand in the window in front of the passenger.
+	part({
+		name = "CounterGuard",
+		size = Vector3.new(9.2, 4.3, 1.6),
+		cframe = CFrame.new(0, 4.8, 0.95),
+		transparency = 1,
+		castShadow = false,
 		collide = true,
 		parent = booth,
 	})
@@ -1219,14 +1231,16 @@ function WorldService.build(): Markers
 		camera = cameraCFrame,
 		pier = pier,
 		-- Where each clerk's feet go on the booth floor, facing the window: the front spot
-		-- first. Four fit along the counter and behind it; more than six share.
+		-- first. Three along the counter; behind them, two who look at the window between
+		-- the front clerks' heads (x = ±2, whose line to the window crosses the front row at
+		-- x = ±1.4); a sixth at the back. More than six share.
 		stands = {
 			CFrame.lookAt(Vector3.new(0, 0.2, 2.7), Vector3.new(0, 0.2, -1)),
 			CFrame.lookAt(Vector3.new(-2.8, 0.2, 3), Vector3.new(-2.8, 0.2, -1)),
 			CFrame.lookAt(Vector3.new(2.8, 0.2, 3), Vector3.new(2.8, 0.2, -1)),
-			CFrame.lookAt(Vector3.new(0, 0.2, 5.4), Vector3.new(0, 0.2, -1)),
-			CFrame.lookAt(Vector3.new(-2.8, 0.2, 5.8), Vector3.new(-2.8, 0.2, -1)),
-			CFrame.lookAt(Vector3.new(2.8, 0.2, 5.8), Vector3.new(2.8, 0.2, -1)),
+			CFrame.lookAt(Vector3.new(-2, 0.2, 5.6), Vector3.new(-2, 0.2, -1)),
+			CFrame.lookAt(Vector3.new(2, 0.2, 5.6), Vector3.new(2, 0.2, -1)),
+			CFrame.lookAt(Vector3.new(0, 0.2, 6.6), Vector3.new(0, 0.2, -1)),
 		},
 		window = Vector3.new(0, 0, -3.2),
 		queue = { Vector3.new(-2, 0, -11), Vector3.new(0.5, 0, -17), Vector3.new(-1.5, 0, -23) },
@@ -1277,16 +1291,17 @@ function WorldService.clockPrompt(): ProximityPrompt
 	return clockPrompt
 end
 
--- The staff door swings open onto the pier between shifts, and shuts for one, on its
--- hinge and with a little bounce.
+-- The staff door swings open onto the pier between shifts, swinging a little past and
+-- back; for a shift it slams shut and bounces off the frame (never past it, into the
+-- booth), with a thud as it hits.
 function WorldService.setDoor(open: boolean)
 	door.CanCollide = not open
 	Glide.start(door, if open then DOOR_OPEN else DOOR_SHUT, 0.6, {
-		style = Enum.EasingStyle.Back,
+		style = if open then Enum.EasingStyle.Back else Enum.EasingStyle.Bounce,
 		direction = Enum.EasingDirection.Out,
 	})
 	if not open then
-		task.delay(0.4, function()
+		task.delay(0.6 / 2.75, function() -- Bounce's first impact
 			doorThud:Play()
 		end)
 	end

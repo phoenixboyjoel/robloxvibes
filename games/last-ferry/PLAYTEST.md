@@ -6,7 +6,12 @@ each screen, but nobody has played it in Roblox yet. This is the checklist for
 that first look. It should take about an hour. Note what's wrong with a
 screenshot, and the agent can fix it from the notes.
 
-Open `LastFerry.rbxl` in Studio, open the **Output** window, then **Play**.
+Build the place fresh (`rojo build -o LastFerry.rbxl`; an older copy predates
+the Roblox-look overhaul), open it in Studio, open the **Output** window, then
+**Play**. If you sync into a place of your own with `rojo serve` instead, first
+set two properties on **Workspace** that the Rojo plugin can't sync:
+**SignalBehavior → Deferred** and **PlayerScriptsUseInputActionSystem →
+Disabled**.
 
 ## 1. The pier (the lobby)
 
@@ -29,8 +34,13 @@ Open `LastFerry.rbxl` in Studio, open the **Output** window, then **Play**.
 ## 2. In the booth (first person)
 
 - [ ] **Looking:** hold the right mouse button to look around (the cursor stays
-      free for the HUD), drag on a phone, or use the right stick. Scroll,
-      pinch or hold R2 to lean in.
+      free for the HUD; it jumps to the middle while you hold the button, as
+      Roblox's first-person camera does), drag on a phone, or use the right
+      stick. Scroll, pinch or hold R2 to lean in. On a phone, walk with the
+      thumbstick while dragging to look: that mustn't lean in.
+- [ ] **Shift Lock:** pressing Shift does nothing on shift (it would drop you to
+      your avatar's own eye height). Back on the pier it works again, if the
+      place allows it.
 - [ ] **Walking:** WASD or the thumbstick moves you round the booth; you can't
       leave it (door, walls, window glass and roof are solid). Jumping bumps
       the roof.
@@ -43,6 +53,12 @@ Open `LastFerry.rbxl` in Studio, open the **Output** window, then **Play**.
       shift. Check the cap sits well on a few avatar heads (classic head,
       dynamic head, big hair).
 - [ ] You don't see your own body or cap in first person.
+- [ ] **In each other's way:** stand behind a friend. While they're between you
+      and the window they turn see-through on your screen (not on theirs), and
+      solid again when they step aside. Try to jump onto the counter: an
+      invisible guard stops you.
+- [ ] **Respawn mid-shift** (Esc → Reset Character): you're back at a stand,
+      looking out of the window, capped.
 
 ## 3. The harbor at night (tune these first)
 
@@ -97,9 +113,11 @@ Open `LastFerry.rbxl` in Studio, open the **Output** window, then **Play**.
       - GULL ISLAND;
       - tonight's date (14 NOV 2026);
       - a red gull stamp.
-- [ ] What they say appears as a Roblox chat bubble over their head, and as a
-      line in the chat window (so it can be read again). Check the bubble is
-      readable through the window glass and isn't hidden by it.
+- [ ] What they say appears in a white bubble over their head that looks like
+      Roblox's own chat bubble, and as a line in the chat window (so it can be
+      read again). The bubble stays up for the whole window (45 s), and shows
+      over the wall above the window from every stand, even for a tall
+      passenger in a hat. It goes a moment after they leave.
 - [ ] **BOARD** (green, with a check): the button squashes and clicks, the
       ticket gets a BOARDED stamp with a thud and slides away. They walk
       through the gate and up the gangway, then fade.
@@ -146,7 +164,7 @@ Open `LastFerry.rbxl` in Studio, open the **Output** window, then **Play**.
 ## 6. Phones and friends
 
 - [ ] **Test → Device** emulators (iPhone SE, a modern iPhone, an iPad, a
-      1080p PC):
+      1080p PC, and an Xbox for the TV layout):
       - nothing sits under the notch or Roblox's buttons;
       - the text is readable;
       - BOARD / TURN AWAY are easy to tap, and the key caps are gone;
@@ -157,6 +175,12 @@ Open `LastFerry.rbxl` in Studio, open the **Output** window, then **Play**.
         rules panel; the part by their feet, and the shadow mark, should
         stay clear.
       - Roblox's chat window opens bottom left, not over the ticket.
+      - On phones the passenger's bubble sits between the clock and IN LINE,
+        clear of the top bar (the top bar leaves out the date there).
+      - On an iPad the rules panel stops above the bigger jump button.
+      - On the Xbox (a TV screen) there's no Roblox chat at all, but the
+        passenger's bubble still shows, in bigger type.
+      - Mara (the smallest passenger) has a normal-looking classic head.
 - [ ] **Test → Clients and Servers**, 2 players:
       - both see the same passenger;
       - either can make the call;
@@ -176,7 +200,7 @@ Open `LastFerry.rbxl` in Studio, open the **Output** window, then **Play**.
 | Clerks' walking speed on shift | `SHIFT_WALK_SPEED` in `CrewService` | 10 studs/s |
 | Eye height in the booth | `EYE_HEIGHT` in `CameraController` | 5.1 studs |
 | How far out the pier camera can zoom | `StarterPlayer.CameraMaxZoomDistance` (project file) | 25 studs |
-| How long a chat bubble stays up | `BubbleDuration` in `HudController.setUpCoreGui` | 20 s |
+| The passenger's speech bubble (text size, width, height above the head) | `ReplicatedStorage/Ui/Speech.luau` | 16 px, 300 px wide (260 on phones), 0.4 studs up |
 | Sound volumes and pitches | `ReplicatedStorage/Shared/Sounds.luau` | |
 | Queue sizes and difficulty per night | `Content.Nights` | 6 to 9 passengers |
 | All story text | `ServerScriptService/Shift/Content.luau` | |

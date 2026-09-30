@@ -7,7 +7,7 @@
 	  Roblox API dump): unknown members, wrong value types and writes to read-only
 	  properties raise the same way they would in Roblox, and deprecated members
 	  are recorded.
-	- task.*, signals (deferred, like Roblox's default), TweenService,
+	- task.*, signals (deferred, as the place is set), TweenService,
 	  RemoteEvents (server and per-player client contexts), DataStores, badges
 	  and players are simulated.
 	- Nothing renders and there is no physics. Tweens jump to their goal when
@@ -72,7 +72,13 @@ local function split(path: string): { string }
 	return parts
 end
 
-function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?, preferredInput: EnumItem? }?)
+function Sim.new(options: {
+	root: string?,
+	screen: Vector2?,
+	safeArea: Vector2?,
+	preferredInput: EnumItem?,
+	tenFoot: boolean?,
+}?)
 	local opts = options or {}
 	local root = opts.root or "."
 	local reflection = serde.decode("json", fs.readFile(`{root}/tests/sim/reflection.json`)).classes
@@ -104,6 +110,8 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		-- Below Roblox's 58 px top bar, where ScreenGuis with CoreUISafeInsets go.
 		safeArea = opts.safeArea or opts.screen or roblox.Vector2.new(1280, 662),
 		preferredInput = opts.preferredInput or Enum.PreferredInput.KeyboardAndMouse,
+		-- A console on a TV: GuiService:IsTenFootInterface(), and Roblox's chat never shows.
+		tenFoot = opts.tenFoot == true,
 		stores = {},
 		badges = {},
 		coreCalls = {},
@@ -259,7 +267,8 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		return coroutine.yield()
 	end
 
-	-- Deferred, like Roblox's default SignalBehavior: handlers run at the next resumption point.
+	-- Deferred, as the place sets Workspace.SignalBehavior (Roblox's Default still means
+	-- Immediate): handlers run at the next resumption point.
 	local function fire(signal, filter: ((context: string) -> boolean)?, ...)
 		for _, connection in table.clone(signal.connections) do
 			if connection.Connected and (filter == nil or filter(connection.context)) then
@@ -397,7 +406,11 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		return found
 	end
 
+	local ancestryListeners = 0 -- AncestryChanged signals made so far; none, and it's never fired
 	local function eventFor(instance, st, key: string)
+		if key == "AncestryChanged" and st.signals[key] == nil then
+			ancestryListeners += 1
+		end
 		local signal = st.signals[key]
 		if signal == nil then
 			signal = newSignal(`{fullName(instance)}.{key}`)
@@ -674,6 +687,19 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		local isInGame = parent ~= nil and inGame(parent)
 		if isInGame ~= wasInGame then
 			retagTree(instance, if isInGame then "added" else "removed")
+		end
+		-- AncestryChanged(child, parent) fires on the instance and everything under it.
+		if ancestryListeners > 0 then
+			local function tell(node)
+				local signal = state[node].signals.AncestryChanged
+				if signal then
+					fire(signal, nil, instance, parent)
+				end
+				for _, child in state[node].children do
+					tell(child)
+				end
+			end
+			tell(instance)
 		end
 		changed(instance, st, "Parent", parent)
 	end
@@ -972,7 +998,7 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 				if timeout and sim.now - started >= timeout then
 					return nil
 				end
-				if not warned and sim.now - started > 5 then
+				if not warned and timeout == nil and sim.now - started > 5 then
 					warned = true
 					note(sim.warnings, `Infinite yield possible on '{fullName(self)}:WaitForChild("{name}")'`)
 				end
@@ -1125,6 +1151,23 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 	local projectPath = `{root}/default.project.json`
 	if fs.isFile(projectPath) then
 		local project = serde.decode("json", fs.readFile(projectPath))
+		-- Signals here always run deferred. A place left on Default runs them immediately
+		-- (for now), which changes the order things happen in, so the place must say Deferred.
+		local workspaceProperties = project.tree and project.tree.Workspace and project.tree.Workspace["$properties"]
+		if workspaceProperties == nil or workspaceProperties.SignalBehavior ~= "Deferred" then
+			error(
+				'sim: set Workspace.SignalBehavior to "Deferred" in default.project.json; the simulator only runs signals deferred',
+				2
+			)
+		end
+		-- Roblox's controls bind jump through ContextActionService unless the place opts into
+		-- the Input Action System, which isn't simulated.
+		if workspaceProperties.PlayerScriptsUseInputActionSystem ~= "Disabled" then
+			error(
+				'sim: set Workspace.PlayerScriptsUseInputActionSystem to "Disabled"; Roblox\'s controls are simulated on ContextActionService',
+				2
+			)
+		end
 		for serviceName, entry in project.tree or {} do
 			if type(entry) == "table" and entry["$properties"] and reflection[serviceName] then
 				local instance = service(serviceName)
@@ -1195,6 +1238,37 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 			return sim.safeArea
 		end,
 	}
+	-- TextBounds, estimated (there's no font engine): about half the text size a character,
+	-- wrapped by words at the label's width when TextWrapped. Enough for layout that
+	-- measures text, like a chat bubble fitting its line.
+	local function textBounds(_instance, st)
+		local text = st.props.Text or ""
+		if text == "" then
+			return roblox.Vector2.zero
+		end
+		local size = st.props.TextSize or 14
+		local charWidth = size * 0.52
+		local frame = st.props.Size
+		local maxWidth = if frame and st.props.TextWrapped and frame.X.Offset > 0 then frame.X.Offset else math.huge
+		local lines, widest, current = 1, 0, 0
+		for word in string.gmatch(text, "%S+") do
+			local width = (utf8.len(word) or #word) * charWidth
+			local joined = if current > 0 then current + charWidth * 0.55 + width else width
+			if current > 0 and joined > maxWidth then
+				widest = math.max(widest, current)
+				lines += 1
+				current = width
+			else
+				current = joined
+			end
+		end
+		widest = math.max(widest, current)
+		return roblox.Vector2.new(math.ceil(math.min(widest, maxWidth)), lines * size)
+	end
+	for _, className in { "TextLabel", "TextButton", "TextBox" } do
+		computed[className] = { TextBounds = textBounds }
+	end
+
 	computed.Camera = {
 		ViewportSize = function()
 			return sim.screen
@@ -1727,6 +1801,43 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		return false
 	end
 	service("GuiService")
+	methods.GuiService = {
+		IsTenFootInterface = function()
+			return sim.tenFoot
+		end,
+	}
+
+	-- The box round every part in a model, turned the way its PrimaryPart is (or its
+	-- WorldPivot), as Roblox's GetBoundingBox: returns its centre and size.
+	methods.Model = {
+		GetBoundingBox = function(self)
+			local st = state[self]
+			local primary = st.props.PrimaryPart
+			local turn = (if primary then primary.CFrame else (st.props.WorldPivot or roblox.CFrame.new())).Rotation
+			local low, high
+			for _, part in descendants(self, {}) do
+				if isA(state[part].className, "BasePart") then
+					local frame, half = part.CFrame, part.Size / 2
+					for _, x in { -1, 1 } do
+						for _, y in { -1, 1 } do
+							for _, z in { -1, 1 } do
+								local corner = turn:PointToObjectSpace(
+									frame:PointToWorldSpace(roblox.Vector3.new(half.X * x, half.Y * y, half.Z * z))
+								)
+								low = if low then low:Min(corner) else corner
+								high = if high then high:Max(corner) else corner
+							end
+						end
+					end
+				end
+			end
+			if low == nil then
+				return roblox.CFrame.new(), roblox.Vector3.zero
+			end
+			return roblox.CFrame.new(turn:PointToWorldSpace((low + high) / 2)) * turn, high - low
+		end,
+	}
+
 	methods.StarterGui = {
 		SetCoreGuiEnabled = function(_self, kind, enabled)
 			assert(typeOf(kind) == "EnumItem" and Enum.CoreGuiType[kind.Name] == kind, "SetCoreGuiEnabled type")
@@ -1977,6 +2088,25 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		end,
 		Back = function(t)
 			return 2.70158 * t ^ 3 - 1.70158 * t * t
+		end,
+		-- Bounce is defined by its Out: a ball dropped onto the end value, bouncing lower
+		-- each time. In mirrors it.
+		Bounce = function(t)
+			local u = 1 - t
+			local out
+			if u < 1 / 2.75 then
+				out = 7.5625 * u * u
+			elseif u < 2 / 2.75 then
+				u -= 1.5 / 2.75
+				out = 7.5625 * u * u + 0.75
+			elseif u < 2.5 / 2.75 then
+				u -= 2.25 / 2.75
+				out = 7.5625 * u * u + 0.9375
+			else
+				u -= 2.625 / 2.75
+				out = 7.5625 * u * u + 0.984375
+			end
+			return 1 - out
 		end,
 	}
 	local function ease(t: number, style, direction): number

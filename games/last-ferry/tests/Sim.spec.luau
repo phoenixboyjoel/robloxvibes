@@ -253,6 +253,15 @@ T.test("TweenService:GetValue follows Roblox's easing curves", function()
 			sineOut = TweenService:GetValue(0.5, S.Sine, D.Out),
 			backPeak = peak,
 			backEnd = TweenService:GetValue(1, S.Back, D.Out),
+			bounceHit = TweenService:GetValue(1 / 2.75, S.Bounce, D.Out),
+			bouncePeak = (function()
+				local most = 0
+				for t = 0, 1, 0.01 do
+					most = math.max(most, TweenService:GetValue(t, S.Bounce, D.Out))
+				end
+				return most
+			end)(),
+			bounceBack = TweenService:GetValue(0.55, S.Bounce, D.Out),
 			below = TweenService:GetValue(-1, S.Linear, D.In),
 			above = TweenService:GetValue(2, S.Quad, D.Out),
 		}
@@ -267,6 +276,9 @@ T.test("TweenService:GetValue follows Roblox's easing curves", function()
 	close(v.sineOut, math.sin(math.pi / 4), "Sine Out")
 	close(v.backPeak, 1.1, "Back Out overshoots by a tenth")
 	close(v.backEnd, 1, "and ends at 1")
+	close(v.bounceHit, 1, "Bounce Out first reaches the end at 1/2.75")
+	close(v.bouncePeak, 1, "and never passes it")
+	T.expect(v.bounceBack < 1, `it bounces back off it ({v.bounceBack})`)
 	close(v.below, 0, "alpha is clamped below")
 	close(v.above, 1, "and above")
 	T.equal(#sim.errors, 0, table.concat(sim.errors, "\n"))

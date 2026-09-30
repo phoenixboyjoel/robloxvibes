@@ -331,8 +331,9 @@ async function main() {
     h: data.safeArea[1],
   };
   // Where TopbarSafeInsets puts a ScreenGui: the part of Roblox's top bar row left free.
+  // GuiService.TopbarInset is measured from the safe area's left edge and the screen's top.
   const [tx0, ty0, tx1, ty1] = data.topbarInset ?? [0, 0, 0, 0];
-  const topbar = { x: tx0, y: ty0, w: tx1 - tx0, h: ty1 - ty0 };
+  const topbar = { x: safe.x + tx0, y: ty0, w: tx1 - tx0, h: ty1 - ty0 };
 
   const content = collectContent(data.workspace, collectContent(data.playerGui, new Set()));
   const textures = new Map();

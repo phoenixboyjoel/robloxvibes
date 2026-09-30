@@ -125,6 +125,12 @@ otherwise. Don't weaken or skip a test to get green.
   with Glide. Tweening other properties on the server (a fade, a colour) is
   fine.
 - Identify players with `player.User`; key saved data by `player.User.Id`.
+- To put GUI over a point in the world, take the layer's `AbsolutePosition` off
+  `Camera:WorldToScreenPoint` (GUI coordinates, as `AbsolutePosition` is).
+  `WorldToViewportPoint` starts at the notch's edge on phones.
+- Never measure something hidden by its `AbsoluteSize`: Roblox doesn't keep
+  what's hidden laid out. Measure text with a label in a disabled ScreenGui
+  (`TextBounds`), as Roblox's own chat does and `Ui/TopBar` and `Ui/Speech` do.
 - New Roblox API in game code? The simulator will say "isn't simulated". Add
   the class to `tests/sim/gen_reflection.py` and the behaviour to
   `tests/sim/Roblox.luau`, rather than working around the test.

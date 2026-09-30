@@ -63,7 +63,7 @@ local base = CFrame.identity -- the booth's view out of the window
 local inBooth = false
 local seeThrough: { [Model]: boolean } = {} -- other clerks made see-through
 local pinching = false
-local aimPending = false -- turn to the window once this clerk is at their stand
+local aimPending = false -- turn to the passenger once this clerk's stand is known
 
 local function humanoid(): Humanoid?
 	local character = player.Character
@@ -91,11 +91,6 @@ local function windowRotation(): CFrame
 	return base.Rotation
 end
 
--- Whether a point is inside the booth (seen from above).
-local function inBoothFootprint(at: Vector3): boolean
-	return math.abs(at.X) < 4.9 and at.Z > 0.2 and at.Z < 7.9
-end
-
 -- Turns the view to look straight out of the window, from wherever the camera is, and
 -- gives the camera back to Roblox. (Roblox's camera keeps whatever direction the
 -- camera faces when it takes over.)
@@ -105,7 +100,7 @@ function CameraController.faceWindow()
 	camera.CameraType = Enum.CameraType.Custom
 	camera.CFrame = CFrame.new(camera.CFrame.Position) * windowRotation()
 	targetFov = WIDE
-	-- Then, from wherever this clerk's stand is, at the passenger: a side stand looks in.
+	-- Then, from this clerk's stand, at the passenger: a side stand looks in.
 	aimPending = true
 end
 
@@ -280,6 +275,13 @@ function CameraController.start()
 
 	connectInput()
 	player:GetAttributeChangedSignal("OnShift"):Connect(applyMode)
+	-- A clerk given a stand (one who joins mid-shift gets theirs a moment after their
+	-- camera starts) looks at the passenger from it.
+	player:GetAttributeChangedSignal("Stand"):Connect(function()
+		if inBooth and cinematic == nil then
+			aimPending = true
+		end
+	end)
 	player.CharacterAdded:Connect(function()
 		eyeOffset = nil
 		-- A new character (a respawn mid-shift) starts off looking out of the window again,
@@ -332,12 +334,12 @@ function CameraController.start()
 		if h == nil or not inBooth then
 			return
 		end
-		local root = h.RootPart
-		if aimPending and root and inBoothFootprint(root.Position) then
+		local stand = player:GetAttribute("Stand")
+		if aimPending and typeof(stand) == "Vector3" then
 			aimPending = false
-			-- Aimed from the eye everyone is held at, over their root: the offset that lifts
-			-- the camera there (below) only reaches it next frame.
-			local eye = Vector3.new(root.Position.X, EYE_HEIGHT, root.Position.Z)
+			-- Aimed from their stand (the server gives it; a respawn starts off at the booth's
+			-- spawn pad), at the eye height everyone is held at.
+			local eye = Vector3.new(stand.X, EYE_HEIGHT, stand.Z)
 			camera.CFrame = CFrame.new(camera.CFrame.Position) * CFrame.lookAt(eye, WINDOW_TARGET).Rotation
 		end
 		-- One eye height for everyone, measured while standing (not mid-jump).

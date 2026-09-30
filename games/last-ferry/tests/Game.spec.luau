@@ -38,6 +38,7 @@ type Bot = {
 	sawFailed: boolean,
 	sawRetry: boolean,
 	sawLedger: boolean?,
+	atPage: boolean?, -- stopped at a passenger with a torn page (policy stopAtPage)
 	calls: number,
 	clockIns: number,
 }
@@ -143,18 +144,6 @@ local function inBooth(player): boolean
 	return math.abs(at.X) < 4.8 and at.Z > 1.75 and at.Z < 7.8 and math.abs(at.Y - 0.2) < 0.01
 end
 
--- Whether Roblox's player list was last left on (StarterGui:SetCoreGuiEnabled).
-local function playerListOn(sim): boolean
-	local on = true
-	for _, call in sim.coreCalls do
-		local state = string.match(call, "^SetCoreGuiEnabled PlayerList (%a+)$")
-		if state then
-			on = state == "true"
-		end
-	end
-	return on
-end
-
 local function onPier(player): boolean
 	local at = feet(player)
 	return at.Z > 8.5 and at.Z < 46 and math.abs(at.X) < 14 and math.abs(at.Y) < 0.01
@@ -195,9 +184,10 @@ local STAND_ORDER = { "front", "left", "right", "backLeft", "backRight", "back" 
 -- The face of a passenger at the window, which every stand's view is aimed at.
 local WINDOW_TARGET = roblox.Vector3.new(0, 4.4, -4)
 
--- Puts a clerk at a stand facing the window, and turns their view to the passenger as it
--- is at the start of a night.
+-- Puts a clerk at a stand facing the window, as the server does when it gives them that
+-- stand, and turns their view to the passenger as it is at the start of a night.
 local function standAt(sim, player, stand)
+	player:SetAttribute("Stand", stand)
 	sim:moveCharacter(player, stand, roblox.Vector3.new(stand.X, stand.Y, -1))
 	sim:executeClient(player, [[require("./Controllers/CameraController").faceWindow()]])
 	sim:run(0.3)
@@ -388,6 +378,10 @@ local function tick(bot: Bot)
 	end
 
 	local tab = desk.TicketHolder.PageTab
+	if bot.policy.stopAtPage and sim:shown(tab) then
+		bot.atPage = true
+		return
+	end
 	if bot.policy.takePages and sim:shown(tab) then
 		if bot.policy.useKeys then
 			sim:pressKey(roblox.Enum.KeyCode.P)
@@ -555,7 +549,7 @@ T.test("a clerk playing from the HUD finishes five nights clean", function()
 	T.equal(root.Lobby.Found.Text, "Endings found: 1 of 4")
 	T.equal(alice.CameraMode, roblox.Enum.CameraMode.Classic, "Roblox's third-person camera on the pier")
 	T.equal(alice.DevEnableMouseLock, true, "Shift Lock is back, as the place allows it")
-	T.expect(playerListOn(sim), "and so is Roblox's player list")
+	T.expect(sim:coreGuiEnabled(alice, "PlayerList"), "and so is Roblox's player list")
 end)
 
 T.test("players arrive on the pier as their avatars and clock in together", function()
@@ -606,7 +600,12 @@ T.test("players arrive on the pier as their avatars and clock in together", func
 	end
 	T.equal(sim.workspace.World.Booth.Door.CanCollide, true, "the door shuts behind them")
 	T.expect(not clockPrompt(sim).Enabled, "no clocking in again mid-shift")
-	T.expect(not playerListOn(sim), "Roblox's player list is put away for the shift, clear of the rules")
+	for _, player in { alice, bob } do
+		T.expect(
+			not sim:coreGuiEnabled(player, "PlayerList"),
+			`{player.Name}: Roblox's player list is put away for the shift, clear of the rules`
+		)
+	end
 	-- A clerk who somehow ends up out on the pier mid-shift is put back at their stand.
 	local stand = feet(bob)
 	sim:moveCharacter(bob, roblox.Vector3.new(0, 0, 20))
@@ -714,6 +713,30 @@ T.test("from every stand, the booth view starts aimed at the passenger's face", 
 		T.expect(math.abs(eye - 5.1) < 0.02, `{name} stand: the eye is at the booth's eye height ({eye})`)
 	end
 	clean(sim, "aim")
+end)
+
+T.test("a respawned clerk's view is aimed from their stand, even while they're still on the spawn pad", function()
+	local sim = boot()
+	local alice = sim:addPlayer("Alice", 101)
+	sim.cameraFollows = alice
+	sim:run(1)
+	T.expect(clockIn(newBot(sim, alice, { idle = true })), "Alice clocks in")
+	sim:run(1.5)
+	T.equal(alice:GetAttribute("Stand"), STANDS.front, "the server told her client which stand is hers")
+	-- Her stand is the left one; her new character appears on the booth's spawn pad, and
+	-- her camera turns to the window before the server moves her to the stand.
+	alice:SetAttribute("Stand", STANDS.left)
+	sim:moveCharacter(alice, roblox.Vector3.new(3.3, 0.2, 7.1))
+	sim:executeClient(alice, [[require("./Controllers/CameraController").faceWindow()]])
+	sim:step(1 / 30)
+	local camera = sim.workspace.CurrentCamera
+	local eye = roblox.Vector3.new(STANDS.left.X, 5.1, STANDS.left.Z)
+	local want = (WINDOW_TARGET - eye).Unit
+	T.expect(
+		camera.CFrame.LookVector:Dot(want) > 0.9999,
+		`looking at the passenger from her stand, not from the pad ({camera.CFrame.LookVector}, want {want})`
+	)
+	clean(sim, "aim from the stand")
 end)
 
 T.test("a clerk who respawns while the view is on the flood keeps watching it", function()
@@ -988,13 +1011,16 @@ local function checkSpeechPlacement(sim, player, model, label: string, snug: boo
 		)
 		T.expect(bubble.left >= 0 and bubble.right <= screen.X, `{where}: the bubble {describe(bubble)} is on screen`)
 		T.expect(bubble.top >= -inset.Y, `{where}: the bubble {describe(bubble)} is below the top of the screen`)
+		-- The tail points down at them, wherever the bubble has had to move.
+		local caret = box(stack.Caret)
+		local tip = camera:WorldToScreenPoint(top + roblox.Vector3.new(0, 0.4, 0))
+		local x, y = (caret.left + caret.right) / 2, caret.bottom
+		T.expect(stack.Caret.Visible, `{where}: the tail is showing`)
+		T.expect(math.abs(x - tip.X) < 1.5, `{where}: the tail at x {x} points at their head, at x {tip.X}`)
 		if snug then
-			local caret = box(stack.Caret)
-			local tip = camera:WorldToScreenPoint(top + roblox.Vector3.new(0, 0.4, 0))
-			local x, y = (caret.left + caret.right) / 2, caret.bottom
 			T.expect(
-				math.abs(x - tip.X) < 1.5 and math.abs(y - tip.Y) < 1.5,
-				`{where}: the tail's tip at ({x}, {y}) touches the point over their head ({tip.X}, {tip.Y})`
+				math.abs(y - tip.Y) < 1.5,
+				`{where}: the tail's tip at y {y} touches the point over their head, at y {tip.Y}`
 			)
 		end
 	end
@@ -1055,13 +1081,12 @@ local LONGEST_LINE = [[
 	return longest
 ]]
 
--- Plays until a passenger with a torn page is at the window and the page is taken (which
--- opens the ledger), then stops playing. Returns the passenger's model.
-local function takeAPage(sim, bot)
-	local model
-	local taken = sim:runUntil(
+-- Plays until a passenger with a torn page is at the window, then stops playing (the bot's
+-- policy must have stopAtPage). Returns the passenger's model.
+local function untilAPage(sim, bot)
+	local reached = sim:runUntil(
 		function()
-			return bot.pagesTaken > 0
+			return bot.atPage == true
 		end,
 		1800,
 		1 / 20,
@@ -1069,12 +1094,10 @@ local function takeAPage(sim, bot)
 			tick(bot)
 		end
 	)
-	assert(taken, "no page came up")
-	sim:run(1) -- the bot leaves the ledger open and makes no call
+	assert(reached, "no page came up")
 	local tells = lookAtPassenger(sim)
 	assert(tells, "nobody at the window")
-	model = tells.model
-	return model
+	return tells.model
 end
 
 T.test("the passenger's line is never under the HUD or over their face, from any stand, on any screen", function()
@@ -1110,11 +1133,15 @@ T.test("the passenger's line is never under the HUD or over their face, from any
 		local longest = sim:execute(LONGEST_LINE)
 		local alice = sim:addPlayer("Alice", 101)
 		sim.cameraFollows = alice
-		local bot = newBot(sim, alice, { takePages = true })
-		local model = takeAPage(sim, bot)
+		local bot = newBot(sim, alice, { stopAtPage = true })
+		local model = untilAPage(sim, bot)
 		T.equal(speechBubble(alice).Bubble.Line.Text, longest, `{screen.label}: the longest line`)
 		local root = alice.PlayerGui.LastFerryHud.Root
-		T.expect(sim:shown(root.Play.Ledger), `{screen.label}: the ledger opened`)
+		local tab = root.Play.Desk.TicketHolder.PageTab
+		checkSpeechPlacement(sim, alice, model, `{screen.label}, a page to take`, screen.snug == true)
+		sim:click(tab)
+		sim:run(1)
+		T.expect(sim:shown(root.Play.Ledger), `{screen.label}: taking the page opened the ledger`)
 		checkSpeechPlacement(sim, alice, model, `{screen.label}, ledger open`, screen.snug == true)
 		sim:click(root.Play.Ledger.Close)
 		checkSpeechPlacement(sim, alice, model, `{screen.label}, rules showing`, screen.snug == true)
@@ -1300,6 +1327,33 @@ T.test("on phones the HUD scales down but the main buttons stay at least 44 px",
 	end
 end)
 
+-- The status pills on this player's screen: those on the left and those on the right don't
+-- meet, and all are inside the row. Returns the room between the two.
+local function checkPills(player, label: string): number
+	local bar = topRow(player).TopBar
+	local leftEnd, rightStart = -math.huge, math.huge
+	for _, pill in bar.Left:GetChildren() do
+		if pill:IsA("GuiObject") and pill.Visible then
+			leftEnd = math.max(leftEnd, pill.AbsolutePosition.X + pill.AbsoluteSize.X)
+		end
+	end
+	for _, pill in bar.Right:GetChildren() do
+		if pill:IsA("GuiObject") and pill.Visible then
+			rightStart = math.min(rightStart, pill.AbsolutePosition.X)
+		end
+	end
+	local row = bar.Parent
+	T.expect(
+		leftEnd < rightStart,
+		`{label}: the pills on the left ({leftEnd}) run into those on the right ({rightStart})`
+	)
+	T.expect(
+		rightStart >= row.AbsolutePosition.X and leftEnd <= row.AbsolutePosition.X + row.AbsoluteSize.X,
+		`{label}: the pills stay in the row`
+	)
+	return rightStart - leftEnd
+end
+
 T.test("the status fits whatever room Roblox's own top bar buttons leave it", function()
 	local sim = boot()
 	local alice = sim:addPlayer("Alice", 101)
@@ -1321,26 +1375,7 @@ T.test("the status fits whatever room Roblox's own top bar buttons leave it", fu
 	local bar = topRow(alice).TopBar
 	local function check(label: string, shown: { [string]: boolean })
 		sim:run(0.5)
-		local leftEnd, rightStart = -math.huge, math.huge
-		for _, pill in bar.Left:GetChildren() do
-			if pill:IsA("GuiObject") and pill.Visible then
-				leftEnd = math.max(leftEnd, pill.AbsolutePosition.X + pill.AbsoluteSize.X)
-			end
-		end
-		for _, pill in bar.Right:GetChildren() do
-			if pill:IsA("GuiObject") and pill.Visible then
-				rightStart = math.min(rightStart, pill.AbsolutePosition.X)
-			end
-		end
-		local row = bar.Parent
-		T.expect(
-			leftEnd < rightStart,
-			`{label}: the pills on the left ({leftEnd}) run into those on the right ({rightStart})`
-		)
-		T.expect(
-			rightStart >= row.AbsolutePosition.X and leftEnd <= row.AbsolutePosition.X + row.AbsoluteSize.X,
-			`{label}: the pills stay in the row`
-		)
+		checkPills(alice, label)
 		for name, want in shown do
 			local pill = bar.Left:FindFirstChild(name) or bar.Right:FindFirstChild(name)
 			T.equal(pill.Visible, want, `{label}: {name} showing`)
@@ -1357,6 +1392,88 @@ T.test("the status fits whatever room Roblox's own top bar buttons leave it", fu
 		{ NightPill = true, ClockPill = true, DatePill = true, QueuePill = true, Lanterns = true }
 	)
 	clean(sim, "top bar room")
+end)
+
+T.test("with a page in the ledger the status still fits, and moves to the HUD only when it must", function()
+	local sim = boot()
+	local alice = sim:addPlayer("Alice", 101)
+	local bot = newBot(sim, alice, { stopAtPage = true })
+	untilAPage(sim, bot)
+	sim:click(alice.PlayerGui.LastFerryHud.Root.Play.Desk.TicketHolder.PageTab)
+	sim:run(0.5)
+	local gui = alice.PlayerGui.LastFerryTopBar
+	T.expect(sim:shown(topRow(alice).TopBar.Right.Ledger), "the ledger's pill is up")
+	-- Roblox's buttons take more and more of the row, 16 px at a time. The bot waits at the
+	-- window meanwhile (well inside the 45 seconds they wait).
+	local order = { "DatePill", "QueuePill", "Word", "ClockPill" } -- the order they go in
+	local spare: number? = nil -- the room between the two groups, up in the row
+	local inHud = false
+	for left = 164, 1244, 16 do
+		sim:setTopbarInset(roblox.Rect.new(left, 0, 1280, 58))
+		sim:run(0.3)
+		local where = `the row from x {left}`
+		local bar = topRow(alice).TopBar
+		T.expect(sim:shown(bar), `{where}: the pills are up`)
+		local between = checkPills(alice, where)
+		local ledger = bar.Right.Ledger
+		for _, always in { bar.Left.NightPill, ledger, ledger.Content.Icon, ledger.Content.Count, bar.Right.Lanterns } do
+			T.expect(always.Visible, `{where}: the {always.Name} always shows`)
+		end
+		local extras = {
+			DatePill = bar.Left.DatePill,
+			QueuePill = bar.Right.QueuePill,
+			Word = ledger.Content.Word,
+			ClockPill = bar.Left.ClockPill,
+		}
+		for i = 1, #order - 1 do
+			if extras[order[i]].Visible then
+				T.expect(extras[order[i + 1]].Visible, `{where}: the {order[i]} shows but the {order[i + 1]} doesn't`)
+			end
+		end
+		if bar.Parent.Parent == gui then
+			T.expect(not inHud, `{where}: back up in Roblox's row with less room than before`)
+			spare = between
+		elseif not inHud then
+			inHud = true
+			-- Down in the HUD only because the pills that always show no longer fit: up in the
+			-- row they had only the gap they keep between the two groups (three of Roblox's
+			-- 8 px gaps) and less than 16 px more.
+			T.expect(spare ~= nil and spare >= 24 and spare < 40, `{where}: moved to the HUD with {spare} px to spare`)
+		end
+	end
+	T.expect(spare ~= nil and inHud, "the status was up in Roblox's row, then in the HUD")
+
+	-- Back up in the row with room for some of the pills: with nothing changing, nothing is
+	-- shown or hidden (the pills aren't switched on and off to see whether they fit).
+	sim:setTopbarInset(roblox.Rect.new(740, 0, 1280, 58))
+	sim:run(0.3)
+	local bar = topRow(alice).TopBar
+	T.equal(bar.Parent.Parent, gui, "back up in Roblox's row with a little more room")
+	checkPills(alice, "a little more room")
+	local extras = { bar.Left.DatePill, bar.Right.QueuePill, bar.Right.Ledger.Content.Word, bar.Left.ClockPill }
+	local showing = 0
+	local writes = {}
+	for _, extra in extras do
+		showing += if extra.Visible then 1 else 0
+		writes[extra.Name] = sim:countWrites(extra, "Visible")
+	end
+	T.expect(showing > 0 and showing < #extras, `some of the pills fit ({showing} of {#extras})`)
+	sim:run(2)
+	for name, counts in writes do
+		local total = 0
+		for _, count in counts do
+			total += count
+		end
+		T.equal(total, 0, `the {name} was shown or hidden {total} times with nothing changing`)
+	end
+
+	sim:setTopbarInset(roblox.Rect.new(164, 0, 1280, 58))
+	sim:run(0.3)
+	checkPills(alice, "room again")
+	for _, extra in extras do
+		T.expect(extra.Visible, `room again: the {extra.Name} is back`)
+	end
+	clean(sim, "ledger in the top bar")
 end)
 
 T.test("with no top bar row to put it in, the status sits at the top of the HUD instead", function()
@@ -1453,6 +1570,7 @@ T.test("co-op: a friend who joins late sees the same shift, and the Continue wai
 	T.equal(bob:GetAttribute("OnShift"), true, "Bob is on shift")
 	T.expect(bob.Character:FindFirstChild("ClerkCap") ~= nil, "Bob wears the cap")
 	T.expect(tostring(feet(bob)) ~= tostring(feet(alice)), "Bob gets his own stand")
+	T.expect(not sim:coreGuiEnabled(bob, "PlayerList"), "and his player list is put away for the shift too")
 	local aliceNight = topRow(alice).TopBar.Left.NightPill.Night.Text
 	local bobNight = topRow(bob).TopBar.Left.NightPill.Night.Text
 	T.equal(bobNight, aliceNight, "Bob sees the same night")

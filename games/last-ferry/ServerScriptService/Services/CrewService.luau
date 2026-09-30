@@ -227,6 +227,8 @@ local function joinShift(player: Player)
 	end
 	local index = freeStand(player)
 	stands[player] = index
+	-- Their client turns their view to the passenger from here (CameraController).
+	player:SetAttribute("Stand", markers.stands[index].Position)
 	place(player, markers.stands[index])
 	humanoid.WalkSpeed = SHIFT_WALK_SPEED
 	wearCap(player)
@@ -235,6 +237,7 @@ end
 -- Sends one player back to the pier, in a loose crowd round the spawn, facing the booth.
 local function leaveShift(player: Player, slot: number)
 	player:SetAttribute("OnShift", false)
+	player:SetAttribute("Stand", nil)
 	player.DevEnableMouseLock = StarterPlayer.EnableMouseLockOption
 	takeOffCap(player)
 	local _, humanoid = body(player)

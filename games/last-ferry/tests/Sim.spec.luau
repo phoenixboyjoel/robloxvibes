@@ -384,7 +384,7 @@ T.test("GUI layout: where things are on screen, as Roblox lays them out", functi
 		root = ".",
 		screen = roblox.Vector2.new(844, 390),
 		safeArea = roblox.Vector2.new(750, 332),
-		topbarInset = roblox.Rect.new(300, 0, 797, 58),
+		topbarInset = roblox.Rect.new(253, 0, 750, 58),
 	})
 	local gui = sim:execute([[
 		local gui = Instance.new("ScreenGui")
@@ -443,14 +443,18 @@ T.test("GUI layout: where things are on screen, as Roblox lays them out", functi
 		return gui
 	]])
 	local V2 = roblox.Vector2.new
-	near(gui.AbsolutePosition, V2(47, 0), "a safe-area ScreenGui starts below the top bar, clear of the notch")
+	near(
+		gui.AbsolutePosition,
+		V2(0, 0),
+		"GUI coordinates start where a safe-area ScreenGui does: below the top bar, clear of the notch"
+	)
 	near(gui.AbsoluteSize, V2(750, 332), "and covers the safe area")
 	local root = gui.Root
 	near(root.AbsoluteSize, V2(750, 332), "a canvas twice the size, scaled by half, fits the screen")
 	local panel = root.Panel
 	-- The canvas is 1500 x 664 before scaling: the panel is 250 wide, 16 in from the right.
 	near(panel.AbsoluteSize, V2(125, (664 - 86) / 2), "a panel's size is scaled with everything in it")
-	near(panel.AbsolutePosition, V2(47 + (1500 - 16 - 250) / 2, 35), "and so is where it is")
+	near(panel.AbsolutePosition, V2((1500 - 16 - 250) / 2, 35), "and so is where it is")
 	local inside = panel.AbsolutePosition + V2(5, 10) -- inside the padding, at half scale
 	near(
 		panel.First.AbsolutePosition,
@@ -468,12 +472,31 @@ T.test("GUI layout: where things are on screen, as Roblox lays them out", functi
 	local top = gui.Parent.Top
 	near(
 		top.AbsolutePosition,
-		V2(300, -58),
+		V2(253, -58),
 		"a TopbarSafeInsets ScreenGui is in Roblox's top bar row, beside its buttons"
 	)
 	near(top.AbsoluteSize, V2(497, 58), "as wide as the room Roblox leaves there")
-	T.equal(sim.game:GetService("GuiService").TopbarInset, roblox.Rect.new(300, 0, 797, 58))
-	near(gui.Parent.Full.AbsolutePosition, V2(0, -58), "a full-screen ScreenGui starts at the top of the screen")
+	T.equal(sim.game:GetService("GuiService").TopbarInset, roblox.Rect.new(253, 0, 750, 58))
+	near(
+		gui.Parent.Full.AbsolutePosition,
+		V2(-47, -58),
+		"a full-screen ScreenGui starts at the screen's corner, under the notch"
+	)
+	near(gui.Parent.Full.AbsoluteSize, V2(844, 390), "and covers all of it")
+	-- The camera draws the whole screen, but its viewport coordinates start at the device
+	-- safe area's top-left, and its screen coordinates are GUI coordinates.
+	local camera = sim.workspace.CurrentCamera
+	near(camera.ViewportSize, V2(750, 390), "the viewport is the device safe area")
+	camera.CFrame = roblox.CFrame.new(0, 10, 0)
+	local ahead = roblox.Vector3.new(0, 10, -20)
+	local viewportPoint = camera:WorldToViewportPoint(ahead)
+	local screenPoint = camera:WorldToScreenPoint(ahead)
+	near(
+		V2(viewportPoint.X, viewportPoint.Y),
+		V2(844 / 2 - 47, 390 / 2),
+		"straight ahead is the screen's middle, in viewport terms"
+	)
+	near(V2(screenPoint.X, screenPoint.Y), V2(844 / 2 - 47, 390 / 2 - 58), "and in GUI terms")
 	T.equal(#sim.errors, 0, table.concat(sim.errors, "\n"))
 end)
 

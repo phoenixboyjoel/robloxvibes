@@ -653,9 +653,10 @@ export async function loadFontsFor(tree) {
   );
 }
 
-// Every ScreenGui in a PlayerGui, in DisplayOrder, drawn over the screen. Guis that
-// respect Roblox's safe area (ScreenInsets CoreUISafeInsets / DeviceSafeInsets) are
-// laid out inside `safe`.
+// Every ScreenGui in a PlayerGui, in DisplayOrder, drawn over the screen, in the area its
+// ScreenInsets gives it: the whole screen (None); the device safe area, top bar and all
+// (DeviceSafeInsets); the free part of the top bar row (TopbarSafeInsets); or, by default,
+// the safe area below the top bar (`safe`, CoreUISafeInsets).
 export function drawScreenGuis(ctx, playerGui, screen, safe, images, topbar) {
   if (!playerGui) return;
   const layers = playerGui.children
@@ -668,9 +669,11 @@ export function drawScreenGuis(ctx, playerGui, screen, safe, images, topbar) {
     const rect =
       insets === 'None'
         ? { x: 0, y: 0, w: screen.w, h: screen.h }
-        : insets === 'TopbarSafeInsets'
-          ? topbar ?? { x: 0, y: 0, w: 0, h: 0 }
-          : safe;
+        : insets === 'DeviceSafeInsets'
+          ? { x: safe.x, y: 0, w: safe.w, h: screen.h }
+          : insets === 'TopbarSafeInsets'
+            ? topbar ?? { x: 0, y: 0, w: 0, h: 0 }
+            : safe;
     drawLayer(ctx, layer, rect, images);
   }
 }

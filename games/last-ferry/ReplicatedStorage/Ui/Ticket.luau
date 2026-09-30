@@ -129,11 +129,13 @@ function Ticket.new(parent: Instance, home: UDim2): Ticket
 	local root = Ui.frame(parent, "TicketHolder", UDim2.fromOffset(WIDTH, HEIGHT), away)
 	root.Visible = false
 
-	-- A torn page poking out of the right edge: 72 x 76 showing, big enough to tap.
+	-- A torn page poking out of the right edge: 72 x 76 showing, big enough to tap. Low on
+	-- the ticket, below where a passenger's head is on a phone, so their speech bubble
+	-- has the room above it.
 	local tab = Instance.new("TextButton")
 	tab.Name = "PageTab"
 	tab.Size = UDim2.fromOffset(100, 76)
-	tab.Position = UDim2.fromOffset(WIDTH - 28, 40)
+	tab.Position = UDim2.fromOffset(WIDTH - 28, 100)
 	tab.Rotation = 5
 	tab.BackgroundColor3 = C.paperShade
 	tab.BorderSizePixel = 0

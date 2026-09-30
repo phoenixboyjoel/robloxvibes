@@ -11,9 +11,10 @@
 
 	The row is Roblox's: 58 px tall (taller on a TV), and narrower while Roblox's own
 	buttons take more room. The pills fit themselves to whatever room there is: the
-	date goes first, then the queue, the ledger's label and the clock. If there's no
-	top bar row, or it's too short for the pills, the row sits at the top of the HUD
-	instead (`fallback`), at the HUD's scale.
+	date goes first, then the queue, the word LEDGER and the clock. If there's no top
+	bar row, or it's too short for the pills, or too narrow for the ones that always
+	show (the night, the ledger's icon and page count, and the lanterns), the row sits
+	at the top of the HUD instead (`fallback`), at the HUD's scale.
 ]]
 
 local GuiService = game:GetService("GuiService")
@@ -35,14 +36,15 @@ export type TopBar = {
 	queue: TextLabel,
 	lanterns: { Frame },
 	ledger: TextButton,
-	ledgerLabel: TextLabel, -- the pages found: "2/5"
+	ledgerCount: TextLabel, -- the pages found: "2/5"
 	alert: Frame,
 	-- Fills in the alert: a bold title, a line of text and an icon ("bang" or "page").
 	setAlert: (title: string, text: string, icon: string, color: Color3, background: Color3) -> (),
 	-- Shows or hides the whole row (it's only up on shift).
 	setShown: (shown: boolean) -> (),
-	-- Fits the pills to the room there is: if need be the date goes, then the queue, then
-	-- the word LEDGER (its icon and page count stay), then the clock.
+	-- Fits the pills to the room there is, after anything they say or show changes: if need
+	-- be the date goes, then the queue, then the word LEDGER (its icon and page count
+	-- stay), then the clock. If even the rest don't fit, the row moves to the HUD.
 	fit: () -> (),
 	-- Whether the row is up in Roblox's top bar (or, if not, at the top of the HUD).
 	inRow: () -> boolean,
@@ -57,18 +59,19 @@ export type TopBar = {
 local ROW = 58
 local PILL = 44
 local PILL_TOP = 12
+local PILL_PADDING = 16 -- left and right, inside a pill
+local PILL_GAP = 6 -- between the things in a pill
 local ALERT = 52 -- a little taller than the pills, so two lines fit on a phone
 local GAP = 8
 local EDGE_LEFT = 8 -- after Roblox's own buttons
 local EDGE_RIGHT = 16 -- from the side of the screen, as Roblox's buttons are
-local LEDGER_PADDING = 28 -- left and right, inside the ledger's pill
-local LEDGER_GAP = 6
+local LEDGER_LEFT = 12 -- inside the ledger's pill, before its icon
 -- Less than this, and the pills would be too small to see or tap (Roblox's old 36 px top
--- bar), or couldn't fit the night and the lanterns.
+-- bar).
 local MIN_ROW = 50
-local MIN_WIDTH = 300
+-- The see-through backgrounds: the pills, and the alert across the row.
+local SEE_THROUGH = 0.08
 local PILL_FILL = Color3.fromRGB(18, 18, 21)
-local PILL_SEE_THROUGH = 0.08
 local INK = Color3.fromRGB(247, 247, 248)
 local INK_MUTED = Color3.fromRGB(188, 190, 200)
 -- Roblox's highlight over a button under the mouse, and while it's pressed.
@@ -83,8 +86,14 @@ local function pill(parent: Instance, name: string, order: number): Frame
 	frame.BackgroundColor3 = PILL_FILL
 	frame.LayoutOrder = order
 	Ui.corner(frame, UDim.new(1, 0))
-	Ui.padding(frame, 0, 16, 0, 16)
-	Ui.list(frame, Enum.FillDirection.Horizontal, 6, Enum.HorizontalAlignment.Left, Enum.VerticalAlignment.Center)
+	Ui.padding(frame, 0, PILL_PADDING, 0, PILL_PADDING)
+	Ui.list(
+		frame,
+		Enum.FillDirection.Horizontal,
+		PILL_GAP,
+		Enum.HorizontalAlignment.Left,
+		Enum.VerticalAlignment.Center
+	)
 	return frame
 end
 
@@ -144,11 +153,11 @@ function TopBar.new(parent: Instance, fallback: GuiObject): TopBar
 	-- What it says, lined up inside; the pill is as wide as that.
 	local content = Ui.frame(ledger, "Content", UDim2.fromOffset(0, PILL))
 	content.AutomaticSize = Enum.AutomaticSize.X
-	Ui.padding(content, 0, LEDGER_PADDING - 12, 0, 12)
+	Ui.padding(content, 0, PILL_PADDING, 0, LEDGER_LEFT)
 	Ui.list(
 		content,
 		Enum.FillDirection.Horizontal,
-		LEDGER_GAP,
+		PILL_GAP,
 		Enum.HorizontalAlignment.Left,
 		Enum.VerticalAlignment.Center
 	)
@@ -156,8 +165,8 @@ function TopBar.new(parent: Instance, fallback: GuiObject): TopBar
 	ledgerIcon.LayoutOrder = 1
 	local ledgerWord = text(content, "Word", F.bodyBold, 16, INK)
 	ledgerWord.Text = "LEDGER"
-	local ledgerLabel = text(content, "Count", F.bodyBold, 16, C.lamp)
-	ledgerLabel.LayoutOrder = 3
+	local ledgerCount = text(content, "Count", F.bodyBold, 16, C.lamp)
+	ledgerCount.LayoutOrder = 3
 	-- Roblox's highlight, over the whole pill while the mouse is on it or it's pressed.
 	local highlight = Ui.frame(ledger, "Highlight", UDim2.fromScale(1, 1))
 	highlight.BackgroundColor3 = HOVER
@@ -202,7 +211,6 @@ function TopBar.new(parent: Instance, fallback: GuiObject): TopBar
 		UDim2.new(1, -(EDGE_LEFT + EDGE_RIGHT), 0, ALERT),
 		UDim2.fromOffset(EDGE_LEFT, PILL_TOP + PILL - ALERT)
 	)
-	alert.BackgroundTransparency = 0.08
 	alert.Visible = false
 	Ui.corner(alert, UDim.new(0, ALERT / 2))
 	Ui.padding(alert, 4, 22, 4, 52)
@@ -232,16 +240,93 @@ function TopBar.new(parent: Instance, fallback: GuiObject): TopBar
 	})
 	paragraph.TextTruncate = Enum.TextTruncate.AtEnd
 
+	-- How wide text is, measured the way Roblox measures the text in its own chat bubbles:
+	-- with a label in a ScreenGui that's never shown, whose TextBounds are worked out when
+	-- they're read. The pills' own sizes won't do, as Roblox only keeps what's showing laid
+	-- out. Each label's width is kept until its text (or the player's text size) changes.
+	local sizer = Instance.new("ScreenGui")
+	sizer.Name = "TopBarSizer"
+	sizer.Enabled = false
+	sizer.ResetOnSpawn = false
+	sizer.Parent = parent
+	local measure = Ui.label(sizer, "Measure", { frameSize = UDim2.fromOffset(10000, PILL) })
+	local measured: { [TextLabel]: { text: string, width: number } } = {}
+	local function textWidth(label: TextLabel): number
+		local known = measured[label]
+		if known and known.text == label.Text then
+			return known.width
+		end
+		measure.FontFace = label.FontFace
+		measure.TextSize = label.TextSize
+		measure.Text = label.Text
+		local width = math.ceil(measure.TextBounds.X)
+		measured[label] = { text = label.Text, width = width }
+		return width
+	end
+	GuiService:GetPropertyChangedSignal("PreferredTextSize"):Connect(function()
+		table.clear(measured)
+	end)
+
+	-- How much room the pills take, at Roblox's size for the row, with `show` saying which of
+	-- the extras are showing: each pill, a gap between each, and two more between the ones on
+	-- the left and the ones on the right.
+	local function need(show: { [GuiObject]: boolean }): number
+		local total, count = 0, 0
+		local function add(width: number)
+			total += width
+			count += 1
+		end
+		local function textPill(label: TextLabel)
+			add(2 * PILL_PADDING + textWidth(label))
+		end
+		textPill(night)
+		if show[clockPill] then
+			textPill(clock)
+		end
+		if show[datePill] then
+			textPill(date)
+		end
+		if ledger.Visible then
+			local width = LEDGER_LEFT + ledgerIcon.Size.X.Offset + PILL_GAP + textWidth(ledgerCount) + PILL_PADDING
+			if show[ledgerWord] then
+				width += textWidth(ledgerWord) + PILL_GAP
+			end
+			add(width)
+		end
+		if show[queuePill] then
+			textPill(queue)
+		end
+		local lit, width = 0, 2 * PILL_PADDING
+		for _, lantern in lanterns do
+			if lantern.Visible then
+				width += lantern.Size.X.Offset
+				lit += 1
+			end
+		end
+		add(width + math.max(lit - 1, 0) * PILL_GAP)
+		return total + (count + 1) * GAP
+	end
+	-- Least needed first; the night, the ledger's icon and count, and the lanterns always stay.
+	local extras: { GuiObject } = { datePill, queuePill, ledgerWord, clockPill }
+	local none: { [GuiObject]: boolean } = {}
+
 	local inRow = false
+	local placedAt: number? = nil -- the row's scale up in Roblox's row, or 0 in the HUD
 	local placed: (() -> ())? = nil
+	-- Up in Roblox's row if it's tall enough for the pills to be seen and tapped, and wide
+	-- enough for the ones that always show; otherwise at the top of the HUD.
 	local function place()
 		local size = gui.AbsoluteSize
+		local s = size.Y / ROW
 		local wasInRow = inRow
-		inRow = size.Y >= MIN_ROW and size.X / (size.Y / ROW) >= MIN_WIDTH
+		inRow = size.Y >= MIN_ROW and size.X / s - EDGE_LEFT - EDGE_RIGHT >= need(none)
+		local at = if inRow then s else 0
+		if at == placedAt then
+			return
+		end
+		placedAt = at
 		if inRow then
-			local height = size.Y
 			-- At Roblox's size for the row, scaled with it (up on a TV).
-			local s = height / ROW
 			scale.Scale = s
 			row.Size = UDim2.fromScale(1 / s, 1 / s)
 			row.Position = UDim2.new()
@@ -268,7 +353,7 @@ function TopBar.new(parent: Instance, fallback: GuiObject): TopBar
 		queue = queue,
 		lanterns = lanterns,
 		ledger = ledger,
-		ledgerLabel = ledgerLabel,
+		ledgerCount = ledgerCount,
 		alert = alert,
 		setAlert = function(title: string, line: string, icon: string, color: Color3, background: Color3)
 			caption.Text = title
@@ -284,49 +369,27 @@ function TopBar.new(parent: Instance, fallback: GuiObject): TopBar
 			row.Visible = shown
 		end,
 		fit = function()
+			place()
 			-- The row's scale on screen: Roblox's (up on a TV), or the HUD's in the fallback.
 			local s = row.AbsoluteSize.Y / ROW
 			if s <= 0 then
 				return
 			end
 			local room = row.AbsoluteSize.X / s - EDGE_LEFT - EDGE_RIGHT
-			-- How wide a pill is. The ledger's is added up from what's showing in it, as its
-			-- own size only catches up with the word going next frame.
-			local function widthOf(item: GuiObject): number
-				if item ~= ledger then
-					return item.AbsoluteSize.X / s
-				end
-				local width, count = LEDGER_PADDING, 0
-				for _, child in content:GetChildren() do
-					if child:IsA("GuiObject") and child.Visible then
-						width += child.AbsoluteSize.X / s
-						count += 1
-					end
-				end
-				return width + math.max(count - 1, 0) * LEDGER_GAP
-			end
-			local function need(): number
-				local total, count = 0, 0
-				for _, group in { left, right } do
-					for _, child in group:GetChildren() do
-						if child:IsA("GuiObject") and child.Visible then
-							total += widthOf(child)
-							count += 1
-						end
-					end
-				end
-				return total + math.max(count - 1, 0) * GAP + 2 * GAP
-			end
-			-- Least needed first; the night and the lanterns always stay.
-			local extras: { GuiObject } = { datePill, queuePill, ledgerWord, clockPill }
+			local show: { [GuiObject]: boolean } = {}
 			for _, extra in extras do
-				extra.Visible = true
+				show[extra] = true
 			end
 			for _, extra in extras do
-				if need() <= room then
-					return
+				if need(show) <= room then
+					break
 				end
-				extra.Visible = false
+				show[extra] = false
+			end
+			for _, extra in extras do
+				if extra.Visible ~= show[extra] then
+					extra.Visible = show[extra]
+				end
 			end
 		end,
 		inRow = function(): boolean
@@ -336,21 +399,19 @@ function TopBar.new(parent: Instance, fallback: GuiObject): TopBar
 			placed = callback
 		end,
 	}
-	-- Roblox's own see-through pills follow the player's transparency setting; so do these.
-	local pills: { GuiObject } = { nightPill, clockPill, datePill, ledger, queuePill, lanternPill }
+	-- Roblox's own see-through pills follow the player's transparency setting; so do these,
+	-- and the alert.
+	local backed: { GuiObject } = { nightPill, clockPill, datePill, ledger, queuePill, lanternPill, alert }
 	local function seeThrough()
-		for _, each in pills do
-			each.BackgroundTransparency = PILL_SEE_THROUGH * GuiService.PreferredTransparency
+		for _, each in backed do
+			each.BackgroundTransparency = SEE_THROUGH * GuiService.PreferredTransparency
 		end
 	end
 	seeThrough()
 	GuiService:GetPropertyChangedSignal("PreferredTransparency"):Connect(seeThrough)
 
 	place()
-	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-		place()
-		topBar.fit()
-	end)
+	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(topBar.fit)
 	return topBar
 end
 

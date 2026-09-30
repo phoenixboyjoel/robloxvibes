@@ -218,8 +218,8 @@ function HudController.start()
 
 	-- What the passenger at the window says, over their head, in the room the HUD leaves
 	-- (see updateSpeechRoom).
-	local speechRoom: Speech.Area? = nil
-	local speech = Speech.new(playerGui, function(): Speech.Area?
+	local speechRoom: Speech.Room? = nil
+	local speech = Speech.new(playerGui, function(): Speech.Room?
 		return speechRoom
 	end)
 
@@ -529,10 +529,11 @@ function HudController.start()
 	end
 
 	-- The part of the screen the passenger's speech bubble may use, while the window is
-	-- being worked: right of the desk (and the page tab), left of the rules panel (or the
-	-- ledger, or the RULES button), below the status and its banner (when they're in the HUD
-	-- rather than Roblox's top bar) and the radio, and above the hint. From where those
-	-- are on screen, whenever the HUD changes.
+	-- being worked: right of the desk, left of the rules panel (or the ledger, or the RULES
+	-- button), below the status and its banner (when they're in the HUD rather than
+	-- Roblox's top bar) and the radio, and above the hint; and clear of the ticket's page
+	-- tab, if it would run into it. From where those are on screen, whenever the HUD
+	-- changes.
 	local function updateSpeechRoom()
 		local state = lastState
 		if not (state and (state.phase == "queue" or state.phase == "window")) then
@@ -542,11 +543,8 @@ function HudController.start()
 		local at, size = hud.AbsolutePosition, hud.AbsoluteSize
 		local left, top, right, bottom = at.X, at.Y, at.X + size.X, at.Y + size.Y
 		local gap = SPEECH_GAP * uiScale.Scale
-		local onLeft: { GuiObject } = { desk, ticket.pageTab }
-		for _, object in onLeft do
-			if showing(object) then
-				left = math.max(left, object.AbsolutePosition.X + object.AbsoluteSize.X + gap)
-			end
+		if showing(desk) then
+			left = math.max(left, desk.AbsolutePosition.X + desk.AbsoluteSize.X + gap)
 		end
 		local onRight: { GuiObject } = { side, ledger, showSide }
 		for _, object in onRight do
@@ -563,7 +561,21 @@ function HudController.start()
 		if showing(hint) then
 			bottom = math.min(bottom, hint.AbsolutePosition.Y - gap)
 		end
-		speechRoom = { left = left, top = top, right = right, bottom = bottom }
+		local obstacles: { Speech.Area } = {}
+		local tab = ticket.pageTab
+		if showing(tab) then
+			-- Where the tab is once the ticket has slid in (it slides in as they start to
+			-- talk): the ticket rests at the desk's top-left corner.
+			local rest = desk.AbsolutePosition + tab.AbsolutePosition - ticket.root.AbsolutePosition
+			local extent = tab.AbsoluteSize
+			table.insert(obstacles, {
+				left = rest.X - gap,
+				top = rest.Y - gap,
+				right = rest.X + extent.X + gap,
+				bottom = rest.Y + extent.Y + gap,
+			})
+		end
+		speechRoom = { area = { left = left, top = top, right = right, bottom = bottom }, obstacles = obstacles }
 	end
 
 	-- The desk down the left side, and the rules panel and the ledger down the right, from
@@ -804,7 +816,7 @@ function HudController.start()
 			lantern.Visible = i <= state.maxLanterns
 		end
 		status.ledger.Visible = #state.ledger > 0
-		status.ledgerLabel.Text = `{#state.ledger}/{state.finalNight}`
+		status.ledgerCount.Text = `{#state.ledger}/{state.finalNight}`
 		if ledger.Visible then
 			renderLedger(state)
 		end
@@ -945,19 +957,22 @@ function HudController.start()
 		actionRemote:FireServer("continue")
 	end)
 
-	-- Clocking in or out: a moment of black hides the jump between the pier and the booth,
-	-- and the cursor is freed for the HUD while on shift. Roblox's player list (top right on
-	-- a computer) would sit over the rules panel, so it's put away for the shift; it's back
-	-- on the pier, with the Endings and Shifts it keeps.
-	local function onShiftChanged()
+	-- On shift the cursor is freed for the HUD, and Roblox's player list (top right on a
+	-- computer), which would sit over the rules panel, is put away; it's back on the pier,
+	-- with the Endings and Shifts it keeps.
+	local function applyShift()
 		local onShift = player:GetAttribute("OnShift") == true
 		StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, not onShift)
 		cursor.Visible = onShift
+	end
+	-- Clocking in or out: a moment of black hides the jump between the pier and the booth.
+	player:GetAttributeChangedSignal("OnShift"):Connect(function()
+		applyShift()
 		blackout.BackgroundTransparency = 0
 		TweenService:Create(blackout, TweenInfo.new(0.9, Enum.EasingStyle.Sine), { BackgroundTransparency = 1 }):Play()
-	end
-	player:GetAttributeChangedSignal("OnShift"):Connect(onShiftChanged)
-	cursor.Visible = player:GetAttribute("OnShift") == true
+	end)
+	-- One who joins mid-shift is on shift already.
+	applyShift()
 	rulesTab.Activated:Connect(function()
 		Sfx.click()
 		showingManifest = false

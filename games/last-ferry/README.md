@@ -61,7 +61,8 @@ the banner say what to do; the time clock by the back door has Roblox's own
 bubbles drawn like Roblox's own, which stay up for the whole window, over their
 heads and clear of the HUD. The living breathe fog and cast a shadow back and to
 the right of them under the lamp. The drowned carry old tickets with the blue
-anchor stamp; this one drips seawater and wears seaweed. The night, the clock
+anchor stamp; this one drips seawater, wears seaweed, and has a torn page from
+the harbormaster's ledger tucked behind the ticket (TAKE PAGE). The night, the clock
 and the lanterns are pills in Roblox's own top bar, beside its buttons; below
 them the HUD is Roblox's chunky style: the ticket, green BOARD, red TURN AWAY,
 and the rules on the right.
@@ -127,7 +128,7 @@ GitHub Actions runs all of these on every pull request
 same pinned versions. It keeps the built place file as a download on each run.
 
 At the time of this build every check comes back clean:
-- 90 tests pass.
+- 92 tests pass.
 - There are 0 selene findings.
 - There are 0 strict type errors.
 
@@ -174,6 +175,28 @@ build fixes:
   thumbstick's area allows for the top bar, and a clerk found on the booth's
   roof is put back at their stand.
 
+The third review, of the top bar and the bubble, found, and this build fixes:
+- **The bubble was off by the notch on phones:** it was placed in viewport
+  coordinates, which start at the notch's edge, on a layer that covers the
+  notch too, so on an 844 × 390 phone its tail pointed 47 px to one side. It
+  now uses GUI coordinates (`WorldToScreenPoint`, as `AbsolutePosition` does),
+  and the simulator puts each of Roblox's coordinate systems where the docs
+  say, so the tests catch it.
+- **Aimed from the stand, not the spawn pad:** after a respawn mid-shift, the
+  view was aimed before the clerk had been moved to their stand. The server now
+  names each clerk's stand (a `Stand` attribute) and the camera aims from it.
+- **A late joiner's player list:** Roblox's player list was put away only when
+  a shift started, so a friend joining mid-shift had it over the rules panel.
+  It now follows each player's own shift from the moment they join.
+- **The page tab under the bubble on an iPhone SE:** the tab is lower on the
+  ticket, and the bubble keeps to one side of it only when it would otherwise
+  cover it.
+- **The ledger in the top bar:** once a page was found, the status could
+  overflow a narrow row. The ledger's pill now counts when deciding whether the
+  row fits, and the status moves to the HUD only when even the pills that
+  always show don't. The pills are measured from their text, as Roblox
+  measures its bubbles, rather than switched on and off to measure them.
+
 Smooth movement came out of the same research: nothing is tweened on the
 server any more. The server sends each move once and every client plays it
 smoothly (`Shared/Glide`), so passengers, the ferry and the door don't stutter,
@@ -208,8 +231,9 @@ The tests have three layers:
    - The simulator lays GUI out as Roblox does, so the tests check where things
      are on screen: the longest line clear of every piece of the HUD and above
      the passenger's head from every stand, on three screens; the status
-     fitting however much of the top bar Roblox's buttons leave; every stand's
-     view aimed at the passenger.
+     fitting however much of the top bar Roblox's buttons leave, with a page in
+     the ledger too; every stand's view aimed at the passenger, respawns
+     included.
    - Passengers walk a steady stride every frame on each client while the
      server sends each leg once (`sim:countWrites` counts who moved what), and
      glides survive late joiners, changes of course and late server moves.

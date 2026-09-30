@@ -73,7 +73,8 @@ local function split(path: string): { string }
 end
 
 -- Roblox's top bar row keeps its left end for its own buttons: the Roblox button (16 to
--- 60 px from the safe area's left edge) and the unibar with the menu and chat (68 to 164).
+-- 60 px from the device safe area's left edge) and the unibar with the menu and chat (68
+-- to 164).
 local TOP_BAR_BUTTONS = 164
 
 function Sim.new(
@@ -82,7 +83,8 @@ function Sim.new(
 		screen: Vector2?,
 		safeArea: Vector2?,
 		-- The part of Roblox's top bar row left for the game (GuiService.TopbarInset), in
-		-- screen pixels. By default, right of Roblox's buttons to the safe area's right edge.
+		-- pixels from the device safe area's left edge and the screen's top. By default,
+		-- right of Roblox's buttons to the safe area's right edge.
 		topbarInset: any?,
 		preferredInput: EnumItem?,
 		tenFoot: boolean?,
@@ -1111,8 +1113,10 @@ function Sim.new(
 				error(`{typeOf(value)} is not a supported attribute type ("{name}" on {fullName(self)})`, 2)
 			end
 			local st = state[self]
+			local old = st.attributes[name]
 			st.attributes[name] = value
-			if st.attributeSignals[name] then
+			-- As in Roblox, only a change fires: setting the same value again does nothing.
+			if old ~= value and st.attributeSignals[name] then
 				fire(st.attributeSignals[name], nil)
 			end
 		end,
@@ -1280,19 +1284,26 @@ function Sim.new(
 			return attachmentWorld(st).Position
 		end,
 	}
-	-- GUI coordinates start at the bottom-left of Roblox's top bar (the screen's top edge
-	-- minus the top inset). A ScreenGui covers the whole screen with ScreenInsets None, and
-	-- otherwise (the default) the safe area: below the top bar, centred sideways.
+	-- Roblox's screen coordinates, as its docs define them. The camera renders the whole
+	-- screen. The device safe area leaves out any notch (sideInset, each side, in
+	-- landscape); Roblox's top bar is the top of it (topInset). GUI coordinates
+	-- (AbsolutePosition, InputObject.Position, WorldToScreenPoint) start at the bottom-left
+	-- corner of the top bar; viewport coordinates (WorldToViewportPoint, ViewportSize)
+	-- start at its top-left. A ScreenGui covers the safe area below the top bar by default
+	-- (CoreUISafeInsets), the whole screen with None, the device safe area with
+	-- DeviceSafeInsets, and the top bar row's free part with TopbarSafeInsets.
 	local function topInset(): number
 		return sim.screen.Y - sim.safeArea.Y
 	end
-	-- The top bar row's free part, GuiService.TopbarInset: screen pixels, from the screen's
-	-- top edge. ScreenGuis with TopbarSafeInsets go there.
+	local function sideInset(): number
+		return (sim.screen.X - sim.safeArea.X) / 2
+	end
+	-- The top bar row's free part, GuiService.TopbarInset: from the device safe area's
+	-- left edge and the screen's top edge.
 	local function topbarInset()
 		if sim.topbarInset == nil then
-			local side = (sim.screen.X - sim.safeArea.X) / 2
-			local left = math.min(side + TOP_BAR_BUTTONS, sim.screen.X - side)
-			sim.topbarInset = roblox.Rect.new(left, 0, sim.screen.X - side, topInset())
+			local left = math.min(TOP_BAR_BUTTONS, sim.safeArea.X)
+			sim.topbarInset = roblox.Rect.new(left, 0, sim.safeArea.X, topInset())
 		end
 		return sim.topbarInset
 	end
@@ -1301,30 +1312,28 @@ function Sim.new(
 			return topbarInset()
 		end,
 	}
-	local function fullScreen(instance): boolean
-		return instance.ScreenInsets == Enum.ScreenInsets.None
-	end
-	local function inTopBar(instance): boolean
-		return instance.ScreenInsets == Enum.ScreenInsets.TopbarSafeInsets
+	-- Where a ScreenGui's area is, in GUI coordinates, and how big it is.
+	local function screenArea(instance, st)
+		local insets = if st.className == "ScreenGui" then instance.ScreenInsets else Enum.ScreenInsets.None
+		if insets == Enum.ScreenInsets.CoreUISafeInsets then
+			return roblox.Vector2.zero, sim.safeArea
+		elseif insets == Enum.ScreenInsets.DeviceSafeInsets then
+			return roblox.Vector2.new(0, -topInset()), roblox.Vector2.new(sim.safeArea.X, sim.screen.Y)
+		elseif insets == Enum.ScreenInsets.TopbarSafeInsets then
+			local inset = topbarInset()
+			return roblox.Vector2.new(inset.Min.X, inset.Min.Y - topInset()),
+				roblox.Vector2.new(inset.Width, inset.Height)
+		end
+		return roblox.Vector2.new(-sideInset(), -topInset()), sim.screen
 	end
 	computed.LayerCollector = {
 		AbsoluteSize = function(instance, st)
-			if st.className == "ScreenGui" and inTopBar(instance) then
-				local inset = topbarInset()
-				return roblox.Vector2.new(inset.Width, inset.Height)
-			elseif st.className == "ScreenGui" and not fullScreen(instance) then
-				return sim.safeArea
-			end
-			return sim.screen
+			local _, size = screenArea(instance, st)
+			return size
 		end,
 		AbsolutePosition = function(instance, st)
-			if st.className == "ScreenGui" and inTopBar(instance) then
-				local inset = topbarInset()
-				return roblox.Vector2.new(inset.Min.X, inset.Min.Y - topInset())
-			elseif st.className == "ScreenGui" and not fullScreen(instance) then
-				return roblox.Vector2.new((sim.screen.X - sim.safeArea.X) / 2, 0)
-			end
-			return roblox.Vector2.new(0, -topInset())
+			local position = screenArea(instance, st)
+			return position
 		end,
 	}
 	-- Text's size, estimated (there's no font engine): about half the text size a
@@ -1626,29 +1635,30 @@ function Sim.new(
 	end
 
 	computed.Camera = {
+		-- The device safe area (not the whole screen the camera renders).
 		ViewportSize = function()
-			return sim.screen
+			return roblox.Vector2.new(sim.safeArea.X, sim.screen.Y)
 		end,
 	}
-	-- Where a point in the world is on screen, for a camera with a vertical FieldOfView:
-	-- x and y in pixels from the top-left of the viewport, less `inset` from the top, and
-	-- the depth in front of the camera (negative behind it).
+	-- Where a point in the world is drawn, for a camera with a vertical FieldOfView over
+	-- the whole screen: x and y in viewport coordinates, less `inset` from the top, and the
+	-- depth in front of the camera (negative behind it).
 	local function project(camera, point, inset: number)
 		local relative = camera.CFrame:PointToObjectSpace(point)
 		local depth = -relative.Z
-		local viewport = sim.screen
+		local screen = sim.screen
 		local tanHalf = math.tan(math.rad(camera.FieldOfView) / 2)
 		local scale = if math.abs(depth) > 1e-6 then depth else 1e-6
-		local x = (relative.X / (scale * tanHalf * viewport.X / viewport.Y) + 1) / 2 * viewport.X
-		local y = (1 - relative.Y / (scale * tanHalf)) / 2 * viewport.Y
-		local onScreen = depth > 0 and x >= 0 and x <= viewport.X and y >= 0 and y <= viewport.Y
+		local x = (relative.X / (scale * tanHalf * screen.X / screen.Y) + 1) / 2 * screen.X - sideInset()
+		local y = (1 - relative.Y / (scale * tanHalf)) / 2 * screen.Y
+		local onScreen = depth > 0 and x >= 0 and x <= sim.safeArea.X and y >= 0 and y <= screen.Y
 		return roblox.Vector3.new(x, y - inset, depth), onScreen
 	end
 	methods.Camera = {
 		WorldToViewportPoint = function(self, point)
 			return project(self, point, 0)
 		end,
-		-- In GUI coordinates, below the top bar, for placing GUI.
+		-- In GUI coordinates, from the bottom-left of the top bar, for placing GUI.
 		WorldToScreenPoint = function(self, point)
 			return project(self, point, topInset())
 		end,
@@ -2225,10 +2235,10 @@ function Sim.new(
 		SetCoreGuiEnabled = function(_self, kind, enabled)
 			assert(typeOf(kind) == "EnumItem" and Enum.CoreGuiType[kind.Name] == kind, "SetCoreGuiEnabled type")
 			assert(type(enabled) == "boolean", "SetCoreGuiEnabled enabled")
-			table.insert(sim.coreCalls, `SetCoreGuiEnabled {kind.Name} {enabled}`)
+			table.insert(sim.coreCalls, `[{currentContext()}] SetCoreGuiEnabled {kind.Name} {enabled}`)
 		end,
 		SetCore = function(_self, name, value)
-			table.insert(sim.coreCalls, `SetCore {name} {tostring(value)}`)
+			table.insert(sim.coreCalls, `[{currentContext()}] SetCore {name} {tostring(value)}`)
 		end,
 		GetCore = function()
 			return nil
@@ -3097,6 +3107,20 @@ function Sim.new(
 			else roblox.CFrame.new(root) * character:GetPivot().Rotation
 		character:PivotTo(frame)
 		drain()
+	end
+
+	-- Whether a player's client last left a piece of Roblox's own UI on
+	-- (StarterGui:SetCoreGuiEnabled, `kind` an Enum.CoreGuiType name). Everything starts on.
+	function sim:coreGuiEnabled(player, kind: string): boolean
+		local context = `client:{state[player].props.UserId}`
+		local on = true
+		for _, call in sim.coreCalls do
+			local who, name, value = string.match(call, "^%[(.-)%] SetCoreGuiEnabled (%a+) (%a+)$")
+			if who == context and name == kind then
+				on = value == "true"
+			end
+		end
+		return on
 	end
 
 	-- Roblox's own top bar buttons take a different amount of room (its chat pill opening,

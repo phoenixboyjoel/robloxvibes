@@ -35,10 +35,13 @@ Disabled**.
       beside Roblox's buttons, level with them and the same height. Open
       Roblox's menu and its chat: nothing of ours sits under Roblox's buttons,
       and if they take more room (join voice, say) the date drops out first,
-      then IN LINE. On a computer, Roblox's player list (top right) is put
-      away for the shift, so it doesn't cover the rules, and it's back on the
-      pier. With a gamepad, Roblox hides its buttons until you press Menu:
-      check the pills move over and back smoothly.
+      then IN LINE. Once you've taken a page, a LEDGER pill joins them (its
+      word goes before the clock when room is short; its icon and page count
+      stay). On a computer, Roblox's player list (top right) is put away for
+      the shift, so it doesn't cover the rules, and it's back on the pier.
+      With a gamepad, Roblox hides its buttons until you press Menu: the pills
+      move over and back with them, in one jump rather than a slide. Judge
+      whether that looks out of place beside Roblox's own buttons.
 
 ## 2. In the booth (first person)
 
@@ -160,8 +163,9 @@ Disabled**.
       before night 5 costs nothing: she says "Not yet."
 - [ ] The end-of-night summary lists every call with a green check or a red
       cross, and a reason.
-- [ ] On one ticket a night, a **TAKE PAGE** tab pokes out. Taking it opens the
-      harbormaster's ledger over the rules panel, without blocking the
+- [ ] On one ticket a night, a **TAKE PAGE** tab pokes out of its right edge,
+      low down (clear of the passenger's bubble on a phone). Taking it opens
+      the harbormaster's ledger over the rules panel, without blocking the
       buttons. With two players, only the finder's ledger opens; the other
       player gets a notice.
 - [ ] Endings:
@@ -196,7 +200,8 @@ Disabled**.
       - On phones the passenger's bubble sits over their head, between the
         ticket and the rules panel, with the longest lines (three lines of
         text) still clear of the top of the screen. The top bar row shows the
-        night, the clock, IN LINE and the lanterns (no date).
+        night, the clock and the lanterns, and IN LINE if there's room
+        (probably not on an iPhone SE). The date is the first to go.
       - On an iPad the rules panel stops above the bigger jump button.
       - On the Xbox (a TV screen) there's no Roblox chat at all, but the
         passenger's bubble still shows, in bigger type.

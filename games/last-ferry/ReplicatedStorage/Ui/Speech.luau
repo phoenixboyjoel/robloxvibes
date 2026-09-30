@@ -24,9 +24,13 @@ local RunService = game:GetService("RunService")
 
 local Ui = require("./Ui")
 
--- A part of the screen, in pixels: `room` gives it in the coordinates of
--- GuiObject.AbsolutePosition; Speech.place works in the bubble layer's own.
+-- A part of the screen, in pixels.
 export type Area = { left: number, top: number, right: number, bottom: number }
+
+-- Where the bubble may go, in GUI coordinates (GuiObject.AbsolutePosition's): `area`, which
+-- the HUD leaves clear from top to bottom, less any of the `obstacles` it would otherwise
+-- run into (a piece of the HUD lower down, beside it, like the ticket's page tab).
+export type Room = { area: Area, obstacles: { Area } }
 
 export type Speech = {
 	-- Shows `text` over `model` until release() or clear(), or for `seconds` if given.
@@ -80,16 +84,21 @@ local function heightAbove(model: Model, root: BasePart): number
 	return size.Y / 2 - box:PointToObjectSpace(root.Position).Y
 end
 
+-- Whether two parts of the screen overlap.
+local function overlap(a: Area, b: Area): boolean
+	return a.left < b.right and b.left < a.right and a.top < b.bottom and b.top < a.bottom
+end
+
 -- `room` gives the part of the screen the bubble may use, or nil to hide it for now.
-function Speech.new(parent: Instance, room: () -> Area?): Speech
+function Speech.new(parent: Instance, room: () -> Room?): Speech
 	local tv = GuiService:IsTenFootInterface()
 	local textSize = if tv then 24 else 16
 	local maxWidth = if tv then 420 else 300 -- widest a line runs before it wraps
 	local caretSize = if tv then Vector2.new(14, 9) else Vector2.new(9, 6)
 
-	-- Over the HUD (LastFerryHud is DisplayOrder 6). It covers the whole screen, so a point
-	-- on it is exactly where the camera draws that point (WorldToViewportPoint), with no
-	-- insets to allow for.
+	-- Over the HUD (LastFerryHud is DisplayOrder 6), across the whole screen. Positions on
+	-- it are GUI coordinates (where the camera draws a point, from WorldToScreenPoint, and
+	-- where the HUD is, from AbsolutePosition) less where it starts.
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "LastFerrySpeech"
 	gui.DisplayOrder = 7
@@ -142,20 +151,28 @@ function Speech.new(parent: Instance, room: () -> Area?): Speech
 	local model: Model? = nil
 	local root: BasePart? = nil
 	local height = 0 -- from the root to the top of their head
-	local wrapAt = 0 -- the width the line was measured at
+	local measured: { [number]: Vector2 } = {} -- the bubble's size for the line, by wrap width
 	local bubbleSize = Vector2.zero
 	local token = 0
 	local timed = false
+	-- The tail overlaps the bubble by a pixel, so it reaches that much less below it.
+	local tail = caretSize.Y - 1
 
-	local function fit(width: number)
-		wrapAt = width
+	-- How big the bubble is with its line wrapped for `area`: as wide as Roblox's bubbles
+	-- go, or as the area is (but never too narrow to read).
+	local function sizeFor(area: Area): Vector2
+		local fits = math.floor(math.min(maxWidth + 2 * PAD_X, area.right - area.left)) - 2 * PAD_X
+		local width = math.max(fits, MIN_TEXT)
+		local known: Vector2? = measured[width]
+		if known then
+			return known
+		end
 		measure.Size = UDim2.fromOffset(width, 10000)
 		measure.Text = line.Text
 		local bounds = measure.TextBounds
-		bubbleSize = Vector2.new(math.ceil(bounds.X) + 2 * PAD_X, math.ceil(bounds.Y) + 2 * PAD_Y)
-		stack.Size = UDim2.fromOffset(bubbleSize.X, bubbleSize.Y + caretSize.Y - 1)
-		bubble.Size = UDim2.fromOffset(bubbleSize.X, bubbleSize.Y)
-		caret.Position = UDim2.fromOffset(bubbleSize.X / 2, bubbleSize.Y - 1)
+		local size = Vector2.new(math.ceil(bounds.X) + 2 * PAD_X, math.ceil(bounds.Y) + 2 * PAD_Y)
+		measured[width] = size
+		return size
 	end
 
 	local function clear()
@@ -190,33 +207,54 @@ function Speech.new(parent: Instance, room: () -> Area?): Speech
 		local free = room()
 		local camera = workspace.CurrentCamera
 		local top = part.Position + Vector3.new(0, height, 0)
-		local tip = camera:WorldToViewportPoint(top + Vector3.new(0, ABOVE, 0))
-		if free == nil or tip.Z <= 0 then
+		local tipPoint = camera:WorldToScreenPoint(top + Vector3.new(0, ABOVE, 0))
+		if free == nil or tipPoint.Z <= 0 then
 			stack.Visible = false -- no room for now, or they're behind the camera
 			return
 		end
-		-- The room, from where things are on screen (AbsolutePosition) to this layer.
+		-- Everything from GUI coordinates to this layer's own.
 		local origin = gui.AbsolutePosition
-		local area = {
-			left = free.left - origin.X,
-			top = free.top - origin.Y,
-			right = free.right - origin.X,
-			bottom = free.bottom - origin.Y,
-		}
-		-- As wide as Roblox's bubbles go, or as the room is (but never too narrow to read).
-		local fits = math.floor(math.min(maxWidth + 2 * PAD_X, area.right - area.left)) - 2 * PAD_X
-		local widest = math.max(fits, MIN_TEXT)
-		if widest ~= wrapAt then
-			fit(widest)
+		local function onLayer(area: Area): Area
+			return {
+				left = area.left - origin.X,
+				top = area.top - origin.Y,
+				right = area.right - origin.X,
+				bottom = area.bottom - origin.Y,
+			}
 		end
-		local head = camera:WorldToViewportPoint(top)
-		-- The tail overlaps the bubble by a pixel, so it reaches that much less below it.
-		local tail = caretSize.Y - 1
-		local at, along = Speech.place(Vector2.new(tip.X, tip.Y), Vector2.new(head.X, head.Y), bubbleSize, tail, area)
+		local headPoint = camera:WorldToScreenPoint(top)
+		local tip = Vector2.new(tipPoint.X, tipPoint.Y) - origin
+		local head = Vector2.new(headPoint.X, headPoint.Y) - origin
+		local area = onLayer(free.area)
+		local size = sizeFor(area)
+		local at, along = Speech.place(tip, head, size, tail, area)
+		-- Something lower down in the way (the page tab)? Keep to the side of it that's clear.
+		local narrowed = area
+		for _, obstacle in free.obstacles do
+			local block = onLayer(obstacle)
+			local spot = { left = at.X, top = at.Y, right = at.X + size.X, bottom = at.Y + size.Y + tail }
+			if overlap(spot, block) then
+				narrowed = table.clone(narrowed)
+				if (block.left + block.right) / 2 < tip.X then
+					narrowed.left = math.max(narrowed.left, block.right)
+				else
+					narrowed.right = math.min(narrowed.right, block.left)
+				end
+			end
+		end
+		if narrowed ~= area then
+			size = sizeFor(narrowed)
+			at, along = Speech.place(tip, head, size, tail, narrowed)
+		end
+		if size ~= bubbleSize then
+			bubbleSize = size
+			stack.Size = UDim2.fromOffset(size.X, size.Y + tail)
+			bubble.Size = UDim2.fromOffset(size.X, size.Y)
+		end
 		stack.Position = UDim2.fromOffset(math.round(at.X), math.round(at.Y))
 		caret.Visible = along ~= nil
 		if along then
-			caret.Position = UDim2.fromOffset(math.round(along), bubbleSize.Y - 1)
+			caret.Position = UDim2.fromOffset(math.round(along), size.Y - 1)
 		end
 		stack.Visible = true
 	end)
@@ -233,7 +271,7 @@ function Speech.new(parent: Instance, room: () -> Area?): Speech
 			root = part
 			height = heightAbove(speaker, part)
 			line.Text = text
-			wrapAt = 0 -- measured on the next frame, for the room there is then
+			table.clear(measured) -- measured on the next frame, for the room there is then
 			stack:SetAttribute("Speaker", speaker.Name)
 			timed = seconds ~= nil
 			if seconds then

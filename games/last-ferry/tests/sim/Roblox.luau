@@ -928,10 +928,17 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		end,
 	}
 
+	-- Terrain isn't voxelized; fills are recorded (for tools/preview) and otherwise ignored.
+	sim.terrainFills = {}
 	methods.Terrain = {
 		FillBlock = function(_self, cframe, size, material)
 			assert(typeOf(cframe) == "CFrame" and typeOf(size) == "Vector3", "FillBlock(CFrame, Vector3, Material)")
 			assert(typeOf(material) == "EnumItem" and Enum.Material[material.Name] == material, "FillBlock material")
+			table.insert(sim.terrainFills, {
+				cframe = { cframe:GetComponents() },
+				size = { size.X, size.Y, size.Z },
+				material = material.Name,
+			})
 		end,
 	}
 

@@ -31,9 +31,9 @@ The story design is in [GAME_DESIGN.md](GAME_DESIGN.md) and the code map is in
 ## What the booth sees
 
 These are blockout renders of the real game's geometry: the server's world code
-running in the test simulator, ray-traced by
-[tools/preview](tools/preview/render.py). They're for layout, not looks. Roblox
-will render the fog, light, materials and particles very differently.
+running in the test simulator, drawn by [tools/preview](tools/preview/README.md).
+They're for layout, not looks. Roblox will render the fog, light, materials and
+particles differently.
 
 | A living regular at the window | One of the drowned (1999 ticket) |
 | --- | --- |

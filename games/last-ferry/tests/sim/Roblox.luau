@@ -72,13 +72,22 @@ local function split(path: string): { string }
 	return parts
 end
 
-function Sim.new(options: {
-	root: string?,
-	screen: Vector2?,
-	safeArea: Vector2?,
-	preferredInput: EnumItem?,
-	tenFoot: boolean?,
-}?)
+-- Roblox's top bar row keeps its left end for its own buttons: the Roblox button (16 to
+-- 60 px from the safe area's left edge) and the unibar with the menu and chat (68 to 164).
+local TOP_BAR_BUTTONS = 164
+
+function Sim.new(
+	options: {
+		root: string?,
+		screen: Vector2?,
+		safeArea: Vector2?,
+		-- The part of Roblox's top bar row left for the game (GuiService.TopbarInset), in
+		-- screen pixels. By default, right of Roblox's buttons to the safe area's right edge.
+		topbarInset: any?,
+		preferredInput: EnumItem?,
+		tenFoot: boolean?,
+	}?
+)
 	local opts = options or {}
 	local root = opts.root or "."
 	local reflection = serde.decode("json", fs.readFile(`{root}/tests/sim/reflection.json`)).classes
@@ -109,6 +118,7 @@ function Sim.new(options: {
 		screen = opts.screen or roblox.Vector2.new(1280, 720),
 		-- Below Roblox's 58 px top bar, where ScreenGuis with CoreUISafeInsets go.
 		safeArea = opts.safeArea or opts.screen or roblox.Vector2.new(1280, 662),
+		topbarInset = opts.topbarInset,
 		preferredInput = opts.preferredInput or Enum.PreferredInput.KeyboardAndMouse,
 		-- A console on a TV: GuiService:IsTenFootInterface(), and Roblox's chat never shows.
 		tenFoot = opts.tenFoot == true,
@@ -619,6 +629,36 @@ function Sim.new(options: {
 	-- Tests can count who writes a property: sim:countWrites(instance, key).
 	local writeCounts = setmetatable({}, { __mode = "k" })
 
+	-- GUI changes, so a laid-out position or size (see layoutOf) is kept only until
+	-- something it depends on changes. Each GUI object has a stamp for its own last change
+	-- (`guiOwn`: its properties, its UIScale, UIPadding or UIListLayout, or which children
+	-- it has) and for the last change anywhere inside it (`guiInside`).
+	local guiStamp = 0
+	local isGuiCache = {}
+	local function isGui(className: string): boolean
+		local hit = isGuiCache[className]
+		if hit == nil then
+			hit = isA(className, "GuiBase2d") or isA(className, "UIComponent")
+			isGuiCache[className] = hit
+		end
+		return hit
+	end
+	local function touchGui(instance)
+		guiStamp += 1
+		local st = state[instance]
+		local node = instance
+		-- A UI component changes how its parent lays out.
+		if isA(st.className, "UIComponent") and st.parent then
+			node = st.parent
+		end
+		state[node].guiOwn = guiStamp
+		while node do
+			local nst = state[node]
+			nst.guiInside = guiStamp
+			node = nst.parent
+		end
+	end
+
 	local function changed(instance, st, key: string, value: any)
 		local counts = writeCounts[instance]
 		if counts and counts[key] then
@@ -671,6 +711,14 @@ function Sim.new(options: {
 			end
 		end
 		st.parent = parent
+		if isGui(st.className) then
+			touchGui(instance)
+			for _, holder in { old, parent } do
+				if holder and isGui(state[holder].className) then
+					touchGui(holder) -- its children changed
+				end
+			end
+		end
 		if parent then
 			table.insert(state[parent].children, instance)
 			if state[parent].signals.ChildAdded then
@@ -828,6 +876,9 @@ function Sim.new(options: {
 		local old = st.props[key]
 		st.props[key] = value
 		if old ~= value then
+			if isGui(st.className) then
+				touchGui(instance)
+			end
 			changed(instance, st, key, value)
 		end
 		if st.className == "WeldConstraint" and (key == "Part0" or key == "Part1") then
@@ -1229,32 +1280,69 @@ function Sim.new(options: {
 			return attachmentWorld(st).Position
 		end,
 	}
-	computed.LayerCollector = {
-		AbsoluteSize = function(_instance, st)
-			local insets = st.props.ScreenInsets
-			if insets == nil or insets == Enum.ScreenInsets.None then
-				return sim.screen
-			end
-			return sim.safeArea
+	-- GUI coordinates start at the bottom-left of Roblox's top bar (the screen's top edge
+	-- minus the top inset). A ScreenGui covers the whole screen with ScreenInsets None, and
+	-- otherwise (the default) the safe area: below the top bar, centred sideways.
+	local function topInset(): number
+		return sim.screen.Y - sim.safeArea.Y
+	end
+	-- The top bar row's free part, GuiService.TopbarInset: screen pixels, from the screen's
+	-- top edge. ScreenGuis with TopbarSafeInsets go there.
+	local function topbarInset()
+		if sim.topbarInset == nil then
+			local side = (sim.screen.X - sim.safeArea.X) / 2
+			local left = math.min(side + TOP_BAR_BUTTONS, sim.screen.X - side)
+			sim.topbarInset = roblox.Rect.new(left, 0, sim.screen.X - side, topInset())
+		end
+		return sim.topbarInset
+	end
+	computed.GuiService = {
+		TopbarInset = function()
+			return topbarInset()
 		end,
 	}
-	-- TextBounds, estimated (there's no font engine): about half the text size a character,
-	-- wrapped by words at the label's width when TextWrapped. Enough for layout that
-	-- measures text, like a chat bubble fitting its line.
-	local function textBounds(_instance, st)
+	local function fullScreen(instance): boolean
+		return instance.ScreenInsets == Enum.ScreenInsets.None
+	end
+	local function inTopBar(instance): boolean
+		return instance.ScreenInsets == Enum.ScreenInsets.TopbarSafeInsets
+	end
+	computed.LayerCollector = {
+		AbsoluteSize = function(instance, st)
+			if st.className == "ScreenGui" and inTopBar(instance) then
+				local inset = topbarInset()
+				return roblox.Vector2.new(inset.Width, inset.Height)
+			elseif st.className == "ScreenGui" and not fullScreen(instance) then
+				return sim.safeArea
+			end
+			return sim.screen
+		end,
+		AbsolutePosition = function(instance, st)
+			if st.className == "ScreenGui" and inTopBar(instance) then
+				local inset = topbarInset()
+				return roblox.Vector2.new(inset.Min.X, inset.Min.Y - topInset())
+			elseif st.className == "ScreenGui" and not fullScreen(instance) then
+				return roblox.Vector2.new((sim.screen.X - sim.safeArea.X) / 2, 0)
+			end
+			return roblox.Vector2.new(0, -topInset())
+		end,
+	}
+	-- Text's size, estimated (there's no font engine): about half the text size a
+	-- character, wrapped by words at `maxWidth` if given. Enough for layout that measures
+	-- text, like a chat bubble fitting its line.
+	local function measureText(st, maxWidth: number?)
 		local text = st.props.Text or ""
 		if text == "" then
 			return roblox.Vector2.zero
 		end
 		local size = st.props.TextSize or 14
 		local charWidth = size * 0.52
-		local frame = st.props.Size
-		local maxWidth = if frame and st.props.TextWrapped and frame.X.Offset > 0 then frame.X.Offset else math.huge
+		local limit = if maxWidth and maxWidth > 0 then maxWidth else math.huge
 		local lines, widest, current = 1, 0, 0
 		for word in string.gmatch(text, "%S+") do
 			local width = (utf8.len(word) or #word) * charWidth
 			local joined = if current > 0 then current + charWidth * 0.55 + width else width
-			if current > 0 and joined > maxWidth then
+			if current > 0 and joined > limit then
 				widest = math.max(widest, current)
 				lines += 1
 				current = width
@@ -1263,7 +1351,275 @@ function Sim.new(options: {
 			end
 		end
 		widest = math.max(widest, current)
-		return roblox.Vector2.new(math.ceil(math.min(widest, maxWidth)), lines * size)
+		return roblox.Vector2.new(math.ceil(math.min(widest, limit)), lines * size)
+	end
+
+	-- GUI layout, for GuiObject.AbsolutePosition and AbsoluteSize, roughly as Roblox lays
+	-- out:
+	-- - Size and Position as a share of the parent's size plus pixels, and AnchorPoint;
+	-- - the parent's UIPadding (its pixels);
+	-- - UIScale, which scales an object and everything in it about its anchor point;
+	-- - UIListLayout, which lines the visible children up in LayoutOrder, with its Padding
+	--   and alignments, ignoring their Position and AnchorPoint;
+	-- - AutomaticSize, which grows an object to fit its text or its visible children
+	--   (their pixel sizes and positions; shares of a size still being worked out count
+	--   as nothing).
+	-- Rotation is ignored, as it is by AbsolutePosition. Each object's layout is kept until
+	-- something it depends on changes (see touchGui).
+	local layoutCache = setmetatable({}, { __mode = "k" })
+	local listCache = setmetatable({}, { __mode = "k" })
+
+	local function childOfClass(st, className: string)
+		for _, child in st.children do
+			if state[child].className == className then
+				return child
+			end
+		end
+		return nil
+	end
+
+	local function isText(className: string): boolean
+		return isA(className, "TextLabel") or isA(className, "TextButton")
+	end
+
+	-- An object's UIPadding in pixels, before scaling: left, top, right, bottom.
+	local function paddingOf(st): (number, number, number, number)
+		local padding = childOfClass(st, "UIPadding")
+		if padding == nil then
+			return 0, 0, 0, 0
+		end
+		return padding.PaddingLeft.Offset,
+			padding.PaddingTop.Offset,
+			padding.PaddingRight.Offset,
+			padding.PaddingBottom.Offset
+	end
+
+	local layoutOf
+	local contentExtent
+
+	-- How big an object is before any scaling, in a box `room` across (in the same units),
+	-- and the UIScale on it.
+	local function sizeOf(instance, room): (any, number)
+		local st = state[instance]
+		local declared = instance.Size
+		local width = declared.X.Scale * room.X + declared.X.Offset
+		local height = declared.Y.Scale * room.Y + declared.Y.Offset
+		local automatic = instance.AutomaticSize
+		if automatic ~= Enum.AutomaticSize.None then
+			local growX = automatic ~= Enum.AutomaticSize.Y
+			local growY = automatic ~= Enum.AutomaticSize.X
+			local extent = contentExtent(instance, if growX then nil else width)
+			if growX then
+				width = math.max(width, extent.X)
+			end
+			if growY then
+				height = math.max(height, extent.Y)
+			end
+		end
+		local uiScale = childOfClass(st, "UIScale")
+		return roblox.Vector2.new(width, height), if uiScale then uiScale.Scale else 1
+	end
+
+	-- How much room an object's content takes before any scaling: its text (wrapped at
+	-- `width` less padding, if its width is set) or its visible children (end to end, if
+	-- a UIListLayout lines them up), plus its UIPadding.
+	contentExtent = function(instance, width: number?)
+		local st = state[instance]
+		local left, top, right, bottom = paddingOf(st)
+		local inner = if width then math.max(0, width - left - right) else nil
+		local extentX, extentY = 0, 0
+		if isText(st.className) then
+			local text = measureText(st, if inner and instance.TextWrapped then inner else nil)
+			extentX, extentY = text.X, text.Y
+		end
+		local list = childOfClass(st, "UIListLayout")
+		local vertical = list ~= nil and list.FillDirection == Enum.FillDirection.Vertical
+		local room = roblox.Vector2.new(inner or 0, 0)
+		local along, across, count = 0, 0, 0
+		for _, child in st.children do
+			if isA(state[child].className, "GuiObject") and child.Visible then
+				local size, own = sizeOf(child, room)
+				size *= own
+				if list then
+					count += 1
+					along += if vertical then size.Y else size.X
+					across = math.max(across, if vertical then size.X else size.Y)
+				else
+					local at, anchor = child.Position, child.AnchorPoint
+					extentX = math.max(extentX, at.X.Offset + (1 - anchor.X) * size.X)
+					extentY = math.max(extentY, at.Y.Offset + (1 - anchor.Y) * size.Y)
+				end
+			end
+		end
+		if list and count > 0 then
+			along += list.Padding.Offset * (count - 1)
+			extentX = math.max(extentX, if vertical then across else along)
+			extentY = math.max(extentY, if vertical then along else across)
+		end
+		return roblox.Vector2.new(extentX + left + right, extentY + top + bottom)
+	end
+
+	-- The box an object's children go in, in pixels (inside any UIPadding), and the scale
+	-- their sizes are drawn at.
+	local function contentBox(instance)
+		local st = state[instance]
+		if isA(st.className, "LayerCollector") then
+			return instance.AbsolutePosition, instance.AbsoluteSize, 1
+		elseif isA(st.className, "GuiObject") then
+			local box = layoutOf(instance)
+			local left, top, right, bottom = paddingOf(st)
+			local scale = box.scale
+			return box.position + roblox.Vector2.new(left, top) * scale,
+				box.size - roblox.Vector2.new(left + right, top + bottom) * scale,
+				scale
+		end
+		return roblox.Vector2.zero, roblox.Vector2.zero, 1
+	end
+
+	-- Where the UIListLayout in `parent` puts each of its visible children, in pixels.
+	local function listSlots(parent, origin, room, scale)
+		local cached = listCache[parent]
+		if
+			cached
+			and cached.inside == (state[parent].guiInside or 0)
+			and cached.origin == origin
+			and cached.room == room
+		then
+			return cached.slots
+		end
+		local pst = state[parent]
+		local list = childOfClass(pst, "UIListLayout")
+		local vertical = list.FillDirection == Enum.FillDirection.Vertical
+		local horizontal, verticalAlign = list.HorizontalAlignment, list.VerticalAlignment
+		local items = {}
+		for index, child in pst.children do
+			if isA(state[child].className, "GuiObject") and child.Visible then
+				table.insert(items, { child = child, index = index, order = child.LayoutOrder })
+			end
+		end
+		table.sort(items, function(a, b)
+			if a.order ~= b.order then
+				return a.order < b.order
+			end
+			return a.index < b.index
+		end)
+		local units = if scale > 0 then room / scale else roblox.Vector2.zero
+		local gap = list.Padding.Scale * (if vertical then room.Y else room.X) + list.Padding.Offset * scale
+		local total = 0
+		for i, item in items do
+			local size, own = sizeOf(item.child, units)
+			item.size = size * scale * own
+			total += (if vertical then item.size.Y else item.size.X) + (if i > 1 then gap else 0)
+		end
+		local function offset(align, space: number): number
+			if align == Enum.HorizontalAlignment.Center or align == Enum.VerticalAlignment.Center then
+				return space / 2
+			elseif align == Enum.HorizontalAlignment.Right or align == Enum.VerticalAlignment.Bottom then
+				return space
+			end
+			return 0
+		end
+		local slots = {}
+		local cursor = if vertical
+			then origin.Y + offset(verticalAlign, room.Y - total)
+			else origin.X + offset(horizontal, room.X - total)
+		for _, item in items do
+			local size = item.size
+			if vertical then
+				slots[item.child] = roblox.Vector2.new(origin.X + offset(horizontal, room.X - size.X), cursor)
+				cursor += size.Y + gap
+			else
+				slots[item.child] = roblox.Vector2.new(cursor, origin.Y + offset(verticalAlign, room.Y - size.Y))
+				cursor += size.X + gap
+			end
+		end
+		listCache[parent] = { inside = state[parent].guiInside or 0, origin = origin, room = room, slots = slots }
+		return slots
+	end
+
+	-- Whether a laid-out entry still holds: nothing it depends on has changed since. It
+	-- depends on the object's own properties (everything inside it too, if it grows to fit
+	-- them), its siblings if a UIListLayout lines them up, and on where its parent is.
+	local function fresh(instance, entry): boolean
+		local st = state[instance]
+		local stamp = if entry.whole then st.guiInside else st.guiOwn
+		if (stamp or 0) ~= entry.stamp or st.parent ~= entry.parent then
+			return false
+		end
+		local parent = st.parent
+		if parent == nil then
+			return true
+		end
+		local pst = state[parent]
+		if entry.siblings and entry.siblings ~= (pst.guiInside or 0) then
+			return false
+		end
+		if isA(pst.className, "GuiObject") then
+			local parentEntry = layoutCache[parent]
+			return parentEntry ~= nil and parentEntry == entry.parentEntry and fresh(parent, parentEntry)
+		end
+		return entry.parentStamp == (pst.guiOwn or 0)
+	end
+
+	layoutOf = function(instance)
+		local cached = layoutCache[instance]
+		if cached and fresh(instance, cached) then
+			return cached
+		end
+		local st = state[instance]
+		local parent = st.parent
+		local origin, room, scale = roblox.Vector2.zero, roblox.Vector2.zero, 1
+		if parent then
+			origin, room, scale = contentBox(parent)
+		end
+		local size, own = sizeOf(instance, if scale > 0 then room / scale else roblox.Vector2.zero)
+		local pixels = size * scale * own
+		local position
+		if parent and childOfClass(state[parent], "UIListLayout") then
+			position = listSlots(parent, origin, room, scale)[instance] or origin
+		else
+			local at, anchor = instance.Position, instance.AnchorPoint
+			position = origin
+				+ roblox.Vector2.new(
+					at.X.Scale * room.X + at.X.Offset * scale - anchor.X * pixels.X,
+					at.Y.Scale * room.Y + at.Y.Offset * scale - anchor.Y * pixels.Y
+				)
+		end
+		local whole = instance.AutomaticSize ~= Enum.AutomaticSize.None
+		local pst = if parent then state[parent] else nil
+		local result = {
+			position = position,
+			size = pixels,
+			scale = scale * own,
+			whole = whole,
+			stamp = (if whole then st.guiInside else st.guiOwn) or 0,
+			parent = parent,
+			parentEntry = if parent then layoutCache[parent] else nil,
+			parentStamp = if pst then pst.guiOwn or 0 else 0,
+			siblings = if pst and childOfClass(pst, "UIListLayout") then pst.guiInside or 0 else nil,
+		}
+		layoutCache[instance] = result
+		return result
+	end
+
+	computed.GuiObject = {
+		AbsolutePosition = function(instance)
+			return layoutOf(instance).position
+		end,
+		AbsoluteSize = function(instance)
+			return layoutOf(instance).size
+		end,
+	}
+
+	-- As laid out: wrapped at the object's width, less its padding.
+	local function textBounds(instance, st)
+		local wrap = nil
+		if st.props.TextWrapped then
+			local box = layoutOf(instance)
+			local left, _, right = paddingOf(st)
+			wrap = box.size.X / box.scale - left - right
+		end
+		return measureText(st, wrap)
 	end
 	for _, className in { "TextLabel", "TextButton", "TextBox" } do
 		computed[className] = { TextBounds = textBounds }
@@ -1272,6 +1628,29 @@ function Sim.new(options: {
 	computed.Camera = {
 		ViewportSize = function()
 			return sim.screen
+		end,
+	}
+	-- Where a point in the world is on screen, for a camera with a vertical FieldOfView:
+	-- x and y in pixels from the top-left of the viewport, less `inset` from the top, and
+	-- the depth in front of the camera (negative behind it).
+	local function project(camera, point, inset: number)
+		local relative = camera.CFrame:PointToObjectSpace(point)
+		local depth = -relative.Z
+		local viewport = sim.screen
+		local tanHalf = math.tan(math.rad(camera.FieldOfView) / 2)
+		local scale = if math.abs(depth) > 1e-6 then depth else 1e-6
+		local x = (relative.X / (scale * tanHalf * viewport.X / viewport.Y) + 1) / 2 * viewport.X
+		local y = (1 - relative.Y / (scale * tanHalf)) / 2 * viewport.Y
+		local onScreen = depth > 0 and x >= 0 and x <= viewport.X and y >= 0 and y <= viewport.Y
+		return roblox.Vector3.new(x, y - inset, depth), onScreen
+	end
+	methods.Camera = {
+		WorldToViewportPoint = function(self, point)
+			return project(self, point, 0)
+		end,
+		-- In GUI coordinates, below the top bar, for placing GUI.
+		WorldToScreenPoint = function(self, point)
+			return project(self, point, topInset())
 		end,
 	}
 
@@ -1804,6 +2183,10 @@ function Sim.new(options: {
 	methods.GuiService = {
 		IsTenFootInterface = function()
 			return sim.tenFoot
+		end,
+		-- The top bar's inset (top left) and the bottom-right inset.
+		GetGuiInset = function()
+			return roblox.Vector2.new(0, topInset()), roblox.Vector2.zero
 		end,
 	}
 
@@ -2438,17 +2821,15 @@ function Sim.new(options: {
 		drain()
 	end
 
-	-- Runs a snippet of Luau as a server script, for testing the simulator itself.
-	-- Returns whatever the snippet returns.
-	function sim:execute(source: string)
-		moduleCaches.server = moduleCaches.server or {}
+	local function runSnippet(context: string, path: string, source: string)
+		moduleCaches[context] = moduleCaches[context] or {}
 		local chunk = luau.load(source, {
-			debugName = "ServerScriptService/Snippet",
-			environment = environment("server", "ServerScriptService/Snippet"),
+			debugName = path,
+			environment = environment(context, path),
 			injectGlobals = false,
 		})
 		local results
-		local thread = newThread("server", function()
+		local thread = newThread(context, function()
 			results = table.pack(chunk())
 		end)
 		resume(thread)
@@ -2457,6 +2838,21 @@ function Sim.new(options: {
 			return nil
 		end
 		return table.unpack(results, 1, results.n)
+	end
+
+	-- Runs a snippet of Luau as a server script, for testing the simulator itself.
+	-- Returns whatever the snippet returns.
+	function sim:execute(source: string)
+		return runSnippet("server", "ServerScriptService/Snippet", source)
+	end
+
+	-- Runs a snippet of Luau on a player's client, next to their client script (so
+	-- `require("./Controllers/CameraController")` is the module their client is running).
+	-- Returns whatever the snippet returns.
+	function sim:executeClient(player, source: string)
+		local context = `client:{state[player].props.UserId}`
+		assert(clientPlayer[context] == player, "executeClient: that player isn't connected")
+		return runSnippet(context, "ReplicatedStorage/Snippet", source)
 	end
 
 	function sim:addPlayer(name: string, userId: number, displayName: string?)
@@ -2700,6 +3096,22 @@ function Sim.new(options: {
 			then lookAt(root, roblox.Vector3.new(toward.X, root.Y, toward.Z))
 			else roblox.CFrame.new(root) * character:GetPivot().Rotation
 		character:PivotTo(frame)
+		drain()
+	end
+
+	-- Roblox's own top bar buttons take a different amount of room (its chat pill opening,
+	-- say): the free part of the top bar row changes, and ScreenGuis in it resize.
+	function sim:setTopbarInset(rect)
+		sim.topbarInset = rect
+		for instance, st in state do
+			if st.className == "ScreenGui" and instance.ScreenInsets == Enum.ScreenInsets.TopbarSafeInsets then
+				touchGui(instance)
+				local signal = st.propertySignals.AbsoluteSize
+				if signal then
+					fire(signal, nil)
+				end
+			end
+		end
 		drain()
 	end
 

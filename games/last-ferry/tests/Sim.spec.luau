@@ -379,4 +379,102 @@ T.test("ContextActionService: higher priority first, Pass falls through, Sink st
 	T.equal(#sim.errors, 0, table.concat(sim.errors, "\n"))
 end)
 
+T.test("GUI layout: where things are on screen, as Roblox lays them out", function()
+	local sim = Sim.new({
+		root = ".",
+		screen = roblox.Vector2.new(844, 390),
+		safeArea = roblox.Vector2.new(750, 332),
+		topbarInset = roblox.Rect.new(300, 0, 797, 58),
+	})
+	local gui = sim:execute([[
+		local gui = Instance.new("ScreenGui")
+		gui.Name = "Hud"
+		gui.Parent = game:GetService("StarterGui")
+		-- A canvas scaled down to half, like the HUD's.
+		local root = Instance.new("Frame")
+		root.Name = "Root"
+		root.Size = UDim2.fromScale(2, 2)
+		root.Parent = gui
+		local scale = Instance.new("UIScale")
+		scale.Scale = 0.5
+		scale.Parent = root
+		local panel = Instance.new("Frame")
+		panel.Name = "Panel"
+		panel.AnchorPoint = Vector2.new(1, 0)
+		panel.Position = UDim2.new(1, -16, 0, 70)
+		panel.Size = UDim2.new(0, 250, 1, -86)
+		panel.Parent = root
+		local padding = Instance.new("UIPadding")
+		padding.PaddingLeft = UDim.new(0, 10)
+		padding.PaddingTop = UDim.new(0, 20)
+		padding.Parent = panel
+		local list = Instance.new("UIListLayout")
+		list.Padding = UDim.new(0, 4)
+		list.SortOrder = Enum.SortOrder.LayoutOrder
+		list.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		list.Parent = panel
+		for i, name in { "Second", "First", "Hidden" } do
+			local row = Instance.new("Frame")
+			row.Name = name
+			row.Size = UDim2.fromOffset(100, 30)
+			row.LayoutOrder = if name == "First" then 1 else 2
+			row.Visible = name ~= "Hidden"
+			row.Parent = panel
+		end
+		-- A label that wraps and grows to fit its text.
+		local label = Instance.new("TextLabel")
+		label.Name = "Note"
+		label.Size = UDim2.fromOffset(100, 0)
+		label.AutomaticSize = Enum.AutomaticSize.Y
+		label.TextWrapped = true
+		label.TextSize = 10
+		label.Text = "one two three four five six"
+		label.LayoutOrder = 3
+		label.Parent = panel
+		-- The top bar row, and the whole screen.
+		local top = Instance.new("ScreenGui")
+		top.Name = "Top"
+		top.ScreenInsets = Enum.ScreenInsets.TopbarSafeInsets
+		top.Parent = gui.Parent
+		local full = Instance.new("ScreenGui")
+		full.Name = "Full"
+		full.ScreenInsets = Enum.ScreenInsets.None
+		full.Parent = gui.Parent
+		return gui
+	]])
+	local V2 = roblox.Vector2.new
+	near(gui.AbsolutePosition, V2(47, 0), "a safe-area ScreenGui starts below the top bar, clear of the notch")
+	near(gui.AbsoluteSize, V2(750, 332), "and covers the safe area")
+	local root = gui.Root
+	near(root.AbsoluteSize, V2(750, 332), "a canvas twice the size, scaled by half, fits the screen")
+	local panel = root.Panel
+	-- The canvas is 1500 x 664 before scaling: the panel is 250 wide, 16 in from the right.
+	near(panel.AbsoluteSize, V2(125, (664 - 86) / 2), "a panel's size is scaled with everything in it")
+	near(panel.AbsolutePosition, V2(47 + (1500 - 16 - 250) / 2, 35), "and so is where it is")
+	local inside = panel.AbsolutePosition + V2(5, 10) -- inside the padding, at half scale
+	near(
+		panel.First.AbsolutePosition,
+		V2(inside.X + (125 - 5 - 50) / 2, inside.Y),
+		"the list goes in LayoutOrder, centred"
+	)
+	near(
+		panel.Second.AbsolutePosition,
+		V2(inside.X + (125 - 5 - 50) / 2, inside.Y + 15 + 2),
+		"each after the last and the gap"
+	)
+	near(panel.Note.AbsolutePosition, V2(inside.X + (125 - 5 - 50) / 2, inside.Y + 34), "a hidden row takes no room")
+	T.expect(panel.Note.AbsoluteSize.Y > 5, `a wrapped label grows to fit its lines ({panel.Note.AbsoluteSize})`)
+	T.equal(panel.Note.AbsoluteSize.Y, panel.Note.TextBounds.Y / 2, "its text's height, scaled")
+	local top = gui.Parent.Top
+	near(
+		top.AbsolutePosition,
+		V2(300, -58),
+		"a TopbarSafeInsets ScreenGui is in Roblox's top bar row, beside its buttons"
+	)
+	near(top.AbsoluteSize, V2(497, 58), "as wide as the room Roblox leaves there")
+	T.equal(sim.game:GetService("GuiService").TopbarInset, roblox.Rect.new(300, 0, 797, 58))
+	near(gui.Parent.Full.AbsolutePosition, V2(0, -58), "a full-screen ScreenGui starts at the top of the screen")
+	T.equal(#sim.errors, 0, table.concat(sim.errors, "\n"))
+end)
+
 return nil

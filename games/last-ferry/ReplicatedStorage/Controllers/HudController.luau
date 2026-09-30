@@ -9,9 +9,13 @@
 		left "desk"    the ticket, the window countdown, BOARD / TURN AWAY
 		right          the rules card and, from night 3, the manifest (can be hidden);
 		               the ledger opens over it without blocking anything
-		top centre     what the passenger says; Pike's radio, only while nobody is at
-		               the window, so nothing covers a passenger's face or breath
+		top centre     Pike's radio, only while nobody is at the window, so nothing
+		               covers a passenger's face or breath
 		bottom centre  kept clear: that's where the planks and the shadows are
+
+	Passengers talk the Roblox way: each line is a chat bubble over their head
+	(TextChatService:DisplayBubble) and a line in the chat window, so it can be
+	read again. "{name}" becomes the local player's display name.
 
 	Keys: B / gamepad A board, T / B turn away, P / X take a torn page, Enter,
 	Space or A continue. Roblox's chat window is moved to the bottom left, clear
@@ -311,7 +315,7 @@ function HudController.start()
 	showSide.Position = UDim2.new(1, -16, 0, TOP)
 	showSide.Visible = false
 
-	-- Top centre: speech, radio, lost lanterns -----------------------------------------
+	-- Top centre: Pike's radio -----------------------------------------------------------
 	local center = Ui.frame(play, "Center", UDim2.fromOffset(300, 0), UDim2.new(0.5, 30, 0, 56), Vector2.new(0.5, 0))
 	center.AutomaticSize = Enum.AutomaticSize.Y
 	Ui.list(center, Enum.FillDirection.Vertical, 8, Enum.HorizontalAlignment.Center)
@@ -326,10 +330,7 @@ function HudController.start()
 		return frame
 	end
 
-	local speech = bubble("Speech", 1)
-	local speechText =
-		Widgets.paragraph(speech, "", { font = F.speech, size = 19, xAlign = Enum.TextXAlignment.Center })
-	local radio = bubble("Radio", 2)
+	local radio = bubble("Radio", 1)
 	Widgets.caption(radio, "RADIO · PIKE, AT THE LIGHTHOUSE", C.radio, 1)
 	local radioText = Widgets.paragraph(radio, "", { size = 16, order = 2 })
 
@@ -399,9 +400,8 @@ function HudController.start()
 	local manifestKey = ""
 	local showingManifest = false
 	local sideHidden = false
-	local sayText: string? = nil
-	local sayUntil = 0
-	local speechPassenger: number? = nil -- whose line the speech bubble belongs to
+	local speechPassenger: number? = nil -- the passenger who last came to the window
+	local speaker = "" -- their name, for the chat log
 	local radioUntil = 0
 	local alertUntil = 0
 	local ledgerToken = 0
@@ -412,6 +412,39 @@ function HudController.start()
 		return (string.gsub(line, "{name}", function()
 			return myName
 		end))
+	end
+
+	-- Rich text in the chat window: keep names and lines literal.
+	local function escape(text: string): string
+		return (
+			string.gsub(text, "[&<>\"']", {
+				["&"] = "&amp;",
+				["<"] = "&lt;",
+				[">"] = "&gt;",
+				['"'] = "&quot;",
+				["'"] = "&apos;",
+			})
+		)
+	end
+
+	local passengers = workspace:WaitForChild("World"):WaitForChild("Passengers")
+	local function logToChat(who: string, color: string, text: string)
+		local channels = TextChatService:FindFirstChild("TextChannels")
+		local system = channels and channels:FindFirstChild("RBXSystem")
+		if system and system:IsA("TextChannel") then
+			system:DisplaySystemMessage(`<font color="{color}"><b>{escape(who)}</b></font>: {escape(text)}`)
+		end
+	end
+
+	-- A passenger says something: a bubble over their head, and a line in the chat.
+	local function speak(passengerId: number?, who: string, text: string)
+		local line = personalize(text)
+		local model = if passengerId then passengers:FindFirstChild(`Passenger{passengerId}`) else nil
+		local head = model and model:FindFirstChild("Head")
+		if head and head:IsA("BasePart") then
+			TextChatService:DisplayBubble(head, line)
+		end
+		logToChat(who, "#FFC684", line)
 	end
 
 	local function rescale()
@@ -552,16 +585,6 @@ function HudController.start()
 	local function refreshSpeech()
 		local now = os.clock()
 		local state = lastState
-		local text: string? = nil
-		if sayText and now < sayUntil then
-			text = sayText
-		elseif state and state.phase == "window" and state.passenger then
-			text = personalize(state.passenger.line)
-		end
-		speech.Visible = text ~= nil
-		if text then
-			speechText.Text = `“{text}”`
-		end
 		-- The radio never covers someone at the window: the shift pauses for it.
 		radio.Visible = now < radioUntil and not (state and state.phase == "window")
 		alert.Visible = now < alertUntil
@@ -619,9 +642,10 @@ function HudController.start()
 		if passenger then
 			ticket.show(passenger)
 			if passenger.id ~= speechPassenger then
-				-- Someone new at the window: whatever the last passenger said is over.
+				-- Someone new at the window says their piece.
 				speechPassenger = passenger.id
-				sayUntil = 0
+				speaker = passenger.ticket.name
+				speak(passenger.id, speaker, passenger.line)
 			end
 		else
 			ticket.clear()
@@ -647,9 +671,10 @@ function HudController.start()
 			flash.BackgroundTransparency = 0.55
 			TweenService:Create(flash, TweenInfo.new(0.7, Enum.EasingStyle.Sine), { BackgroundTransparency = 1 }):Play()
 		elseif fx.kind == "say" then
-			sayText = text
-			sayUntil = os.clock() + 5
+			-- What the passenger just called says as they leave the window.
+			speak(speechPassenger, speaker, text)
 		elseif fx.kind == "radio" then
+			logToChat("Radio · Pike", "#AAD6BE", text)
 			radioText.Text = text
 			radioText.MaxVisibleGraphemes = 0
 			radioUntil = os.clock() + 16

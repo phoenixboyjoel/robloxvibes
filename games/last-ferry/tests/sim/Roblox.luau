@@ -1154,8 +1154,36 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		end,
 	}
 
-	-- Chat bubbles: recorded per client, for tests and previews.
+	-- TextChatService comes with Roblox's defaults: the chat configurations and the
+	-- RBXGeneral and RBXSystem channels (CreateDefaultTextChannels).
+	local textChat = service("TextChatService")
+	for _, className in { "ChatWindowConfiguration", "BubbleChatConfiguration" } do
+		local configuration = newInstance(className)
+		configuration.Parent = textChat
+	end
+	local channels = newInstance("Folder")
+	state[channels].props.Name = "TextChannels"
+	channels.Parent = textChat
+	for _, name in { "RBXGeneral", "RBXSystem" } do
+		local channel = newInstance("TextChannel")
+		state[channel].props.Name = name
+		channel.Parent = channels
+	end
+
+	-- Chat bubbles and system messages: recorded per client, for tests and previews.
 	sim.bubbles = {}
+	sim.systemMessages = {}
+	methods.TextChannel = {
+		DisplaySystemMessage = function(self, text)
+			local player = clientPlayer[currentContext()]
+			if player == nil then
+				error("DisplaySystemMessage can only be called from the client", 2)
+			end
+			assert(type(text) == "string", "DisplaySystemMessage expects a string")
+			table.insert(sim.systemMessages, { time = sim.now, player = player, channel = self.Name, text = text })
+			return nil
+		end,
+	}
 	methods.TextChatService = {
 		DisplayBubble = function(_self, partOrCharacter, message)
 			local player = clientPlayer[currentContext()]

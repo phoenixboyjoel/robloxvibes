@@ -47,10 +47,6 @@ local function hud(bot: Bot)
 	return gui and gui:FindFirstChild("Root")
 end
 
-local function textOf(label): string
-	return if label then label.Text else ""
-end
-
 -- Everything the ticket, the rules card, the manifest and the speech bubble say.
 local function readDesk(root)
 	local desk = root.Play.Desk
@@ -89,9 +85,21 @@ local function readDesk(root)
 		rules = ordered,
 		tonight = string.match(ordered[1] or "", "date: (.-)%.$"),
 		manifest = manifest,
-		speech = textOf(root.Play.Center.Speech:FindFirstChild("Paragraph")),
+		speech = "", -- read from the passenger's chat bubble (see tick)
 		night = tonumber(string.match(root.Play.TopBar.Left.Night.Text, "NIGHT (%d+)")),
 	}
+end
+
+-- The latest chat bubble this player saw over `model`'s head.
+local function heard(bot: Bot, model): string
+	local head = model:FindFirstChild("Head")
+	local latest = ""
+	for _, bubble in bot.sim.bubbles do
+		if bubble.player == bot.player and bubble.adornee == head then
+			latest = bubble.message
+		end
+	end
+	return latest
 end
 
 -- What you can see of the passenger standing at the window.
@@ -108,6 +116,7 @@ local function lookAtPassenger(sim)
 					breath = breath ~= nil and breath.Enabled,
 					wet = drips ~= nil and drips.Enabled,
 					shadow = model.Torso.CastShadow,
+					model = model,
 				}
 			end
 		end
@@ -269,6 +278,8 @@ local function tick(bot: Bot)
 
 	local tells = lookAtPassenger(sim)
 	assert(tells, `no passenger at the window for {view.name}`)
+	view.speech = heard(bot, tells.model)
+	assert(view.speech ~= "", `{view.name} said nothing`)
 	local call = rightCall(bot, view, tells)
 	if bot.policy.override then
 		call = bot.policy.override(view, tells, call) or call
@@ -371,6 +382,48 @@ T.test("passengers are classic Robloxians who move like Roblox characters", func
 	sim:run(1.5)
 	T.expect(neck.Transform ~= before, "the head turns while they wait")
 	T.expect(model.Torso["Right Shoulder"].Transform ~= roblox.CFrame.identity, "the arms sway")
+end)
+
+T.test("passengers speak in chat bubbles over their heads, and in the chat log", function()
+	local sim = boot()
+	local alice = sim:addPlayer("Alice", 101)
+	local bob = sim:addPlayer("Bob", 202)
+	local bot = newBot(sim, alice, { idle = true, pressContinue = false })
+	local friend = newBot(sim, bob, { idle = true, pressContinue = false })
+	local seen = sim:runUntil(
+		function()
+			return #sim.bubbles >= 2
+		end,
+		300,
+		1 / 20,
+		function()
+			-- Both press Continue so the first window opens.
+			for _, player in { alice, bob } do
+				local continue = player.PlayerGui.LastFerryHud.Root.Overlay.Card.Footer.Continue
+				if sim:shown(continue) and continue.Interactable then
+					sim:click(continue)
+				end
+			end
+			tick(bot)
+			tick(friend)
+		end
+	)
+	clean(sim, "speech")
+	T.expect(seen, "bubbles appeared")
+	local tells = lookAtPassenger(sim)
+	T.expect(tells ~= nil, "someone is at the window")
+	local line = heard(bot, tells.model)
+	T.expect(line ~= "", "Alice sees the passenger's line over their head")
+	T.equal(heard(friend, tells.model), line, "Bob sees the same line")
+	local logged = 0
+	for _, message in sim.systemMessages do
+		-- The chat line is rich text, so its quotes and ampersands are escaped.
+		local text = string.gsub(message.text, "&(%a+);", { apos = "'", quot = '"', lt = "<", gt = ">", amp = "&" })
+		if message.channel == "RBXSystem" and string.find(text, line, 1, true) then
+			logged += 1
+		end
+	end
+	T.equal(logged, 2, "the line is in both players' chat logs")
 end)
 
 T.test("all five torn pages reach the ledger and the epilogue", function()

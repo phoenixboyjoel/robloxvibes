@@ -1,0 +1,9 @@
+# Toolchain pinned for this game. Install Rokit, then run `rokit install` here.
+# Lune runs the test suite (`lune run tests/run.luau`); the rest build, lint,
+# format and type-check.
+[tools]
+rojo = "rojo-rbx/rojo@7.7.0"
+selene = "Kampfkarren/selene@0.31.0"
+stylua = "JohnnyMorganz/StyLua@2.5.2"
+luau-lsp = "JohnnyMorganz/luau-lsp@1.70.1"
+lune = "lune-org/lune@0.10.5"

@@ -1,0 +1,5561 @@
+{
+ "classes": {
+  "Atmosphere": {
+   "creatable": true,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "Color": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    },
+    "Decay": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    },
+    "Density": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "Glare": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "Haze": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "Offset": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    }
+   },
+   "service": false,
+   "superclass": "Instance"
+  },
+  "Attachment": {
+   "creatable": true,
+   "events": {},
+   "functions": {
+    "GetAxis": {
+     "deprecated": true,
+     "yields": false
+    },
+    "GetConstraints": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetSecondaryAxis": {
+     "deprecated": true,
+     "yields": false
+    },
+    "SetAxis": {
+     "deprecated": true,
+     "yields": false
+    },
+    "SetSecondaryAxis": {
+     "deprecated": true,
+     "yields": false
+    }
+   },
+   "properties": {
+    "Axis": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector3"
+    },
+    "CFrame": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "CFrame"
+    },
+    "Orientation": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector3"
+    },
+    "Position": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector3"
+    },
+    "Rotation": {
+     "category": "DataType",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "Vector3"
+    },
+    "SecondaryAxis": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector3"
+    },
+    "Visible": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "WorldAxis": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector3"
+    },
+    "WorldCFrame": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "CFrame"
+    },
+    "WorldOrientation": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector3"
+    },
+    "WorldPosition": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector3"
+    },
+    "WorldRotation": {
+     "category": "DataType",
+     "deprecated": true,
+     "readOnly": true,
+     "type": "Vector3"
+    },
+    "WorldSecondaryAxis": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector3"
+    }
+   },
+   "service": false,
+   "superclass": "Instance"
+  },
+  "BadgeService": {
+   "creatable": false,
+   "events": {},
+   "functions": {
+    "AwardBadge": {
+     "deprecated": true,
+     "yields": true
+    },
+    "AwardBadgeAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "CheckUserBadgesAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "GetBadgeInfoAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "GetUserBadgesAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "IsDisabled": {
+     "deprecated": true,
+     "yields": true
+    },
+    "IsLegal": {
+     "deprecated": true,
+     "yields": true
+    },
+    "UserHasBadge": {
+     "deprecated": true,
+     "yields": true
+    },
+    "UserHasBadgeAsync": {
+     "deprecated": false,
+     "yields": true
+    }
+   },
+   "properties": {},
+   "service": true,
+   "superclass": "Instance"
+  },
+  "BasePart": {
+   "creatable": false,
+   "events": {
+    "LocalSimulationTouched": {
+     "deprecated": true
+    },
+    "OutfitChanged": {
+     "deprecated": true
+    },
+    "StoppedTouching": {
+     "deprecated": true
+    },
+    "TouchEnded": {
+     "deprecated": false
+    },
+    "Touched": {
+     "deprecated": false
+    }
+   },
+   "functions": {
+    "AngularAccelerationToTorque": {
+     "deprecated": false,
+     "yields": false
+    },
+    "ApplyAngularImpulse": {
+     "deprecated": false,
+     "yields": false
+    },
+    "ApplyImpulse": {
+     "deprecated": false,
+     "yields": false
+    },
+    "ApplyImpulseAtPosition": {
+     "deprecated": false,
+     "yields": false
+    },
+    "BindToCollisionSummaries": {
+     "deprecated": false,
+     "yields": false
+    },
+    "BreakJoints": {
+     "deprecated": true,
+     "yields": false
+    },
+    "CanCollideWith": {
+     "deprecated": false,
+     "yields": false
+    },
+    "CanSetNetworkOwnership": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetClosestPointOnSurface": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetConnectedParts": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetJoints": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetMass": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetNetworkOwner": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetNetworkOwnershipAuto": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetNoCollisionConstraints": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetRenderCFrame": {
+     "deprecated": true,
+     "yields": false
+    },
+    "GetRootPart": {
+     "deprecated": true,
+     "yields": false
+    },
+    "GetTouchingParts": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetVelocityAtPosition": {
+     "deprecated": false,
+     "yields": false
+    },
+    "IntersectAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "IsGrounded": {
+     "deprecated": false,
+     "yields": false
+    },
+    "MakeJoints": {
+     "deprecated": true,
+     "yields": false
+    },
+    "Resize": {
+     "deprecated": false,
+     "yields": false
+    },
+    "SetNetworkOwner": {
+     "deprecated": false,
+     "yields": false
+    },
+    "SetNetworkOwnershipAuto": {
+     "deprecated": false,
+     "yields": false
+    },
+    "SubtractAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "TorqueToAngularAcceleration": {
+     "deprecated": false,
+     "yields": false
+    },
+    "UnionAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "breakJoints": {
+     "deprecated": true,
+     "yields": false
+    },
+    "getMass": {
+     "deprecated": true,
+     "yields": false
+    },
+    "makeJoints": {
+     "deprecated": true,
+     "yields": false
+    },
+    "resize": {
+     "deprecated": true,
+     "yields": false
+    }
+   },
+   "properties": {
+    "Anchored": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "AssemblyAngularVelocity": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector3"
+    },
+    "AssemblyCenterOfMass": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "Vector3"
+    },
+    "AssemblyLinearVelocity": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector3"
+    },
+    "AssemblyMass": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "float"
+    },
+    "AssemblyRootPart": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "BasePart"
+    },
+    "AudioCanCollide": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "BackParamA": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "float"
+    },
+    "BackParamB": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "float"
+    },
+    "BackSurface": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "SurfaceType"
+    },
+    "BackSurfaceInput": {
+     "category": "Enum",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "InputType"
+    },
+    "BottomParamA": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "float"
+    },
+    "BottomParamB": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "float"
+    },
+    "BottomSurface": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "SurfaceType"
+    },
+    "BottomSurfaceInput": {
+     "category": "Enum",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "InputType"
+    },
+    "BrickColor": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "BrickColor"
+    },
+    "CFrame": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "CFrame"
+    },
+    "CanCollide": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "CanQuery": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "CanTouch": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "CastShadow": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "CenterOfMass": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "Vector3"
+    },
+    "CollisionGroup": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "string"
+    },
+    "CollisionGroupId": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "int"
+    },
+    "Color": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    },
+    "CurrentPhysicalProperties": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "PhysicalProperties"
+    },
+    "CustomPhysicalProperties": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "PhysicalProperties"
+    },
+    "Elasticity": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "float"
+    },
+    "EnableFluidForces": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "ExtentsCFrame": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "CFrame"
+    },
+    "ExtentsSize": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "Vector3"
+    },
+    "Friction": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "float"
+    },
+    "FrontParamA": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "float"
+    },
+    "FrontParamB": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "float"
+    },
+    "FrontSurface": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "SurfaceType"
+    },
+    "FrontSurfaceInput": {
+     "category": "Enum",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "InputType"
+    },
+    "LeftParamA": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "float"
+    },
+    "LeftParamB": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "float"
+    },
+    "LeftSurface": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "SurfaceType"
+    },
+    "LeftSurfaceInput": {
+     "category": "Enum",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "InputType"
+    },
+    "LocalTransparencyModifier": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "Locked": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "Mass": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "float"
+    },
+    "Massless": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "Material": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Material"
+    },
+    "MaterialVariant": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "string"
+    },
+    "Orientation": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector3"
+    },
+    "PivotOffset": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "CFrame"
+    },
+    "Position": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector3"
+    },
+    "ReceiveAge": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "float"
+    },
+    "Reflectance": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "ResizeIncrement": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "int"
+    },
+    "ResizeableFaces": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "Faces"
+    },
+    "RightParamA": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "float"
+    },
+    "RightParamB": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "float"
+    },
+    "RightSurface": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "SurfaceType"
+    },
+    "RightSurfaceInput": {
+     "category": "Enum",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "InputType"
+    },
+    "RootPriority": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "int"
+    },
+    "RotVelocity": {
+     "category": "DataType",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "Vector3"
+    },
+    "Rotation": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector3"
+    },
+    "Size": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector3"
+    },
+    "SpecificGravity": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": true,
+     "type": "float"
+    },
+    "TopParamA": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "float"
+    },
+    "TopParamB": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "float"
+    },
+    "TopSurface": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "SurfaceType"
+    },
+    "TopSurfaceInput": {
+     "category": "Enum",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "InputType"
+    },
+    "Transparency": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "Velocity": {
+     "category": "DataType",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "Vector3"
+    },
+    "brickColor": {
+     "category": "DataType",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "BrickColor"
+    }
+   },
+   "service": false,
+   "superclass": "PVInstance"
+  },
+  "BasePlayerGui": {
+   "creatable": false,
+   "events": {},
+   "functions": {
+    "GetGuiObjectsAtPosition": {
+     "deprecated": false,
+     "yields": false
+    }
+   },
+   "properties": {},
+   "service": false,
+   "superclass": "Instance"
+  },
+  "BaseRemoteEvent": {
+   "creatable": false,
+   "events": {},
+   "functions": {},
+   "properties": {},
+   "service": false,
+   "superclass": "Instance"
+  },
+  "BlurEffect": {
+   "creatable": true,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "Size": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    }
+   },
+   "service": false,
+   "superclass": "PostEffect"
+  },
+  "CFrameValue": {
+   "creatable": true,
+   "events": {
+    "Changed": {
+     "deprecated": false
+    },
+    "changed": {
+     "deprecated": true
+    }
+   },
+   "functions": {},
+   "properties": {
+    "Value": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "CFrame"
+    }
+   },
+   "service": false,
+   "superclass": "ValueBase"
+  },
+  "Camera": {
+   "creatable": true,
+   "events": {
+    "InterpolationFinished": {
+     "deprecated": false
+    }
+   },
+   "functions": {
+    "GetLargestCutoffDistance": {
+     "deprecated": true,
+     "yields": false
+    },
+    "GetPanSpeed": {
+     "deprecated": true,
+     "yields": false
+    },
+    "GetPartsObscuringTarget": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetRenderCFrame": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetRoll": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetTiltSpeed": {
+     "deprecated": true,
+     "yields": false
+    },
+    "Interpolate": {
+     "deprecated": true,
+     "yields": false
+    },
+    "PanUnits": {
+     "deprecated": true,
+     "yields": false
+    },
+    "ScreenPointToRay": {
+     "deprecated": false,
+     "yields": false
+    },
+    "SetCameraPanMode": {
+     "deprecated": true,
+     "yields": false
+    },
+    "SetRoll": {
+     "deprecated": false,
+     "yields": false
+    },
+    "TiltUnits": {
+     "deprecated": true,
+     "yields": false
+    },
+    "ViewportPointToRay": {
+     "deprecated": false,
+     "yields": false
+    },
+    "WorldToScreenPoint": {
+     "deprecated": false,
+     "yields": false
+    },
+    "WorldToViewportPoint": {
+     "deprecated": false,
+     "yields": false
+    },
+    "ZoomToExtents": {
+     "deprecated": false,
+     "yields": false
+    }
+   },
+   "properties": {
+    "CFrame": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "CFrame"
+    },
+    "CameraSubject": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Instance"
+    },
+    "CameraType": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "CameraType"
+    },
+    "CoordinateFrame": {
+     "category": "DataType",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "CFrame"
+    },
+    "DiagonalFieldOfView": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "FieldOfView": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "FieldOfViewMode": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "FieldOfViewMode"
+    },
+    "Focus": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "CFrame"
+    },
+    "HeadLocked": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "HeadScale": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "MaxAxisFieldOfView": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "NearPlaneZ": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "float"
+    },
+    "VRTiltAndRollEnabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "ViewportSize": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "Vector2"
+    },
+    "focus": {
+     "category": "DataType",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "CFrame"
+    }
+   },
+   "service": false,
+   "superclass": "PVInstance"
+  },
+  "ColorCorrectionEffect": {
+   "creatable": true,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "Brightness": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "Contrast": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "Saturation": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "TintColor": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    }
+   },
+   "service": false,
+   "superclass": "PostEffect"
+  },
+  "DataModel": {
+   "creatable": false,
+   "events": {
+    "AllowedGearTypeChanged": {
+     "deprecated": true
+    },
+    "GraphicsQualityChangeRequest": {
+     "deprecated": false
+    },
+    "ItemChanged": {
+     "deprecated": true
+    },
+    "Loaded": {
+     "deprecated": false
+    },
+    "ServerLifecycleChanged": {
+     "deprecated": false
+    },
+    "ServerLowMemoryWarning": {
+     "deprecated": false
+    },
+    "ServerRestartScheduled": {
+     "deprecated": false
+    }
+   },
+   "functions": {
+    "BindToClose": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetMessage": {
+     "deprecated": true,
+     "yields": false
+    },
+    "GetRemoteBuildMode": {
+     "deprecated": true,
+     "yields": false
+    },
+    "IsGearTypeAllowed": {
+     "deprecated": true,
+     "yields": false
+    },
+    "IsLoaded": {
+     "deprecated": false,
+     "yields": false
+    },
+    "OnClose": {
+     "deprecated": true,
+     "yields": false
+    },
+    "SavePlace": {
+     "deprecated": true,
+     "yields": true
+    }
+   },
+   "properties": {
+    "CreatorId": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "int64"
+    },
+    "CreatorType": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "CreatorType"
+    },
+    "GameId": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "int64"
+    },
+    "GearGenreSetting": {
+     "category": "Enum",
+     "deprecated": true,
+     "readOnly": true,
+     "type": "GearGenreSetting"
+    },
+    "Genre": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "Genre"
+    },
+    "JobId": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "string"
+    },
+    "MatchmakingType": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "MatchmakingType"
+    },
+    "PlaceId": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "int64"
+    },
+    "PlaceVersion": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "int"
+    },
+    "PrivateServerId": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "string"
+    },
+    "PrivateServerOwnerId": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "int64"
+    },
+    "RunService": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "RunService"
+    },
+    "VIPServerId": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": true,
+     "type": "string"
+    },
+    "VIPServerOwnerId": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": true,
+     "type": "int64"
+    },
+    "Workspace": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "Workspace"
+    },
+    "lighting": {
+     "category": "Class",
+     "deprecated": true,
+     "readOnly": true,
+     "type": "Instance"
+    },
+    "workspace": {
+     "category": "Class",
+     "deprecated": true,
+     "readOnly": true,
+     "type": "Workspace"
+    }
+   },
+   "service": false,
+   "superclass": "ServiceProvider"
+  },
+  "DataStore": {
+   "creatable": false,
+   "events": {},
+   "functions": {
+    "GetVersionAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "GetVersionAtTimeAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "ListKeysAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "ListVersionsAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "RemoveVersionAsync": {
+     "deprecated": true,
+     "yields": true
+    }
+   },
+   "properties": {},
+   "service": false,
+   "superclass": "GlobalDataStore"
+  },
+  "DataStoreService": {
+   "creatable": false,
+   "events": {},
+   "functions": {
+    "GetDataStore": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetGlobalDataStore": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetOrderedDataStore": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetRequestBudgetForRequestType": {
+     "deprecated": false,
+     "yields": false
+    },
+    "ListDataStoresAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "SetRateLimitForRequestType": {
+     "deprecated": false,
+     "yields": false
+    }
+   },
+   "properties": {},
+   "service": true,
+   "superclass": "Instance"
+  },
+  "Folder": {
+   "creatable": true,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "IconTint": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    }
+   },
+   "service": false,
+   "superclass": "Instance"
+  },
+  "FormFactorPart": {
+   "creatable": false,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "FormFactor": {
+     "category": "Enum",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "FormFactor"
+    },
+    "formFactor": {
+     "category": "Enum",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "FormFactor"
+    }
+   },
+   "service": false,
+   "superclass": "BasePart"
+  },
+  "Frame": {
+   "creatable": true,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "Style": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "FrameStyle"
+    }
+   },
+   "service": false,
+   "superclass": "GuiObject"
+  },
+  "GlobalDataStore": {
+   "creatable": false,
+   "events": {},
+   "functions": {
+    "BatchGetAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "GetAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "IncrementAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "OnUpdate": {
+     "deprecated": true,
+     "yields": false
+    },
+    "RemoveAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "SetAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "UpdateAsync": {
+     "deprecated": false,
+     "yields": true
+    }
+   },
+   "properties": {},
+   "service": false,
+   "superclass": "Instance"
+  },
+  "GuiBase": {
+   "creatable": false,
+   "events": {},
+   "functions": {},
+   "properties": {},
+   "service": false,
+   "superclass": "Instance"
+  },
+  "GuiBase2d": {
+   "creatable": false,
+   "events": {
+    "SelectionChanged": {
+     "deprecated": false
+    }
+   },
+   "functions": {},
+   "properties": {
+    "AbsolutePosition": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "Vector2"
+    },
+    "AbsoluteRotation": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "float"
+    },
+    "AbsoluteSize": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "Vector2"
+    },
+    "AutoLocalize": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "Localize": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "RootLocalizationTable": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "LocalizationTable"
+    },
+    "SelectionBehaviorDown": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "SelectionBehavior"
+    },
+    "SelectionBehaviorLeft": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "SelectionBehavior"
+    },
+    "SelectionBehaviorRight": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "SelectionBehavior"
+    },
+    "SelectionBehaviorUp": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "SelectionBehavior"
+    },
+    "SelectionGroup": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    }
+   },
+   "service": false,
+   "superclass": "GuiBase"
+  },
+  "GuiButton": {
+   "creatable": false,
+   "events": {
+    "Activated": {
+     "deprecated": false
+    },
+    "MouseButton1Click": {
+     "deprecated": false
+    },
+    "MouseButton1Down": {
+     "deprecated": false
+    },
+    "MouseButton1Up": {
+     "deprecated": false
+    },
+    "MouseButton2Click": {
+     "deprecated": false
+    },
+    "MouseButton2Down": {
+     "deprecated": false
+    },
+    "MouseButton2Up": {
+     "deprecated": false
+    },
+    "SecondaryActivated": {
+     "deprecated": false
+    }
+   },
+   "functions": {},
+   "properties": {
+    "AutoButtonColor": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "HoverHapticEffect": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "HapticEffect"
+    },
+    "Modal": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "PressHapticEffect": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "HapticEffect"
+    },
+    "Selected": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "Style": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ButtonStyle"
+    }
+   },
+   "service": false,
+   "superclass": "GuiObject"
+  },
+  "GuiLabel": {
+   "creatable": false,
+   "events": {},
+   "functions": {},
+   "properties": {},
+   "service": false,
+   "superclass": "GuiObject"
+  },
+  "GuiObject": {
+   "creatable": false,
+   "events": {
+    "DragBegin": {
+     "deprecated": true
+    },
+    "DragStopped": {
+     "deprecated": true
+    },
+    "InputBegan": {
+     "deprecated": false
+    },
+    "InputChanged": {
+     "deprecated": false
+    },
+    "InputEnded": {
+     "deprecated": false
+    },
+    "MouseEnter": {
+     "deprecated": false
+    },
+    "MouseLeave": {
+     "deprecated": false
+    },
+    "MouseMoved": {
+     "deprecated": false
+    },
+    "MouseWheelBackward": {
+     "deprecated": false
+    },
+    "MouseWheelForward": {
+     "deprecated": false
+    },
+    "SelectionGained": {
+     "deprecated": false
+    },
+    "SelectionLost": {
+     "deprecated": false
+    },
+    "TouchLongPress": {
+     "deprecated": false
+    },
+    "TouchPan": {
+     "deprecated": false
+    },
+    "TouchPinch": {
+     "deprecated": false
+    },
+    "TouchRotate": {
+     "deprecated": false
+    },
+    "TouchSwipe": {
+     "deprecated": false
+    },
+    "TouchTap": {
+     "deprecated": false
+    }
+   },
+   "functions": {
+    "TweenPosition": {
+     "deprecated": true,
+     "yields": false
+    },
+    "TweenSize": {
+     "deprecated": true,
+     "yields": false
+    },
+    "TweenSizeAndPosition": {
+     "deprecated": true,
+     "yields": false
+    }
+   },
+   "properties": {
+    "Active": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "AnchorPoint": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector2"
+    },
+    "AutomaticSize": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "AutomaticSize"
+    },
+    "BackgroundColor": {
+     "category": "DataType",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "BrickColor"
+    },
+    "BackgroundColor3": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    },
+    "BackgroundTransparency": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "BorderColor": {
+     "category": "DataType",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "BrickColor"
+    },
+    "BorderColor3": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    },
+    "BorderMode": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "BorderMode"
+    },
+    "BorderSizePixel": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "int"
+    },
+    "ClipsDescendants": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "Draggable": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "GuiState": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "GuiState"
+    },
+    "InputSink": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "InputSink"
+    },
+    "Interactable": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "LayoutOrder": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "int"
+    },
+    "NextSelectionDown": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "GuiObject"
+    },
+    "NextSelectionLeft": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "GuiObject"
+    },
+    "NextSelectionRight": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "GuiObject"
+    },
+    "NextSelectionUp": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "GuiObject"
+    },
+    "Position": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "UDim2"
+    },
+    "Rotation": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "Selectable": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "SelectionImageObject": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "GuiObject"
+    },
+    "SelectionOrder": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "int"
+    },
+    "Size": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "UDim2"
+    },
+    "SizeConstraint": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "SizeConstraint"
+    },
+    "Transparency": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "float"
+    },
+    "Visible": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "ZIndex": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "int"
+    }
+   },
+   "service": false,
+   "superclass": "GuiBase2d"
+  },
+  "GuiService": {
+   "creatable": false,
+   "events": {
+    "MenuClosed": {
+     "deprecated": false
+    },
+    "MenuOpened": {
+     "deprecated": false
+    }
+   },
+   "functions": {
+    "AddSelectionParent": {
+     "deprecated": true,
+     "yields": false
+    },
+    "AddSelectionTuple": {
+     "deprecated": true,
+     "yields": false
+    },
+    "CloseInspectMenu": {
+     "deprecated": false,
+     "yields": false
+    },
+    "DismissNotification": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetEmotesMenuOpen": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetGameplayPausedNotificationEnabled": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetGuiInset": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetInsetArea": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetInspectMenuEnabled": {
+     "deprecated": false,
+     "yields": false
+    },
+    "InspectPlayerFromHumanoidDescription": {
+     "deprecated": false,
+     "yields": false
+    },
+    "InspectPlayerFromUserId": {
+     "deprecated": false,
+     "yields": false
+    },
+    "IsTenFootInterface": {
+     "deprecated": false,
+     "yields": false
+    },
+    "RemoveSelectionGroup": {
+     "deprecated": true,
+     "yields": false
+    },
+    "Select": {
+     "deprecated": false,
+     "yields": false
+    },
+    "SendNotification": {
+     "deprecated": false,
+     "yields": false
+    },
+    "SetEmotesMenuOpen": {
+     "deprecated": false,
+     "yields": false
+    },
+    "SetGameplayPausedNotificationEnabled": {
+     "deprecated": false,
+     "yields": false
+    },
+    "SetInspectMenuEnabled": {
+     "deprecated": false,
+     "yields": false
+    }
+   },
+   "properties": {
+    "AutoSelectGuiEnabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "CoreGuiNavigationEnabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "GuiNavigationEnabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "IsModalDialog": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "IsWindows": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "MenuIsOpen": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "PreferredTextSize": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "PreferredTextSize"
+    },
+    "PreferredTransparency": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "float"
+    },
+    "ReducedMotionEnabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "SelectedObject": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "GuiObject"
+    },
+    "TopbarInset": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "Rect"
+    },
+    "TouchControlsEnabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "ViewportDisplaySize": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "DisplaySize"
+    }
+   },
+   "service": true,
+   "superclass": "Instance"
+  },
+  "InputObject": {
+   "creatable": false,
+   "events": {},
+   "functions": {
+    "IsModifierKeyDown": {
+     "deprecated": false,
+     "yields": false
+    }
+   },
+   "properties": {
+    "Delta": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector3"
+    },
+    "KeyCode": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "KeyCode"
+    },
+    "Position": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector3"
+    },
+    "UserInputState": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "UserInputState"
+    },
+    "UserInputType": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "UserInputType"
+    }
+   },
+   "service": false,
+   "superclass": "Instance"
+  },
+  "Instance": {
+   "creatable": false,
+   "events": {
+    "AncestryChanged": {
+     "deprecated": false
+    },
+    "AttributeChanged": {
+     "deprecated": false
+    },
+    "ChildAdded": {
+     "deprecated": false
+    },
+    "ChildRemoved": {
+     "deprecated": false
+    },
+    "DescendantAdded": {
+     "deprecated": false
+    },
+    "DescendantRemoving": {
+     "deprecated": false
+    },
+    "Destroying": {
+     "deprecated": false
+    },
+    "StyledPropertiesChanged": {
+     "deprecated": false
+    },
+    "childAdded": {
+     "deprecated": true
+    }
+   },
+   "functions": {
+    "AddTag": {
+     "deprecated": false,
+     "yields": false
+    },
+    "ClearAllChildren": {
+     "deprecated": false,
+     "yields": false
+    },
+    "Clone": {
+     "deprecated": false,
+     "yields": false
+    },
+    "Destroy": {
+     "deprecated": false,
+     "yields": false
+    },
+    "FindFirstAncestor": {
+     "deprecated": false,
+     "yields": false
+    },
+    "FindFirstAncestorOfClass": {
+     "deprecated": false,
+     "yields": false
+    },
+    "FindFirstAncestorWhichIsA": {
+     "deprecated": false,
+     "yields": false
+    },
+    "FindFirstChild": {
+     "deprecated": false,
+     "yields": false
+    },
+    "FindFirstChildOfClass": {
+     "deprecated": false,
+     "yields": false
+    },
+    "FindFirstChildWhichIsA": {
+     "deprecated": false,
+     "yields": false
+    },
+    "FindFirstDescendant": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetActor": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetAttribute": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetAttributeChangedSignal": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetAttributes": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetChildren": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetDescendants": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetFullName": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetStyled": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetStyledPropertyChangedSignal": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetTags": {
+     "deprecated": false,
+     "yields": false
+    },
+    "HasTag": {
+     "deprecated": false,
+     "yields": false
+    },
+    "IsAncestorOf": {
+     "deprecated": false,
+     "yields": false
+    },
+    "IsDescendantOf": {
+     "deprecated": false,
+     "yields": false
+    },
+    "IsPropertyModified": {
+     "deprecated": false,
+     "yields": false
+    },
+    "QueryDescendants": {
+     "deprecated": false,
+     "yields": false
+    },
+    "Remove": {
+     "deprecated": true,
+     "yields": false
+    },
+    "RemoveTag": {
+     "deprecated": false,
+     "yields": false
+    },
+    "ResetPropertyToDefault": {
+     "deprecated": false,
+     "yields": false
+    },
+    "SetAttribute": {
+     "deprecated": false,
+     "yields": false
+    },
+    "WaitForChild": {
+     "deprecated": false,
+     "yields": false
+    },
+    "children": {
+     "deprecated": true,
+     "yields": false
+    },
+    "clone": {
+     "deprecated": true,
+     "yields": false
+    },
+    "destroy": {
+     "deprecated": true,
+     "yields": false
+    },
+    "findFirstChild": {
+     "deprecated": true,
+     "yields": false
+    },
+    "getChildren": {
+     "deprecated": true,
+     "yields": false
+    },
+    "isDescendantOf": {
+     "deprecated": true,
+     "yields": false
+    },
+    "remove": {
+     "deprecated": true,
+     "yields": false
+    }
+   },
+   "properties": {
+    "Archivable": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "Capabilities": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "SecurityCapabilities"
+    },
+    "Name": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "string"
+    },
+    "Parent": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Instance"
+    },
+    "Sandboxed": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "archivable": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "bool"
+    }
+   },
+   "service": false,
+   "superclass": "Object"
+  },
+  "LayerCollector": {
+   "creatable": false,
+   "events": {},
+   "functions": {
+    "GetLayoutNodeTree": {
+     "deprecated": true,
+     "yields": false
+    }
+   },
+   "properties": {
+    "Enabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "ResetOnSpawn": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "ZIndexBehavior": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ZIndexBehavior"
+    }
+   },
+   "service": false,
+   "superclass": "GuiBase2d"
+  },
+  "Light": {
+   "creatable": false,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "Brightness": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "Color": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    },
+    "Enabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "Shadows": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    }
+   },
+   "service": false,
+   "superclass": "Instance"
+  },
+  "Lighting": {
+   "creatable": false,
+   "events": {
+    "LightingChanged": {
+     "deprecated": false
+    }
+   },
+   "functions": {
+    "GetMinutesAfterMidnight": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetMoonDirection": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetMoonPhase": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetSunDirection": {
+     "deprecated": false,
+     "yields": false
+    },
+    "SetMinutesAfterMidnight": {
+     "deprecated": false,
+     "yields": false
+    },
+    "getMinutesAfterMidnight": {
+     "deprecated": true,
+     "yields": false
+    },
+    "setMinutesAfterMidnight": {
+     "deprecated": true,
+     "yields": false
+    }
+   },
+   "properties": {
+    "Ambient": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    },
+    "Brightness": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "ClockTime": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "ColorShift_Bottom": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    },
+    "ColorShift_Top": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    },
+    "EnvironmentDiffuseScale": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "EnvironmentSpecularScale": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "ExposureCompensation": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "FogColor": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    },
+    "FogEnd": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "FogStart": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "GeographicLatitude": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "GlobalShadows": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "LightingStyle": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "LightingStyle"
+    },
+    "OutdoorAmbient": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    },
+    "Outlines": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "PrioritizeLightingQuality": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "ShadowColor": {
+     "category": "DataType",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "Color3"
+    },
+    "ShadowSoftness": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "TimeOfDay": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "string"
+    }
+   },
+   "service": true,
+   "superclass": "Instance"
+  },
+  "Model": {
+   "creatable": true,
+   "events": {},
+   "functions": {
+    "AddPersistentPlayer": {
+     "deprecated": false,
+     "yields": false
+    },
+    "BreakJoints": {
+     "deprecated": true,
+     "yields": false
+    },
+    "GetBoundingBox": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetExtentsSize": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetModelCFrame": {
+     "deprecated": true,
+     "yields": false
+    },
+    "GetModelSize": {
+     "deprecated": true,
+     "yields": false
+    },
+    "GetPersistentPlayers": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetPrimaryPartCFrame": {
+     "deprecated": true,
+     "yields": false
+    },
+    "GetScale": {
+     "deprecated": false,
+     "yields": false
+    },
+    "MakeJoints": {
+     "deprecated": true,
+     "yields": false
+    },
+    "MoveTo": {
+     "deprecated": false,
+     "yields": false
+    },
+    "RemovePersistentPlayer": {
+     "deprecated": false,
+     "yields": false
+    },
+    "ResetOrientationToIdentity": {
+     "deprecated": true,
+     "yields": false
+    },
+    "ScaleTo": {
+     "deprecated": false,
+     "yields": false
+    },
+    "SetIdentityOrientation": {
+     "deprecated": true,
+     "yields": false
+    },
+    "SetPrimaryPartCFrame": {
+     "deprecated": true,
+     "yields": false
+    },
+    "TranslateBy": {
+     "deprecated": false,
+     "yields": false
+    },
+    "breakJoints": {
+     "deprecated": true,
+     "yields": false
+    },
+    "makeJoints": {
+     "deprecated": true,
+     "yields": false
+    },
+    "move": {
+     "deprecated": true,
+     "yields": false
+    },
+    "moveTo": {
+     "deprecated": true,
+     "yields": false
+    }
+   },
+   "properties": {
+    "ModelStreamingMode": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ModelStreamingMode"
+    },
+    "PrimaryPart": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "BasePart"
+    },
+    "WorldPivot": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "CFrame"
+    }
+   },
+   "service": false,
+   "superclass": "PVInstance"
+  },
+  "Object": {
+   "creatable": false,
+   "events": {
+    "Changed": {
+     "deprecated": false
+    }
+   },
+   "functions": {
+    "GetPropertyChangedSignal": {
+     "deprecated": false,
+     "yields": false
+    },
+    "IsA": {
+     "deprecated": false,
+     "yields": false
+    },
+    "isA": {
+     "deprecated": true,
+     "yields": false
+    }
+   },
+   "properties": {
+    "ClassName": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "string"
+    },
+    "className": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": true,
+     "type": "string"
+    }
+   },
+   "service": false,
+   "superclass": "<<<ROOT>>>"
+  },
+  "PVInstance": {
+   "creatable": false,
+   "events": {},
+   "functions": {
+    "GetPivot": {
+     "deprecated": false,
+     "yields": false
+    },
+    "PivotTo": {
+     "deprecated": false,
+     "yields": false
+    }
+   },
+   "properties": {},
+   "service": false,
+   "superclass": "Instance"
+  },
+  "Part": {
+   "creatable": true,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "Shape": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "PartType"
+    }
+   },
+   "service": false,
+   "superclass": "FormFactorPart"
+  },
+  "ParticleEmitter": {
+   "creatable": true,
+   "events": {},
+   "functions": {
+    "Clear": {
+     "deprecated": false,
+     "yields": false
+    },
+    "Emit": {
+     "deprecated": false,
+     "yields": false
+    }
+   },
+   "properties": {
+    "Acceleration": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector3"
+    },
+    "Brightness": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "Color": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ColorSequence"
+    },
+    "Drag": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "EmissionDirection": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "NormalId"
+    },
+    "Enabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "FlipbookBlendFrames": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "FlipbookFramerate": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "NumberRange"
+    },
+    "FlipbookIncompatible": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "string"
+    },
+    "FlipbookLayout": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ParticleFlipbookLayout"
+    },
+    "FlipbookMode": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ParticleFlipbookMode"
+    },
+    "FlipbookSizeX": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "int"
+    },
+    "FlipbookSizeY": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "int"
+    },
+    "FlipbookStartRandom": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "Lifetime": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "NumberRange"
+    },
+    "LightEmission": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "LightInfluence": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "LocalTransparencyModifier": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "LockedToPart": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "Orientation": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ParticleOrientation"
+    },
+    "Rate": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "RotSpeed": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "NumberRange"
+    },
+    "Rotation": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "NumberRange"
+    },
+    "Shape": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ParticleEmitterShape"
+    },
+    "ShapeInOut": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ParticleEmitterShapeInOut"
+    },
+    "ShapePartial": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "ShapeStyle": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ParticleEmitterShapeStyle"
+    },
+    "Size": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "NumberSequence"
+    },
+    "Speed": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "NumberRange"
+    },
+    "SpreadAngle": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector2"
+    },
+    "Squash": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "NumberSequence"
+    },
+    "Texture": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ContentId"
+    },
+    "TextureContent": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Content"
+    },
+    "TimeScale": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "Transparency": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "NumberSequence"
+    },
+    "VelocityInheritance": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "VelocitySpread": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "float"
+    },
+    "WindAffectsDrag": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "ZOffset": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    }
+   },
+   "service": false,
+   "superclass": "Instance"
+  },
+  "Player": {
+   "creatable": true,
+   "events": {
+    "CharacterAdded": {
+     "deprecated": false
+    },
+    "CharacterAppearanceLoaded": {
+     "deprecated": false
+    },
+    "CharacterRemoving": {
+     "deprecated": false
+    },
+    "Chatted": {
+     "deprecated": false
+    },
+    "Idled": {
+     "deprecated": false
+    },
+    "OnTeleport": {
+     "deprecated": false
+    }
+   },
+   "functions": {
+    "AddReplicationFocus": {
+     "deprecated": false,
+     "yields": false
+    },
+    "ClearCachedAvatarAppearance": {
+     "deprecated": false,
+     "yields": false
+    },
+    "ClearCharacterAppearance": {
+     "deprecated": false,
+     "yields": false
+    },
+    "DistanceFromCharacter": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetCameraState": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetData": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetFriendsInServerAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "GetFriendsInUniverseAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "GetFriendsOnline": {
+     "deprecated": true,
+     "yields": true
+    },
+    "GetFriendsOnlineAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "GetFriendsWhoPlayedAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "GetJoinData": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetMouse": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetNetworkPing": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetRankInGroup": {
+     "deprecated": true,
+     "yields": true
+    },
+    "GetRankInGroupAsync": {
+     "deprecated": true,
+     "yields": true
+    },
+    "GetRoleInGroup": {
+     "deprecated": true,
+     "yields": true
+    },
+    "GetRoleInGroupAsync": {
+     "deprecated": true,
+     "yields": true
+    },
+    "HasAppearanceLoaded": {
+     "deprecated": false,
+     "yields": false
+    },
+    "IsBestFriendsWith": {
+     "deprecated": true,
+     "yields": true
+    },
+    "IsFriendsWith": {
+     "deprecated": true,
+     "yields": true
+    },
+    "IsFriendsWithAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "IsInGroup": {
+     "deprecated": true,
+     "yields": true
+    },
+    "IsInGroupAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "IsVerified": {
+     "deprecated": false,
+     "yields": false
+    },
+    "Kick": {
+     "deprecated": false,
+     "yields": false
+    },
+    "LoadBoolean": {
+     "deprecated": true,
+     "yields": false
+    },
+    "LoadCharacter": {
+     "deprecated": true,
+     "yields": true
+    },
+    "LoadCharacterAppearance": {
+     "deprecated": true,
+     "yields": false
+    },
+    "LoadCharacterAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "LoadCharacterWithHumanoidDescription": {
+     "deprecated": true,
+     "yields": true
+    },
+    "LoadCharacterWithHumanoidDescriptionAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "LoadInstance": {
+     "deprecated": true,
+     "yields": false
+    },
+    "LoadNumber": {
+     "deprecated": true,
+     "yields": false
+    },
+    "LoadString": {
+     "deprecated": true,
+     "yields": false
+    },
+    "Move": {
+     "deprecated": false,
+     "yields": false
+    },
+    "PromptAgeCheck": {
+     "deprecated": false,
+     "yields": false
+    },
+    "RemoveReplicationFocus": {
+     "deprecated": false,
+     "yields": false
+    },
+    "RequestStreamAroundAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "SaveBoolean": {
+     "deprecated": true,
+     "yields": false
+    },
+    "SaveInstance": {
+     "deprecated": true,
+     "yields": false
+    },
+    "SaveNumber": {
+     "deprecated": true,
+     "yields": false
+    },
+    "SaveString": {
+     "deprecated": true,
+     "yields": false
+    },
+    "WaitForDataReady": {
+     "deprecated": true,
+     "yields": true
+    },
+    "isFriendsWith": {
+     "deprecated": true,
+     "yields": true
+    },
+    "loadBoolean": {
+     "deprecated": true,
+     "yields": false
+    },
+    "loadInstance": {
+     "deprecated": true,
+     "yields": false
+    },
+    "loadNumber": {
+     "deprecated": true,
+     "yields": false
+    },
+    "loadString": {
+     "deprecated": true,
+     "yields": false
+    },
+    "saveBoolean": {
+     "deprecated": true,
+     "yields": false
+    },
+    "saveInstance": {
+     "deprecated": true,
+     "yields": false
+    },
+    "saveNumber": {
+     "deprecated": true,
+     "yields": false
+    },
+    "saveString": {
+     "deprecated": true,
+     "yields": false
+    },
+    "waitForDataReady": {
+     "deprecated": true,
+     "yields": true
+    }
+   },
+   "properties": {
+    "AccountAge": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "int"
+    },
+    "AgeChecked": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "AgeCheckStatus"
+    },
+    "AutoJumpEnabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "CameraMaxZoomDistance": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "CameraMinZoomDistance": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "CameraMode": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "CameraMode"
+    },
+    "CanLoadCharacterAppearance": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "Character": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Model"
+    },
+    "CharacterAppearance": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "string"
+    },
+    "CharacterAppearanceId": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "int64"
+    },
+    "DataComplexity": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": true,
+     "type": "int"
+    },
+    "DataReady": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "DevCameraOcclusionMode": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "DevCameraOcclusionMode"
+    },
+    "DevComputerCameraMode": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "DevComputerCameraMovementMode"
+    },
+    "DevComputerMovementMode": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "DevComputerMovementMode"
+    },
+    "DevEnableMouseLock": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "DevTouchCameraMode": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "DevTouchCameraMovementMode"
+    },
+    "DevTouchMovementMode": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "DevTouchMovementMode"
+    },
+    "DisplayName": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "string"
+    },
+    "FollowUserId": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "int64"
+    },
+    "FrustumStreaming": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "FrustumStreamingMode"
+    },
+    "GameplayPaused": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "HasRobloxSubscription": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "HasVerifiedBadge": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "HealthDisplayDistance": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "LocaleId": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "string"
+    },
+    "MembershipType": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "MembershipType"
+    },
+    "NameDisplayDistance": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "Neutral": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "PartyId": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "string"
+    },
+    "ReplicationFocus": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Instance"
+    },
+    "RespawnLocation": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "SpawnLocation"
+    },
+    "Team": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Team"
+    },
+    "TeamColor": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "BrickColor"
+    },
+    "User": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "User"
+    },
+    "UserId": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "int64"
+    },
+    "userId": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "int64"
+    }
+   },
+   "service": false,
+   "superclass": "Instance"
+  },
+  "PlayerGui": {
+   "creatable": false,
+   "events": {
+    "TopbarTransparencyChangedSignal": {
+     "deprecated": true
+    }
+   },
+   "functions": {
+    "GetTopbarTransparency": {
+     "deprecated": true,
+     "yields": false
+    },
+    "SetTopbarTransparency": {
+     "deprecated": true,
+     "yields": false
+    }
+   },
+   "properties": {
+    "CurrentScreenOrientation": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "ScreenOrientation"
+    },
+    "ScreenOrientation": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ScreenOrientation"
+    },
+    "SelectionImageObject": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "GuiObject"
+    }
+   },
+   "service": false,
+   "superclass": "BasePlayerGui"
+  },
+  "Players": {
+   "creatable": false,
+   "events": {
+    "PlayerAdded": {
+     "deprecated": false
+    },
+    "PlayerMembershipChanged": {
+     "deprecated": false
+    },
+    "PlayerRemoving": {
+     "deprecated": false
+    },
+    "UserSubscriptionStatusChanged": {
+     "deprecated": false
+    }
+   },
+   "functions": {
+    "BanAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "CreateHumanoidModelFromDescription": {
+     "deprecated": true,
+     "yields": true
+    },
+    "CreateHumanoidModelFromDescriptionAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "CreateHumanoidModelFromUserId": {
+     "deprecated": true,
+     "yields": true
+    },
+    "CreateHumanoidModelFromUserIdAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "GetBanHistoryAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "GetCharacterAppearanceAsync": {
+     "deprecated": true,
+     "yields": true
+    },
+    "GetCharacterAppearanceInfoAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "GetFriendsAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "GetHumanoidDescriptionFromOutfitId": {
+     "deprecated": true,
+     "yields": true
+    },
+    "GetHumanoidDescriptionFromOutfitIdAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "GetHumanoidDescriptionFromUserId": {
+     "deprecated": true,
+     "yields": true
+    },
+    "GetHumanoidDescriptionFromUserIdAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "GetNameFromUserIdAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "GetPlayerByUserId": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetPlayerFromCharacter": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetPlayers": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetProfileConfigurationFromUserIdAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "GetUserIdFromNameAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "GetUserThumbnailAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "UnbanAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "getPlayers": {
+     "deprecated": true,
+     "yields": false
+    },
+    "playerFromCharacter": {
+     "deprecated": true,
+     "yields": false
+    },
+    "players": {
+     "deprecated": true,
+     "yields": false
+    }
+   },
+   "properties": {
+    "BubbleChat": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "CharacterAutoLoads": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "ClassicChat": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "LocalPlayer": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "Player"
+    },
+    "MaxPlayers": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "int"
+    },
+    "NumPlayers": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": true,
+     "type": "int"
+    },
+    "PreferredPlayers": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "int"
+    },
+    "RespawnTime": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "localPlayer": {
+     "category": "Class",
+     "deprecated": true,
+     "readOnly": true,
+     "type": "Player"
+    },
+    "numPlayers": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": true,
+     "type": "int"
+    }
+   },
+   "service": true,
+   "superclass": "Instance"
+  },
+  "PointLight": {
+   "creatable": true,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "Range": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    }
+   },
+   "service": false,
+   "superclass": "Light"
+  },
+  "PostEffect": {
+   "creatable": false,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "Enabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    }
+   },
+   "service": false,
+   "superclass": "Instance"
+  },
+  "RemoteEvent": {
+   "creatable": true,
+   "events": {
+    "OnClientEvent": {
+     "deprecated": false
+    },
+    "OnServerEvent": {
+     "deprecated": false
+    }
+   },
+   "functions": {
+    "FireAllClients": {
+     "deprecated": false,
+     "yields": false
+    },
+    "FireClient": {
+     "deprecated": false,
+     "yields": false
+    },
+    "FireServer": {
+     "deprecated": false,
+     "yields": false
+    }
+   },
+   "properties": {},
+   "service": false,
+   "superclass": "BaseRemoteEvent"
+  },
+  "ReplicatedStorage": {
+   "creatable": false,
+   "events": {},
+   "functions": {},
+   "properties": {},
+   "service": true,
+   "superclass": "Instance"
+  },
+  "RunService": {
+   "creatable": false,
+   "events": {
+    "Heartbeat": {
+     "deprecated": false
+    },
+    "Misprediction": {
+     "deprecated": false
+    },
+    "PostSimulation": {
+     "deprecated": false
+    },
+    "PreAnimation": {
+     "deprecated": false
+    },
+    "PreRender": {
+     "deprecated": false
+    },
+    "PreSimulation": {
+     "deprecated": false
+    },
+    "RenderStepped": {
+     "deprecated": false
+    },
+    "Rollback": {
+     "deprecated": false
+    },
+    "Stepped": {
+     "deprecated": false
+    }
+   },
+   "functions": {
+    "BindToAnimation": {
+     "deprecated": false,
+     "yields": false
+    },
+    "BindToRenderStep": {
+     "deprecated": false,
+     "yields": false
+    },
+    "BindToSimulation": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetPredictionStatus": {
+     "deprecated": false,
+     "yields": false
+    },
+    "IsClient": {
+     "deprecated": false,
+     "yields": false
+    },
+    "IsResimulating": {
+     "deprecated": false,
+     "yields": false
+    },
+    "IsRunMode": {
+     "deprecated": false,
+     "yields": false
+    },
+    "IsRunning": {
+     "deprecated": false,
+     "yields": false
+    },
+    "IsServer": {
+     "deprecated": false,
+     "yields": false
+    },
+    "IsStudio": {
+     "deprecated": false,
+     "yields": false
+    },
+    "SetPredictionMode": {
+     "deprecated": false,
+     "yields": false
+    },
+    "UnbindFromRenderStep": {
+     "deprecated": false,
+     "yields": false
+    }
+   },
+   "properties": {
+    "FrameNumber": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "int64"
+    }
+   },
+   "service": true,
+   "superclass": "Instance"
+  },
+  "ScreenGui": {
+   "creatable": true,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "ClipToDeviceSafeArea": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "DisplayOrder": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "int"
+    },
+    "IgnoreGuiInset": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "SafeAreaCompatibility": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "SafeAreaCompatibility"
+    },
+    "ScreenInsets": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ScreenInsets"
+    }
+   },
+   "service": false,
+   "superclass": "LayerCollector"
+  },
+  "ScrollingFrame": {
+   "creatable": true,
+   "events": {},
+   "functions": {
+    "GetScrollVelocity": {
+     "deprecated": false,
+     "yields": false
+    },
+    "ResetScrollVelocity": {
+     "deprecated": false,
+     "yields": false
+    }
+   },
+   "properties": {
+    "AbsoluteCanvasSize": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "Vector2"
+    },
+    "AbsoluteWindowSize": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "Vector2"
+    },
+    "AutomaticCanvasSize": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "AutomaticSize"
+    },
+    "BottomImage": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ContentId"
+    },
+    "BottomImageContent": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Content"
+    },
+    "CanvasPosition": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector2"
+    },
+    "CanvasSize": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "UDim2"
+    },
+    "ElasticBehavior": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ElasticBehavior"
+    },
+    "HorizontalScrollBarInset": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ScrollBarInset"
+    },
+    "MidImage": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ContentId"
+    },
+    "MidImageContent": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Content"
+    },
+    "ScrollBarImageColor3": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    },
+    "ScrollBarImageTransparency": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "ScrollBarThickness": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "int"
+    },
+    "ScrollingDirection": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ScrollingDirection"
+    },
+    "ScrollingEnabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "TopImage": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ContentId"
+    },
+    "TopImageContent": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Content"
+    },
+    "VerticalScrollBarInset": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ScrollBarInset"
+    },
+    "VerticalScrollBarPosition": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "VerticalScrollBarPosition"
+    }
+   },
+   "service": false,
+   "superclass": "GuiObject"
+  },
+  "ServerScriptService": {
+   "creatable": false,
+   "events": {},
+   "functions": {},
+   "properties": {},
+   "service": true,
+   "superclass": "Instance"
+  },
+  "ServiceProvider": {
+   "creatable": false,
+   "events": {
+    "Close": {
+     "deprecated": false
+    },
+    "ServiceAdded": {
+     "deprecated": false
+    },
+    "ServiceRemoving": {
+     "deprecated": false
+    }
+   },
+   "functions": {
+    "FindService": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetService": {
+     "deprecated": false,
+     "yields": false
+    },
+    "getService": {
+     "deprecated": true,
+     "yields": false
+    },
+    "service": {
+     "deprecated": true,
+     "yields": false
+    }
+   },
+   "properties": {},
+   "service": false,
+   "superclass": "Instance"
+  },
+  "SpotLight": {
+   "creatable": true,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "Angle": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "Face": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "NormalId"
+    },
+    "Range": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    }
+   },
+   "service": false,
+   "superclass": "Light"
+  },
+  "StarterGui": {
+   "creatable": false,
+   "events": {},
+   "functions": {
+    "GetCore": {
+     "deprecated": false,
+     "yields": true
+    },
+    "GetCoreGuiEnabled": {
+     "deprecated": false,
+     "yields": false
+    },
+    "SetCore": {
+     "deprecated": false,
+     "yields": false
+    },
+    "SetCoreGuiEnabled": {
+     "deprecated": false,
+     "yields": false
+    }
+   },
+   "properties": {
+    "ResetPlayerGuiOnSpawn": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "ScreenOrientation": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ScreenOrientation"
+    },
+    "ShowDevelopmentGui": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    }
+   },
+   "service": true,
+   "superclass": "BasePlayerGui"
+  },
+  "SurfaceGui": {
+   "creatable": true,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "AlwaysOnTop": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "Brightness": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "CanvasSize": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector2"
+    },
+    "ClipsDescendants": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "LightInfluence": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "MaxDistance": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "PixelsPerStud": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "SizingMode": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "SurfaceGuiSizingMode"
+    },
+    "ToolPunchThroughDistance": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "ZOffset": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    }
+   },
+   "service": false,
+   "superclass": "SurfaceGuiBase"
+  },
+  "SurfaceGuiBase": {
+   "creatable": false,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "Active": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "Adornee": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Instance"
+    },
+    "Face": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "NormalId"
+    }
+   },
+   "service": false,
+   "superclass": "LayerCollector"
+  },
+  "Terrain": {
+   "creatable": false,
+   "events": {},
+   "functions": {
+    "AutowedgeCell": {
+     "deprecated": true,
+     "yields": false
+    },
+    "AutowedgeCells": {
+     "deprecated": true,
+     "yields": false
+    },
+    "CellCenterToWorld": {
+     "deprecated": false,
+     "yields": false
+    },
+    "CellCornerToWorld": {
+     "deprecated": false,
+     "yields": false
+    },
+    "Clear": {
+     "deprecated": false,
+     "yields": false
+    },
+    "ClearVoxelsAsync_beta": {
+     "deprecated": false,
+     "yields": false
+    },
+    "CopyRegion": {
+     "deprecated": false,
+     "yields": false
+    },
+    "CountCells": {
+     "deprecated": false,
+     "yields": false
+    },
+    "FillBall": {
+     "deprecated": false,
+     "yields": false
+    },
+    "FillBlock": {
+     "deprecated": false,
+     "yields": false
+    },
+    "FillCylinder": {
+     "deprecated": false,
+     "yields": false
+    },
+    "FillRegion": {
+     "deprecated": false,
+     "yields": false
+    },
+    "FillWedge": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetCell": {
+     "deprecated": true,
+     "yields": false
+    },
+    "GetMaterialColor": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetMaterialSlot": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetWaterCell": {
+     "deprecated": true,
+     "yields": false
+    },
+    "IterateVoxelsAsync_beta": {
+     "deprecated": false,
+     "yields": false
+    },
+    "ModifyVoxelsAsync_beta": {
+     "deprecated": false,
+     "yields": false
+    },
+    "PasteRegion": {
+     "deprecated": false,
+     "yields": false
+    },
+    "ReadVoxelChannels": {
+     "deprecated": false,
+     "yields": false
+    },
+    "ReadVoxels": {
+     "deprecated": false,
+     "yields": false
+    },
+    "ReadVoxelsAsync_beta": {
+     "deprecated": false,
+     "yields": false
+    },
+    "ReplaceMaterial": {
+     "deprecated": false,
+     "yields": false
+    },
+    "ResetMaterialSlot": {
+     "deprecated": false,
+     "yields": false
+    },
+    "SetCell": {
+     "deprecated": true,
+     "yields": false
+    },
+    "SetCells": {
+     "deprecated": true,
+     "yields": false
+    },
+    "SetMaterialColor": {
+     "deprecated": false,
+     "yields": false
+    },
+    "SetMaterialSlot": {
+     "deprecated": false,
+     "yields": false
+    },
+    "SetWaterCell": {
+     "deprecated": true,
+     "yields": false
+    },
+    "WorldToCell": {
+     "deprecated": false,
+     "yields": false
+    },
+    "WorldToCellPreferEmpty": {
+     "deprecated": false,
+     "yields": false
+    },
+    "WorldToCellPreferSolid": {
+     "deprecated": false,
+     "yields": false
+    },
+    "WriteVoxelChannels": {
+     "deprecated": false,
+     "yields": false
+    },
+    "WriteVoxels": {
+     "deprecated": false,
+     "yields": false
+    },
+    "WriteVoxelsAsync_beta": {
+     "deprecated": false,
+     "yields": false
+    }
+   },
+   "properties": {
+    "IsSmooth": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "MaxExtents": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "Region3int16"
+    },
+    "WaterColor": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    },
+    "WaterReflectance": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "WaterTransparency": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "WaterWaveSize": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "WaterWaveSpeed": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    }
+   },
+   "service": false,
+   "superclass": "BasePart"
+  },
+  "TextButton": {
+   "creatable": true,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "ContentText": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "string"
+    },
+    "Font": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Font"
+    },
+    "FontFace": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Font"
+    },
+    "FontSize": {
+     "category": "Enum",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "FontSize"
+    },
+    "LineHeight": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "LocalizedText": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "string"
+    },
+    "MaxVisibleGraphemes": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "int"
+    },
+    "OpenTypeFeatures": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "string"
+    },
+    "OpenTypeFeaturesError": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "string"
+    },
+    "RichText": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "Text": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "string"
+    },
+    "TextBounds": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "Vector2"
+    },
+    "TextColor": {
+     "category": "DataType",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "BrickColor"
+    },
+    "TextColor3": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    },
+    "TextDirection": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "TextDirection"
+    },
+    "TextFits": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "TextScaled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "TextSize": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "TextStrokeColor3": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    },
+    "TextStrokeTransparency": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "TextTransparency": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "TextTruncate": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "TextTruncate"
+    },
+    "TextWrap": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "TextWrapped": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "TextXAlignment": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "TextXAlignment"
+    },
+    "TextYAlignment": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "TextYAlignment"
+    }
+   },
+   "service": false,
+   "superclass": "GuiButton"
+  },
+  "TextLabel": {
+   "creatable": true,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "ContentText": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "string"
+    },
+    "Font": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Font"
+    },
+    "FontFace": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Font"
+    },
+    "FontSize": {
+     "category": "Enum",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "FontSize"
+    },
+    "LineHeight": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "LocalizedText": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "string"
+    },
+    "MaxVisibleGraphemes": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "int"
+    },
+    "OpenTypeFeatures": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "string"
+    },
+    "OpenTypeFeaturesError": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "string"
+    },
+    "RichText": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "Text": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "string"
+    },
+    "TextBounds": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "Vector2"
+    },
+    "TextColor": {
+     "category": "DataType",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "BrickColor"
+    },
+    "TextColor3": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    },
+    "TextDirection": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "TextDirection"
+    },
+    "TextFits": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "TextScaled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "TextSize": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "TextStrokeColor3": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    },
+    "TextStrokeTransparency": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "TextTransparency": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "TextTruncate": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "TextTruncate"
+    },
+    "TextWrap": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "TextWrapped": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "TextXAlignment": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "TextXAlignment"
+    },
+    "TextYAlignment": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "TextYAlignment"
+    }
+   },
+   "service": false,
+   "superclass": "GuiLabel"
+  },
+  "Tween": {
+   "creatable": true,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "Instance": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "Instance"
+    },
+    "TweenInfo": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "TweenInfo"
+    }
+   },
+   "service": false,
+   "superclass": "TweenBase"
+  },
+  "TweenBase": {
+   "creatable": false,
+   "events": {
+    "Completed": {
+     "deprecated": false
+    }
+   },
+   "functions": {
+    "Cancel": {
+     "deprecated": false,
+     "yields": false
+    },
+    "Pause": {
+     "deprecated": false,
+     "yields": false
+    },
+    "Play": {
+     "deprecated": false,
+     "yields": false
+    }
+   },
+   "properties": {
+    "PlaybackState": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "PlaybackState"
+    }
+   },
+   "service": false,
+   "superclass": "Instance"
+  },
+  "TweenService": {
+   "creatable": false,
+   "events": {},
+   "functions": {
+    "Create": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetValue": {
+     "deprecated": false,
+     "yields": false
+    },
+    "SmoothDamp": {
+     "deprecated": false,
+     "yields": false
+    }
+   },
+   "properties": {},
+   "service": true,
+   "superclass": "Instance"
+  },
+  "UIBase": {
+   "creatable": false,
+   "events": {},
+   "functions": {},
+   "properties": {},
+   "service": false,
+   "superclass": "Instance"
+  },
+  "UIComponent": {
+   "creatable": false,
+   "events": {},
+   "functions": {},
+   "properties": {},
+   "service": false,
+   "superclass": "UIBase"
+  },
+  "UICorner": {
+   "creatable": true,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "BottomLeftRadius": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "UDim"
+    },
+    "BottomRightRadius": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "UDim"
+    },
+    "CornerRadius": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "UDim"
+    },
+    "TopLeftRadius": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "UDim"
+    },
+    "TopRightRadius": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "UDim"
+    }
+   },
+   "service": false,
+   "superclass": "UIComponent"
+  },
+  "UIGridStyleLayout": {
+   "creatable": false,
+   "events": {},
+   "functions": {
+    "ApplyLayout": {
+     "deprecated": true,
+     "yields": false
+    },
+    "SetCustomSortFunction": {
+     "deprecated": true,
+     "yields": false
+    }
+   },
+   "properties": {
+    "AbsoluteContentSize": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "Vector2"
+    },
+    "FillDirection": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "FillDirection"
+    },
+    "HorizontalAlignment": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "HorizontalAlignment"
+    },
+    "SortOrder": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "SortOrder"
+    },
+    "VerticalAlignment": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "VerticalAlignment"
+    }
+   },
+   "service": false,
+   "superclass": "UILayout"
+  },
+  "UILayout": {
+   "creatable": false,
+   "events": {},
+   "functions": {},
+   "properties": {},
+   "service": false,
+   "superclass": "UIComponent"
+  },
+  "UIListLayout": {
+   "creatable": true,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "HorizontalFlex": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "UIFlexAlignment"
+    },
+    "ItemLineAlignment": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ItemLineAlignment"
+    },
+    "Padding": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "UDim"
+    },
+    "VerticalFlex": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "UIFlexAlignment"
+    },
+    "Wraps": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    }
+   },
+   "service": false,
+   "superclass": "UIGridStyleLayout"
+  },
+  "UIPadding": {
+   "creatable": true,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "PaddingBottom": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "UDim"
+    },
+    "PaddingLeft": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "UDim"
+    },
+    "PaddingRight": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "UDim"
+    },
+    "PaddingTop": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "UDim"
+    }
+   },
+   "service": false,
+   "superclass": "UIComponent"
+  },
+  "UIScale": {
+   "creatable": true,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "Scale": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    }
+   },
+   "service": false,
+   "superclass": "UIComponent"
+  },
+  "UIStroke": {
+   "creatable": true,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "ApplyStrokeMode": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ApplyStrokeMode"
+    },
+    "BorderOffset": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "UDim"
+    },
+    "BorderStrokePosition": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "BorderStrokePosition"
+    },
+    "Color": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    },
+    "Enabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "LineJoinMode": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "LineJoinMode"
+    },
+    "StrokeSizingMode": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "StrokeSizingMode"
+    },
+    "Thickness": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "Transparency": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "ZIndex": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "int"
+    }
+   },
+   "service": false,
+   "superclass": "UIComponent"
+  },
+  "UserInputService": {
+   "creatable": false,
+   "events": {
+    "DeviceAccelerationChanged": {
+     "deprecated": false
+    },
+    "DeviceGravityChanged": {
+     "deprecated": false
+    },
+    "DeviceRotationChanged": {
+     "deprecated": false
+    },
+    "GamepadConnected": {
+     "deprecated": false
+    },
+    "GamepadDisconnected": {
+     "deprecated": false
+    },
+    "InputBegan": {
+     "deprecated": false
+    },
+    "InputChanged": {
+     "deprecated": false
+    },
+    "InputEnded": {
+     "deprecated": false
+    },
+    "JumpRequest": {
+     "deprecated": false
+    },
+    "LastInputTypeChanged": {
+     "deprecated": false
+    },
+    "PointerAction": {
+     "deprecated": false
+    },
+    "TextBoxFocusReleased": {
+     "deprecated": false
+    },
+    "TextBoxFocused": {
+     "deprecated": false
+    },
+    "TouchDrag": {
+     "deprecated": false
+    },
+    "TouchEnded": {
+     "deprecated": false
+    },
+    "TouchLongPress": {
+     "deprecated": false
+    },
+    "TouchMoved": {
+     "deprecated": false
+    },
+    "TouchPan": {
+     "deprecated": false
+    },
+    "TouchPinch": {
+     "deprecated": false
+    },
+    "TouchRotate": {
+     "deprecated": false
+    },
+    "TouchStarted": {
+     "deprecated": false
+    },
+    "TouchSwipe": {
+     "deprecated": false
+    },
+    "TouchTap": {
+     "deprecated": false
+    },
+    "TouchTapInWorld": {
+     "deprecated": false
+    },
+    "UserCFrameChanged": {
+     "deprecated": true
+    },
+    "WindowFocusReleased": {
+     "deprecated": false
+    },
+    "WindowFocused": {
+     "deprecated": false
+    }
+   },
+   "functions": {
+    "CreateVirtualInput": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GamepadSupports": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetConnectedGamepads": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetDeviceAcceleration": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetDeviceGravity": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetDeviceRotation": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetFocusedTextBox": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetGamepadConnected": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetGamepadState": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetImageForKeyCode": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetKeysPressed": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetLastInputType": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetMouseButtonsPressed": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetMouseDelta": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetMouseLocation": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetNavigationGamepads": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetStringForKeyCode": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetSupportedGamepadKeyCodes": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetUserCFrame": {
+     "deprecated": true,
+     "yields": false
+    },
+    "IsGamepadButtonDown": {
+     "deprecated": false,
+     "yields": false
+    },
+    "IsKeyDown": {
+     "deprecated": false,
+     "yields": false
+    },
+    "IsMouseButtonPressed": {
+     "deprecated": false,
+     "yields": false
+    },
+    "IsNavigationGamepad": {
+     "deprecated": false,
+     "yields": false
+    },
+    "RecenterUserHeadCFrame": {
+     "deprecated": false,
+     "yields": false
+    },
+    "SetNavigationGamepad": {
+     "deprecated": false,
+     "yields": false
+    }
+   },
+   "properties": {
+    "AccelerometerEnabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "GamepadEnabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "GyroscopeEnabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "KeyboardEnabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "ModalEnabled": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "MouseBehavior": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "MouseBehavior"
+    },
+    "MouseDeltaSensitivity": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "MouseEnabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "MouseIcon": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ContentId"
+    },
+    "MouseIconContent": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Content"
+    },
+    "MouseIconEnabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "OnScreenKeyboardPosition": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "Vector2"
+    },
+    "OnScreenKeyboardSize": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "Vector2"
+    },
+    "OnScreenKeyboardVisible": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "PreferredInput": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "PreferredInput"
+    },
+    "TouchEnabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "UserHeadCFrame": {
+     "category": "DataType",
+     "deprecated": true,
+     "readOnly": true,
+     "type": "CFrame"
+    },
+    "VREnabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "bool"
+    }
+   },
+   "service": true,
+   "superclass": "Instance"
+  },
+  "ValueBase": {
+   "creatable": false,
+   "events": {},
+   "functions": {},
+   "properties": {},
+   "service": false,
+   "superclass": "Instance"
+  },
+  "WeldConstraint": {
+   "creatable": true,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "Active": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "Enabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "Part0": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "BasePart"
+    },
+    "Part1": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "BasePart"
+    }
+   },
+   "service": false,
+   "superclass": "Instance"
+  },
+  "Workspace": {
+   "creatable": false,
+   "events": {
+    "PersistentLoaded": {
+     "deprecated": false
+    }
+   },
+   "functions": {
+    "GetNumAwakeParts": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetPhysicsThrottling": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetRealPhysicsFPS": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetServerTimeNow": {
+     "deprecated": false,
+     "yields": false
+    },
+    "JoinToOutsiders": {
+     "deprecated": false,
+     "yields": false
+    },
+    "PGSIsEnabled": {
+     "deprecated": false,
+     "yields": false
+    },
+    "UnjoinFromOutsiders": {
+     "deprecated": false,
+     "yields": false
+    }
+   },
+   "properties": {
+    "AirDensity": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "AirTurbulenceIntensity": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "AllowThirdPartySales": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "ClientAnimatorThrottling": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ClientAnimatorThrottlingMode"
+    },
+    "CurrentCamera": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Camera"
+    },
+    "DistributedGameTime": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "double"
+    },
+    "FallHeightEnabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "FallenPartsDestroyHeight": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "float"
+    },
+    "FilteringEnabled": {
+     "category": "Primitive",
+     "deprecated": true,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "GlobalWind": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector3"
+    },
+    "Gravity": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "InsertPoint": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector3"
+    },
+    "InterpolationThrottling": {
+     "category": "Enum",
+     "deprecated": true,
+     "readOnly": true,
+     "type": "InterpolationThrottlingMode"
+    },
+    "Retargeting": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "AnimatorRetargetingMode"
+    },
+    "StreamingAdaptiveRadius": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "StreamingEnabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "Terrain": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "Terrain"
+    }
+   },
+   "service": true,
+   "superclass": "WorldRoot"
+  },
+  "WorldRoot": {
+   "creatable": false,
+   "events": {},
+   "functions": {
+    "ArePartsTouchingOthers": {
+     "deprecated": false,
+     "yields": false
+    },
+    "Blockcast": {
+     "deprecated": false,
+     "yields": false
+    },
+    "BulkMoveTo": {
+     "deprecated": false,
+     "yields": false
+    },
+    "CollisionGroupSetCollidable": {
+     "deprecated": false,
+     "yields": false
+    },
+    "CollisionGroupsAreCollidable": {
+     "deprecated": false,
+     "yields": false
+    },
+    "FindPartOnRay": {
+     "deprecated": true,
+     "yields": false
+    },
+    "FindPartOnRayWithIgnoreList": {
+     "deprecated": true,
+     "yields": false
+    },
+    "FindPartOnRayWithWhitelist": {
+     "deprecated": true,
+     "yields": false
+    },
+    "FindPartsInRegion3": {
+     "deprecated": true,
+     "yields": false
+    },
+    "FindPartsInRegion3WithIgnoreList": {
+     "deprecated": true,
+     "yields": false
+    },
+    "FindPartsInRegion3WithWhiteList": {
+     "deprecated": true,
+     "yields": false
+    },
+    "GetMaxCollisionGroups": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetPartBoundsInBox": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetPartBoundsInRadius": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetPartsInPart": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetRegisteredCollisionGroups": {
+     "deprecated": false,
+     "yields": false
+    },
+    "IsCollisionGroupRegistered": {
+     "deprecated": false,
+     "yields": false
+    },
+    "IsRegion3Empty": {
+     "deprecated": true,
+     "yields": false
+    },
+    "IsRegion3EmptyWithIgnoreList": {
+     "deprecated": true,
+     "yields": false
+    },
+    "Raycast": {
+     "deprecated": false,
+     "yields": false
+    },
+    "RegisterCollisionGroup": {
+     "deprecated": false,
+     "yields": false
+    },
+    "RenameCollisionGroup": {
+     "deprecated": false,
+     "yields": false
+    },
+    "Shapecast": {
+     "deprecated": false,
+     "yields": false
+    },
+    "Spherecast": {
+     "deprecated": false,
+     "yields": false
+    },
+    "UnregisterCollisionGroup": {
+     "deprecated": false,
+     "yields": false
+    },
+    "findPartOnRay": {
+     "deprecated": true,
+     "yields": false
+    },
+    "findPartsInRegion3": {
+     "deprecated": true,
+     "yields": false
+    }
+   },
+   "properties": {},
+   "service": false,
+   "superclass": "Model"
+  }
+ }
+}

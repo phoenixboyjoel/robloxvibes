@@ -81,10 +81,10 @@ anything you can't measure.
 
 ## Checks
 
-From this folder (tools pinned in `rokit.toml`, plus Lune):
+From this folder (every tool, Lune included, is pinned in `rokit.toml`):
 
 ```sh
-stylua ServerScriptService ReplicatedStorage tests
+stylua ServerScriptService ReplicatedStorage tests tools
 selene .
 rojo sourcemap default.project.json -o sourcemap.json
 luau-lsp analyze --platform roblox --sourcemap sourcemap.json \

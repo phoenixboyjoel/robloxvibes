@@ -81,11 +81,11 @@ with Claude Code or Codex.
 
 ## Checks
 
-Run from this folder. The tools are pinned in `rokit.toml`, plus Lune for the
-tests.
+Run from this folder. Every tool, Lune included, is pinned in `rokit.toml`:
+install Rokit, then run `rokit install`.
 
 ```sh
-stylua --check ServerScriptService ReplicatedStorage tests
+stylua --check ServerScriptService ReplicatedStorage tests tools
 selene .
 rojo sourcemap default.project.json -o sourcemap.json
 luau-lsp analyze --platform roblox --sourcemap sourcemap.json \

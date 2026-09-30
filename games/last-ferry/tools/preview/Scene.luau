@@ -204,6 +204,7 @@ function Scene.capture(sim, options: Options): any
 
 	local camera = sim.workspace.CurrentCamera
 	local character = if options.player then options.player.Character else nil
+	local inset = sim.game:GetService("GuiService").TopbarInset
 	return {
 		bubbles = bubbles,
 		version = 3,
@@ -212,6 +213,8 @@ function Scene.capture(sim, options: Options): any
 		time = sim.now,
 		screen = { sim.screen.X, sim.screen.Y },
 		safeArea = { sim.safeArea.X, sim.safeArea.Y },
+		-- The part of Roblox's top bar row left for the game (GuiService.TopbarInset).
+		topbarInset = { inset.Min.X, inset.Min.Y, inset.Max.X, inset.Max.Y },
 		preferredInput = sim.preferredInput.Name,
 		camera = {
 			cframe = { camera.CFrame:GetComponents() },

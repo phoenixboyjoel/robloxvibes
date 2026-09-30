@@ -19,6 +19,7 @@ local Ui = require("./Ui")
 
 export type Ticket = {
 	root: Frame,
+	pageTab: TextButton, -- sticks out of the ticket's right edge while a page is behind it
 	show: (view: View.PassengerView) -> (),
 	clear: () -> (),
 	stamp: (text: string, color: Color3) -> (),
@@ -262,6 +263,7 @@ function Ticket.new(parent: Instance, home: UDim2): Ticket
 
 	local ticket: Ticket = {
 		root = root,
+		pageTab = tab,
 		show = function(view: View.PassengerView)
 			hideToken += 1
 			local isNew = view.id ~= currentId

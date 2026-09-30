@@ -34,6 +34,15 @@ local function remotesFolder(): Instance
 	return folder
 end
 
+-- The server's clock (workspace:GetServerTimeNow()), or nil on a client that has been
+-- disconnected, where it throws: for code that reads it every frame.
+function Net.serverTime(): number?
+	local ok, now = pcall(function(): number
+		return workspace:GetServerTimeNow()
+	end)
+	return if ok then now else nil
+end
+
 -- Returns the RemoteEvent called `name`, creating it on the server if needed.
 function Net.event(name: string): RemoteEvent
 	local folder = remotesFolder()

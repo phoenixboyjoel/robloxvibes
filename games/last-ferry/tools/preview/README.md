@@ -5,9 +5,10 @@ simulator (`tests/sim`), using a three.js approximation of Roblox's renderer.
 
 1. **Export a scene.** The game runs until the scenario is on screen, then the
    whole scene is written to JSON: every part, light, decal, particle emitter and
-   SurfaceGui, the Lighting settings, the camera, the player's ScreenGuis and
-   BillboardGuis (like the passenger's speech bubble), Roblox chat bubbles they
-   can see, and their character (for prompts in reach).
+   SurfaceGui, the Lighting settings, the camera, the player's ScreenGuis (the
+   HUD, the status in Roblox's top bar row, the passenger's speech bubble) and
+   BillboardGuis, Roblox chat bubbles they can see, and their character (for
+   prompts in reach).
    The simulator stands in for Roblox's default camera (`sim.cameraFollows`):
    third person behind the avatar on the pier, first person at the head in the
    booth (with Humanoid.CameraOffset, and the avatar hidden from its own
@@ -74,8 +75,9 @@ whether a tell can be seen from the booth. It is not Roblox's renderer.
   - Particles are a still frame replayed from the emitter's settings.
   - Text measured by the game (`TextBounds`) is the simulator's estimate, so a
     bubble can wrap a word differently from Roblox.
-  - The top bar in the corner is a sketch of Roblox's, there only to show what the
-    safe area keeps clear.
+  - Roblox's buttons in the top-left corner are a sketch of Roblox's. ScreenGuis
+    with `TopbarSafeInsets` are drawn beside them, in the part of the row the
+    simulator's `GuiService.TopbarInset` leaves, which is an estimate.
 - **Not drawn:** uploaded assets (`rbxassetid://` meshes, images and sounds),
   terrain other than water, the touch thumbstick and jump button, the chat
   window and the player list. Player avatars are the simulator's blocky R15 in

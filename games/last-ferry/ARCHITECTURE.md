@@ -45,21 +45,22 @@ something.
 | `ServerScriptService/Services/ShiftService.luau` | The Roblox `Stage` for the Director (queue on the dock, remotes, world calls) and the action handler |
 | `ServerScriptService/Services/ProgressService.luau` | Endings found per player (DataStore), badges, and the player list's `leaderstats` (Endings, Shifts) |
 | `ReplicatedStorage/Shared/Config.luau` | Remote names and tunables both sides read (timers, walk speed, rate limits) |
-| `ReplicatedStorage/Shared/Net.luau` | Creates and finds RemoteEvents; per-player rate limiter |
+| `ReplicatedStorage/Shared/Net.luau` | Creates and finds RemoteEvents; per-player rate limiter; `serverTime()`, the server's clock, or nil while the client has lost its connection (when Roblox's `GetServerTimeNow` throws) |
 | `ReplicatedStorage/Shared/Types.luau` | The screen state, effects and progress payloads the server sends |
 | `ReplicatedStorage/Shared/Sounds.luau` | Every sound in the game, all Roblox built-ins (`rbxasset://sounds/`): footsteps, splash, slosh, thud, click, gust |
-| `ReplicatedStorage/Shared/Glide.luau` | Smooth movement. The server's side: `start` (from where it is now to a target, eased, optionally turning first), `frame` (where it has got to), `stop`, `set`. It writes the glide as attributes (`GlideFrom`, `GlideTo`, `GlideStart` in server time, `GlideTime`, `GlideStyle`, `GlideDirection`, `GlideTurn`, then `GlideId`) and the `Glide` tag, and moves the server's copy only at the start and the end. The shared maths: `sample`, `read`, `lag` |
+| `ReplicatedStorage/Shared/Glide.luau` | Smooth movement. The server's side: `start` (from where it is now to a target, eased, optionally turning first), `frame` (where it has got to), `stop`, `set`, and `spread` (a part growing, like a wet passenger's puddle; full size on the server at once). It writes the glide as attributes (`GlideFrom`, `GlideTo`, `GlideStart` in server time, `GlideTime`, `GlideStyle`, `GlideDirection`, `GlideTurn`, then `GlideId`) and the `Glide` tag, and moves the server's copy only at the start and the end. The shared maths: `sample`, `read`, `lag`, `lagFor` (a glide that carries straight on from the last, like the next leg of a walk, keeps its lag so the legs join up), `spreadSize` |
 | `ReplicatedStorage/Client.client.luau` | Client entry: starts the glide, effects, camera, crowd and HUD controllers |
-| `ReplicatedStorage/Controllers/CameraController.luau` | Roblox's own cameras: Classic on the pier, LockFirstPerson on shift (one eye height for every avatar, lean in by field of view, shake, both through `Humanoid.CameraOffset`), Scriptable views of the flood and the endings. Other clerks between you and the window turn see-through on your screen (`LocalTransparencyModifier`); a respawn mid-shift faces the window again; a pinch with a finger on the thumbstick isn't a lean |
+| `ReplicatedStorage/Controllers/CameraController.luau` | Roblox's own cameras: Classic on the pier, LockFirstPerson on shift (one eye height for every avatar, lean in by field of view, shake, both through `Humanoid.CameraOffset`), Scriptable views of the flood and the endings. At the start of every night each clerk's view turns, from their own stand and at the booth's eye height, to the face of the passenger at the window (0, 4.4, −4). Other clerks between you and the window turn see-through on your screen (`LocalTransparencyModifier`); a respawn mid-shift faces the window again, unless the view is on the flood or an ending; a pinch with a finger on the thumbstick isn't a lean |
 | `ReplicatedStorage/Controllers/CrowdController.luau` | Animates passengers on each client: the classic Roblox walk, idle sway and look-about, via `Motor6D.Transform` in `PreSimulation`, with Roblox's plastic footsteps while they walk |
-| `ReplicatedStorage/Controllers/GlideController.luau` | Moves everything tagged `Glide` on this client every frame, before the camera (render priority First). A glide is played from when it arrives, as far behind the server as the network is, so it's seen whole and lines up with the server's own moves; one more than half a second late (a player who has just joined) is joined where it has got to. For a second after a glide ends it holds the thing at the end, so a late move from the server can't leave it elsewhere |
+| `ReplicatedStorage/Controllers/GlideController.luau` | Moves everything tagged `Glide` on this client every frame, before the camera (render priority First). A glide is played from when it arrives, as far behind the server as the network is, so it's seen whole and lines up with the server's own moves; one more than half a second late (a player who has just joined) is joined where it has got to. A glide that carries straight on from the last keeps that one's lag, so a walk's legs join with no skip or pause. For a second after a glide ends it holds the thing at the end, so a late move from the server can't leave it elsewhere. It also grows everything tagged `Spread` |
 | `ReplicatedStorage/Controllers/EffectsController.luau` | Blur behind cards, flood tint, lantern-out pulse, client-side lighthouse spin |
-| `ReplicatedStorage/Controllers/HudController.luau` | The whole HUD and its wiring to the remotes: the lobby banner on the pier, the shift HUD, passengers' lines as speech bubbles (`Ui/Speech`) and chat-log lines, `ContextActionService` shortcuts that give way to Roblox's controls, the Modal button that frees the mouse in first person |
+| `ReplicatedStorage/Controllers/HudController.luau` | The whole HUD and its wiring to the remotes: the lobby banner on the pier, the shift HUD (the status up in Roblox's top bar row, `Ui/TopBar`; the desk and the rules panel under it), passengers' lines as speech bubbles (`Ui/Speech`) kept to the room the HUD leaves them, and chat-log lines, `ContextActionService` shortcuts that give way to Roblox's controls, the Modal button that frees the mouse in first person |
 | `ReplicatedStorage/Ui/Theme.luau` | Colours and fonts in Roblox's chunky house style (Fredoka One titles, Builder Sans ExtraBold controls, Special Elite and Oswald only on paper), design canvas and scale limits |
 | `ReplicatedStorage/Ui/Ui.luau` | Typed UI builders: frames, labels, layout, text strokes, hard shadows (`UIShadow`), gloss, drawn icons (check, cross, play, bang, page) and chunky buttons that squash and spring back |
 | `ReplicatedStorage/Ui/Widgets.luau` | Shared pieces: captions, paragraphs, tags, rule rows with number badges, lantern icons, text outlines |
 | `ReplicatedStorage/Ui/Sfx.luau` | Sounds only this player hears (clicks, the stamp, a lantern's gust), made in SoundService on the client |
-| `ReplicatedStorage/Ui/Speech.luau` | What the passenger at the window says: a BillboardGui over their head drawn exactly like Roblox's chat bubble (GothamSSm Medium 16, white, rounded, Roblox's tail), sized from its measured text as Roblox sizes its own. It stays up for the whole window, is drawn over walls (`AlwaysOnTop`), and works where Roblox's chat doesn't (consoles, with bigger text) |
+| `ReplicatedStorage/Ui/Speech.luau` | What the passenger at the window says, drawn exactly like Roblox's chat bubble (Gotham SSm Medium 16, white, rounded, Roblox's tail) and sized from its measured text as Roblox sizes its own, on its own ScreenGui (`LastFerrySpeech`, DisplayOrder 7) over the HUD. Every frame, once the camera has moved, it goes over their head and then moves to stay in the room the HUD leaves it: along or up as far as it takes, down only until its tail touches the top of their head (`Speech.place`). It stays up for the whole window and works where Roblox's chat doesn't (consoles, with bigger text) |
+| `ReplicatedStorage/Ui/TopBar.luau` | The shift's status in Roblox's own top bar row (`ScreenInsets.TopbarSafeInsets`, beside Roblox's buttons), as pills like Roblox's: night, clock and date; ledger, queue and lanterns; a lost lantern or a found page as a banner across the row. It scales with the row (up on a TV) and fits whatever room Roblox's buttons leave, dropping the date, then the queue, the word LEDGER and the clock. With no row tall enough, it sits at the top of the HUD instead |
 | `ReplicatedStorage/Ui/Ticket.luau` | The ticket card, its drawn stamps, the torn-page tab, the BOARDED / TURNED AWAY stamp |
 | `ReplicatedStorage/Ui/Overlay.luau` | Intro, summary, tide-came-in and ending cards, with the co-op Continue |
 | `tests/` | Lune test suite (`lune run tests/run.luau`) and the headless simulator in `tests/sim/` |
@@ -140,8 +141,13 @@ Passengers' lines are shown by each client in a bubble over the passenger's head
 (`Ui/Speech`, drawn like Roblox's own) for the whole window, and logged to the
 chat window as a system message. Roblox's `TextChatService:DisplayBubble` isn't
 used for them: what they say is a rule on night 5, and Roblox's bubbles fade
-after `BubbleDuration`, can be hidden by the wall above the window, and don't
-show at all on consoles.
+after `BubbleDuration`, sit under every ScreenGui (they're BillboardGuis, so the
+HUD would cover them), and don't show at all on consoles. The bubble is on its
+own layer over the HUD, and the HUD tells it the room it may use: right of the
+desk (and the page tab), left of the rules panel (or the ledger, or the RULES
+button), below anything at the top, above the hint. The status is up in
+Roblox's top bar row so that on a phone there's room above a passenger's head
+for the longest line in the game.
 
 Moving things are glided, not tweened on the server: the server writes each
 move once as attributes (see `Shared/Glide`) and every client moves the thing
@@ -185,7 +191,7 @@ Studs; dock surface at y = 0; the booth window faces −Z.
 
 | Thing | Where |
 | --- | --- |
-| Booth view | First person from each clerk's stand, the eye held at y = 5.1 for every avatar. The front stand's view matches the old fixed camera `CameraAnchor` at (0, 5.1, 3.4), which cinematic views and previews still use: the sill hides the planks closer than z ≈ −4.1, and a passenger's body hides the planks straight behind them |
+| Booth view | First person from each clerk's stand, the eye held at y = 5.1 for every avatar and aimed at the passenger's face, (0, 4.4, −4), at the start of every night. The front stand's view matches the old fixed camera `CameraAnchor` at (0, 5.1, 3.4), which cinematic views and previews still use: the sill hides the planks closer than z ≈ −4.1, and a passenger's body hides the planks straight behind them |
 | Stands | Feet at (0, 0.2, 2.7) (front), (±2.8, 0.2, 3), then (±2, 0.2, 5.6), whose line to the window passes between the front clerks' heads, and (0, 0.2, 6.6); all facing the window. `BoothSpawn` is in the back right corner, (3.3, 0.1, 7.1), clear of them all |
 | Pier | Behind the booth, z 8 to 46; railings and invisible walls keep players on it. `PierSpawn` at (0, 0, 30) faces the booth; the notice board at (−7.5, 3.9, 12) faces the spawn |
 | Booth door and time clock | The back wall's door (hinge at (−1.3, 3.45, 8); the door's `PivotOffset` puts its pivot there, so gliding it swings it on the hinge) opens onto the pier between shifts and slams shut for one, bouncing off the frame. The time clock is right of it on the pier side, (2.7, 3.9, 8.4); its `ClockIn` prompt (hold E, 9 studs) is up only between shifts. Walls, glass, counter and roof are solid, and an invisible `CounterGuard` over the counter, up to the top of the window, stops anyone standing on it in front of the passenger |
@@ -203,16 +209,23 @@ Studs; dock surface at y = 0; the booth window faces −Z.
 - `tests/Director.spec.luau`: the shift on a fake Stage and Clock.
 - `tests/Sim.spec.luau`: the simulator's own engine behaviour: rigs and joints,
   characters and spawns, accessories, ProximityPrompts, ContextActionService,
-  CollectionService tags, easing curves (Bounce too), pivots, attribute types.
+  CollectionService tags, easing curves (Bounce too), pivots, attribute types,
+  GUI layout (where things are on screen) and Roblox's top bar row.
 - `tests/Glide.spec.luau`: glides are eased, sent once and moved by every
   client every frame; late joiners, changes of course, stops and late server
-  moves; models and hinged parts.
+  moves; a walk's legs joining up; the server's end move with nobody watching;
+  spreading parts; models and hinged parts.
+- `tests/Speech.spec.luau`: where a speech bubble goes in the room it has.
 - `tests/Passenger.spec.luau`: passengers look the same whatever their kind;
   the tells come from their facts.
 - `tests/Game.spec.luau`: the real server and client scripts in
   `tests/sim/Roblox.luau`, a mock engine checked against
   `tests/sim/reflection.json`. A bot spawns on the pier, clocks in at the
-  time clock and plays from the HUD.
+  time clock and plays from the HUD. It also checks, from every stand and on a
+  monitor, a notched phone and an iPhone SE, that the longest line in the game
+  sits clear of every piece of the HUD and never over the passenger's face;
+  that every stand's view is aimed at the passenger; and that the status fits
+  however much of the top bar row Roblox's buttons leave.
 
 When the game starts using a Roblox class or method the simulator doesn't know:
 
@@ -223,5 +236,10 @@ When the game starts using a Roblox class or method the simulator doesn't know:
 The simulator doesn't render, has no physics, and snaps tweens to their end
 values. It has one copy of the world, shared by the server and every client,
 so a client's glide shows on the server's copy too; `sim:countWrites` tells
-who moved what. Text has no font engine: `TextBounds` is an estimate. Consoles
-are `Sim.new({ tenFoot = true })`. It proves logic and wiring, not looks.
+who moved what. It lays GUI out as Roblox does (sizes, anchors, padding,
+UIScale, list layouts, automatic sizes) for `AbsolutePosition` and
+`AbsoluteSize`, but text has no font engine: `TextBounds` is an estimate.
+Screens are `Sim.new({ screen, safeArea, topbarInset })`, where the top bar row's
+free part defaults to all but Roblox's buttons (`sim:setTopbarInset` changes it,
+as when Roblox's chat pill opens); consoles are `Sim.new({ tenFoot = true })`.
+It proves logic, wiring and layout, not looks.

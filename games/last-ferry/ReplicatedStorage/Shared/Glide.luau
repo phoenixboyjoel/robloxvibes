@@ -17,6 +17,7 @@
 		Glide.frame(target)                         where it is now, mid-glide or not
 		Glide.stop(target)                          stops it where it is now
 		Glide.set(target, frame)                    puts it there at once
+		Glide.spread(part, from, to, seconds)       grows a part (a wet passenger's puddle)
 
 	`target` is a Model or a part, moved by its pivot. A part moves its whole
 	assembly, so a passenger glides by their HumanoidRootPart.
@@ -97,6 +98,36 @@ function Glide.lag(late: number): number
 	return if late > 0 and late < Glide.LATE then late else 0
 end
 
+-- How far behind to play `spec`, which arrived `late`, after `previous` played
+-- `previousLag` behind. A glide that carries straight on from the last one (it starts
+-- where and when that one ends, like the next leg of a walk) keeps that one's lag, so
+-- the two join up with no skip or pause at the corner however unevenly the network
+-- delivers them. If it arrives after the last one has finished here, it's played from
+-- then (a pause at the corner rather than a skip), up to LATE later.
+local CHAIN = 0.1 -- seconds of slack in "when that one ends"
+function Glide.lagFor(previous: Spec?, previousLag: number, spec: Spec, late: number): number
+	if
+		previous
+		and (spec.from.Position - previous.to.Position).Magnitude < 0.01
+		and math.abs(spec.start - (previous.start + previous.time)) < CHAIN
+	then
+		return math.clamp(late, previousLag, previousLag + Glide.LATE)
+	end
+	return Glide.lag(late)
+end
+
+-- How big a spreading part is `elapsed` seconds into spreading from `from` to `to` over
+-- `time`: fast at first, then slowing, as spilt water does.
+function Glide.spreadSize(from: Vector3, to: Vector3, time: number, elapsed: number): Vector3
+	if elapsed >= time then
+		return to
+	end
+	return from:Lerp(
+		to,
+		TweenService:GetValue(math.max(elapsed / time, 0), Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+	)
+end
+
 -- The glide `target` is on, from its attributes, or nil if it has none (or a broken one).
 function Glide.read(target: Instance): Spec?
 	local id = target:GetAttribute(ID)
@@ -135,6 +166,10 @@ function Glide.read(target: Instance): Spec?
 		turn = turn,
 	}
 end
+
+-- The tag clients find spreading parts by, and their attributes.
+Glide.SpreadTag = "Spread"
+Glide.SpreadAttributes = { from = "SpreadFrom", to = "SpreadTo", start = "SpreadStart", time = "SpreadTime" }
 
 --------------------------------------------------------------------------------
 -- Server
@@ -209,6 +244,19 @@ function Glide.stop(target: PVInstance)
 	if active[target] then
 		Glide.set(target, Glide.frame(target))
 	end
+end
+
+-- Grows `part` from size `from` to `to` over `seconds` on every client. The server's copy
+-- is its full size at once. Call it before parenting the part, so it reaches clients
+-- with everything they need.
+function Glide.spread(part: BasePart, from: Vector3, to: Vector3, seconds: number)
+	local names = Glide.SpreadAttributes
+	part.Size = to
+	part:SetAttribute(names.from, from)
+	part:SetAttribute(names.to, to)
+	part:SetAttribute(names.time, seconds)
+	part:SetAttribute(names.start, workspace:GetServerTimeNow())
+	part:AddTag(Glide.SpreadTag)
 end
 
 return Glide

@@ -9,6 +9,7 @@
 
 local TweenService = game:GetService("TweenService")
 
+local Net = require("../Shared/Net")
 local Sfx = require("./Sfx")
 local Theme = require("./Theme")
 
@@ -332,10 +333,11 @@ end
 
 -- "12s" style countdown text from a server-time deadline.
 function Ui.secondsLeft(deadline: number?): number
-	if deadline == nil then
+	local now = Net.serverTime()
+	if deadline == nil or now == nil then
 		return 0
 	end
-	return math.max(0, math.ceil(deadline - workspace:GetServerTimeNow()))
+	return math.max(0, math.ceil(deadline - now))
 end
 
 return Ui

@@ -47,6 +47,12 @@ local function hud(bot: Bot)
 	return gui and gui:FindFirstChild("Root")
 end
 
+-- The shift's status (Ui/TopBar): up in Roblox's top bar row, or at the top of the HUD
+-- where there's no row for it.
+local function topRow(player)
+	return player.PlayerGui.LastFerryTopBar:FindFirstChild("Row") or player.PlayerGui.LastFerryHud.Root.Play.Row
+end
+
 -- Everything the ticket, the rules card, the manifest and the speech bubble say.
 local function readDesk(root)
 	local desk = root.Play.Desk
@@ -86,19 +92,23 @@ local function readDesk(root)
 		tonight = string.match(ordered[1] or "", "date: (.-)%.$"),
 		manifest = manifest,
 		speech = "", -- read from the passenger's chat bubble (see tick)
-		night = tonumber(string.match(root.Play.TopBar.Left.Night.Text, "NIGHT (%d+)")),
+		night = tonumber(
+			string.match(topRow(root.Parent.Parent.Parent).TopBar.Left.NightPill.Night.Text, "NIGHT (%d+)")
+		),
 	}
 end
 
--- The latest chat bubble this player saw over `model` (bubbles go on the whole model).
--- What the bubble over this passenger says on the bot's screen, or "" if there's none.
+-- The passenger's speech bubble on this player's screen (Ui/Speech): the bubble and its
+-- tail, moved as one.
 local function speechBubble(player)
-	return player.PlayerGui:FindFirstChild("PassengerSpeech")
+	local gui = player.PlayerGui:FindFirstChild("LastFerrySpeech")
+	return gui and gui:FindFirstChild("Stack")
 end
+-- What the bubble over this passenger says on the bot's screen, or "" if there's none.
 local function heard(bot: Bot, model): string
 	local bubble = speechBubble(bot.player)
-	if bubble and bubble.Enabled and bubble.Adornee and bubble.Adornee.Parent == model then
-		return bubble.Stack.Bubble.Line.Text
+	if bubble and bot.sim:shown(bubble) and bubble:GetAttribute("Speaker") == model.Name then
+		return bubble.Bubble.Line.Text
 	end
 	return ""
 end
@@ -133,6 +143,18 @@ local function inBooth(player): boolean
 	return math.abs(at.X) < 4.8 and at.Z > 1.75 and at.Z < 7.8 and math.abs(at.Y - 0.2) < 0.01
 end
 
+-- Whether Roblox's player list was last left on (StarterGui:SetCoreGuiEnabled).
+local function playerListOn(sim): boolean
+	local on = true
+	for _, call in sim.coreCalls do
+		local state = string.match(call, "^SetCoreGuiEnabled PlayerList (%a+)$")
+		if state then
+			on = state == "true"
+		end
+	end
+	return on
+end
+
 local function onPier(player): boolean
 	local at = feet(player)
 	return at.Z > 8.5 and at.Z < 46 and math.abs(at.X) < 14 and math.abs(at.Y) < 0.01
@@ -158,6 +180,64 @@ local function lookAtPassenger(sim)
 		end
 	end
 	return nil
+end
+
+-- Where each clerk stands in the booth (feet), front first (WorldService's stands).
+local STANDS = {
+	front = roblox.Vector3.new(0, 0.2, 2.7),
+	left = roblox.Vector3.new(-2.8, 0.2, 3),
+	right = roblox.Vector3.new(2.8, 0.2, 3),
+	backLeft = roblox.Vector3.new(-2, 0.2, 5.6),
+	backRight = roblox.Vector3.new(2, 0.2, 5.6),
+	back = roblox.Vector3.new(0, 0.2, 6.6),
+}
+local STAND_ORDER = { "front", "left", "right", "backLeft", "backRight", "back" }
+-- The face of a passenger at the window, which every stand's view is aimed at.
+local WINDOW_TARGET = roblox.Vector3.new(0, 4.4, -4)
+
+-- Puts a clerk at a stand facing the window, and turns their view to the passenger as it
+-- is at the start of a night.
+local function standAt(sim, player, stand)
+	sim:moveCharacter(player, stand, roblox.Vector3.new(stand.X, stand.Y, -1))
+	sim:executeClient(player, [[require("./Controllers/CameraController").faceWindow()]])
+	sim:run(0.3)
+end
+
+-- Where a GUI object is on screen, in GUI pixels.
+local function box(object)
+	local at, size = object.AbsolutePosition, object.AbsoluteSize
+	return { left = at.X, top = at.Y, right = at.X + size.X, bottom = at.Y + size.Y }
+end
+local function overlap(a, b): boolean
+	return a.left < b.right and b.left < a.right and a.top < b.bottom and b.top < a.bottom
+end
+local function describe(r): string
+	return string.format("(%d, %d)-(%d, %d)", r.left, r.top, r.right, r.bottom)
+end
+
+-- The pieces of the shift HUD on a player's screen now: everything showing at its top level,
+-- the ticket's page tab, and the status pills (or the alert) up in the top bar row.
+local function hudPieces(sim, player)
+	local pieces = {}
+	local play = player.PlayerGui.LastFerryHud.Root.Play
+	local candidates = play:GetChildren()
+	table.insert(candidates, play.Desk.TicketHolder.PageTab)
+	local row = topRow(player)
+	for _, group in { row.TopBar.Left, row.TopBar.Right } do
+		for _, pill in group:GetChildren() do
+			table.insert(candidates, pill)
+		end
+	end
+	table.insert(candidates, row.Alert)
+	for _, piece in candidates do
+		if piece:IsA("GuiObject") and sim:shown(piece) then
+			local r = box(piece)
+			if r.right > r.left and r.bottom > r.top then
+				pieces[piece.Name] = r
+			end
+		end
+	end
+	return pieces
 end
 
 local function rightCall(bot: Bot, desk, tells): string
@@ -219,7 +299,7 @@ local function tick(bot: Bot)
 
 	-- Count lanterns going out from the top bar (they're relit each night).
 	local lit = 0
-	for _, lantern in root.Play.TopBar.Right.Lanterns:GetChildren() do
+	for _, lantern in topRow(bot.player).TopBar.Right.Lanterns:GetChildren() do
 		if lantern:IsA("Frame") and lantern.Visible and lantern:GetAttribute("Lit") then
 			lit += 1
 		end
@@ -229,7 +309,7 @@ local function tick(bot: Bot)
 	end
 	bot.lit = lit
 
-	local alert = root.Play.Alert
+	local alert = topRow(bot.player).Alert
 	if sim:shown(alert) then
 		local line = `{alert.Caption.Text}: {alert.Paragraph.Text}`
 		if bot.alerts[#bot.alerts] ~= line then
@@ -475,6 +555,7 @@ T.test("a clerk playing from the HUD finishes five nights clean", function()
 	T.equal(root.Lobby.Found.Text, "Endings found: 1 of 4")
 	T.equal(alice.CameraMode, roblox.Enum.CameraMode.Classic, "Roblox's third-person camera on the pier")
 	T.equal(alice.DevEnableMouseLock, true, "Shift Lock is back, as the place allows it")
+	T.expect(playerListOn(sim), "and so is Roblox's player list")
 end)
 
 T.test("players arrive on the pier as their avatars and clock in together", function()
@@ -525,6 +606,7 @@ T.test("players arrive on the pier as their avatars and clock in together", func
 	end
 	T.equal(sim.workspace.World.Booth.Door.CanCollide, true, "the door shuts behind them")
 	T.expect(not clockPrompt(sim).Enabled, "no clocking in again mid-shift")
+	T.expect(not playerListOn(sim), "Roblox's player list is put away for the shift, clear of the rules")
 	-- A clerk who somehow ends up out on the pier mid-shift is put back at their stand.
 	local stand = feet(bob)
 	sim:moveCharacter(bob, roblox.Vector3.new(0, 0, 20))
@@ -612,6 +694,48 @@ T.test("a clerk who respawns mid-shift looks out of the window again", function(
 	T.expect(camera.CFrame.LookVector:Dot(outward) > 0.99, `looking out of the window ({camera.CFrame.LookVector})`)
 	T.expect(inBooth(alice), "back at the counter")
 	clean(sim, "respawn")
+end)
+
+T.test("from every stand, the booth view starts aimed at the passenger's face", function()
+	local sim = boot()
+	local alice = sim:addPlayer("Alice", 101)
+	sim.cameraFollows = alice
+	sim:run(1)
+	T.expect(clockIn(newBot(sim, alice, { idle = true })), "Alice clocks in")
+	sim:run(1.5)
+	local camera = sim.workspace.CurrentCamera
+	for _, name in STAND_ORDER do
+		standAt(sim, alice, STANDS[name])
+		local look = camera.CFrame.LookVector
+		local toTarget = WINDOW_TARGET - camera.CFrame.Position
+		local miss = (toTarget - look * toTarget:Dot(look)).Magnitude
+		T.expect(miss < 0.02, `{name} stand: the view passes {miss} studs from the passenger's face`)
+		local eye = camera.CFrame.Position.Y + look.Y * 0.5
+		T.expect(math.abs(eye - 5.1) < 0.02, `{name} stand: the eye is at the booth's eye height ({eye})`)
+	end
+	clean(sim, "aim")
+end)
+
+T.test("a clerk who respawns while the view is on the flood keeps watching it", function()
+	local sim = boot()
+	local alice = sim:addPlayer("Alice", 101)
+	sim:run(1)
+	T.expect(clockIn(newBot(sim, alice, { idle = true })), "Alice clocks in")
+	sim:run(1.5)
+	local camera = sim.workspace.CurrentCamera
+	-- The tide comes in and the view turns to look down into the booth, as it does on a
+	-- failed night; then her character resets.
+	sim:executeClient(alice, [[require("./Controllers/CameraController").lookTo(0, -26)]])
+	sim:run(2)
+	local watching = camera.CFrame
+	sim:execute([[game:GetService("Players"):GetPlayers()[1]:LoadCharacterAsync()]])
+	sim:run(1)
+	T.equal(camera.CameraType, roblox.Enum.CameraType.Scriptable, "still the flood's view")
+	T.expect(
+		camera.CFrame.LookVector:Dot(watching.LookVector) > 0.999,
+		`still looking where it was ({camera.CFrame.LookVector})`
+	)
+	clean(sim, "respawn in a cinematic")
 end)
 
 T.test("gamepad A boards at the window and jumps the rest of the time", function()
@@ -756,7 +880,7 @@ T.test("passengers speak in Roblox-style bubbles for the whole window, and in th
 	local function bothSee(): boolean
 		for _, player in { alice, bob } do
 			local bubble = speechBubble(player)
-			if not (bubble and bubble.Enabled) then
+			if not (bubble and sim:shown(bubble)) then
 				return false
 			end
 		end
@@ -781,17 +905,14 @@ T.test("passengers speak in Roblox-style bubbles for the whole window, and in th
 	T.expect(line ~= "", "Alice sees the passenger's line over their head")
 	T.equal(heard(friend, tells.model), line, "Bob sees the same line")
 
-	-- Roblox's own bubble look, over their hat, drawn over the wall above the window.
+	-- Roblox's own bubble look, drawn over everything: the booth's walls and the HUD.
 	local bubble = speechBubble(alice)
-	local label = bubble.Stack.Bubble.Line
+	local label = bubble.Bubble.Line
 	T.equal(label.FontFace.Family, "rbxasset://fonts/families/GothamSSm.json", "Roblox's bubble font")
 	T.equal(label.TextSize, 16, "at Roblox's bubble size")
-	T.equal(bubble.Stack.Bubble.BackgroundColor3, roblox.Color3.fromRGB(250, 250, 250), "white")
-	T.equal(bubble.Stack.Caret.Image, "rbxasset://textures/ui/InGameChat/Caret.png", "with Roblox's tail")
-	T.expect(bubble.AlwaysOnTop, "never hidden by the booth's walls")
-	local top = bubble.Adornee.Position.Y + bubble.StudsOffsetWorldSpace.Y
-	local box, size = tells.model:GetBoundingBox()
-	T.expect(math.abs(top - (box.Position.Y + size.Y / 2)) < 1e-3, `anchored on the top of their head ({top})`)
+	T.equal(bubble.Bubble.BackgroundColor3, roblox.Color3.fromRGB(250, 250, 250), "white")
+	T.equal(bubble.Caret.Image, "rbxasset://textures/ui/InGameChat/Caret.png", "with Roblox's tail")
+	T.expect(bubble.Parent.DisplayOrder > alice.PlayerGui.LastFerryHud.DisplayOrder, "over the HUD")
 
 	-- Still up near the end of the window, long after Roblox's own bubbles would have gone.
 	sim:run(40, 1 / 20)
@@ -821,7 +942,7 @@ T.test("on a console, where Roblox's chat never shows, passengers' lines still d
 	local seen = sim:runUntil(
 		function()
 			local bubble = speechBubble(alice)
-			return bubble ~= nil and bubble.Enabled
+			return bubble ~= nil and sim:shown(bubble)
 		end,
 		300,
 		1 / 20,
@@ -831,7 +952,176 @@ T.test("on a console, where Roblox's chat never shows, passengers' lines still d
 	)
 	clean(sim, "console")
 	T.expect(seen, "the passenger's line shows")
-	T.equal(speechBubble(alice).Stack.Bubble.Line.TextSize, 24, "in bigger type, for a TV across the room")
+	T.equal(speechBubble(alice).Bubble.Line.TextSize, 24, "in bigger type, for a TV across the room")
+end)
+
+-- On one screen, from every stand: the passenger's line is up, clear of every piece of the
+-- HUD, and entirely above their head (never over their face). With `snug`, there's room
+-- for it to sit where Roblox's own bubbles do, its tail touching a point just over their
+-- head.
+local function checkSpeechPlacement(sim, player, model, label: string, snug: boolean)
+	local camera = sim.workspace.CurrentCamera
+	local stack = speechBubble(player)
+	local screen = sim.workspace.CurrentCamera.ViewportSize
+	local inset = sim.game:GetService("GuiService"):GetGuiInset()
+	for _, name in STAND_ORDER do
+		standAt(sim, player, STANDS[name])
+		local where = `{label}, {name} stand`
+		T.expect(sim:shown(stack) and stack.Bubble.Line.Text ~= "", `{where}: the line is up`)
+		local bubble = box(stack)
+		for piece, r in hudPieces(sim, player) do
+			T.expect(
+				not overlap(bubble, r),
+				`{where}: the bubble {describe(bubble)} overlaps the HUD's {piece} {describe(r)}`
+			)
+		end
+		local boxFrame, size = model:GetBoundingBox()
+		local top = roblox.Vector3.new(
+			model.HumanoidRootPart.Position.X,
+			boxFrame.Position.Y + size.Y / 2,
+			model.HumanoidRootPart.Position.Z
+		)
+		local head = camera:WorldToScreenPoint(top)
+		T.expect(
+			bubble.bottom <= head.Y + 0.5,
+			`{where}: the bubble ends at {bubble.bottom}, below the top of their head at {head.Y}`
+		)
+		T.expect(bubble.left >= 0 and bubble.right <= screen.X, `{where}: the bubble {describe(bubble)} is on screen`)
+		T.expect(bubble.top >= -inset.Y, `{where}: the bubble {describe(bubble)} is below the top of the screen`)
+		if snug then
+			local caret = box(stack.Caret)
+			local tip = camera:WorldToScreenPoint(top + roblox.Vector3.new(0, 0.4, 0))
+			local x, y = (caret.left + caret.right) / 2, caret.bottom
+			T.expect(
+				math.abs(x - tip.X) < 1.5 and math.abs(y - tip.Y) < 1.5,
+				`{where}: the tail's tip at ({x}, {y}) touches the point over their head ({tip.X}, {tip.Y})`
+			)
+		end
+	end
+end
+
+-- Makes every passenger say the longest line any of them can (with "{name}" as the longest
+-- display name Roblox allows), and returns it.
+local LONGEST_LINE = [[
+	local Content = require("./Shift/Content")
+	local name = string.rep("W", 20)
+	local longest = ""
+	local function consider(line)
+		line = string.gsub(line, "{name}", name)
+		if #line > #longest then
+			longest = line
+		end
+	end
+	for _, regular in Content.Regulars do
+		for _, line in regular.lines do
+			consider(line)
+		end
+	end
+	for _, line in Content.LivingLines do
+		consider(line)
+	end
+	for _, herring in Content.RedHerrings do
+		consider(herring.line)
+	end
+	for _, lines in Content.DrownedLines do
+		for _, line in lines do
+			consider(line)
+		end
+	end
+	for _, line in Content.Mara.lines do
+		consider(line)
+	end
+	consider(Content.Anna.line)
+	for _, regular in Content.Regulars do
+		for i in regular.lines do
+			regular.lines[i] = longest
+		end
+	end
+	for i in Content.LivingLines do
+		Content.LivingLines[i] = longest
+	end
+	for _, herring in Content.RedHerrings do
+		herring.line = longest
+	end
+	for _, lines in Content.DrownedLines do
+		for i in lines do
+			lines[i] = longest
+		end
+	end
+	for i in Content.Mara.lines do
+		Content.Mara.lines[i] = longest
+	end
+	Content.Anna.line = longest
+	return longest
+]]
+
+-- Plays until a passenger with a torn page is at the window and the page is taken (which
+-- opens the ledger), then stops playing. Returns the passenger's model.
+local function takeAPage(sim, bot)
+	local model
+	local taken = sim:runUntil(
+		function()
+			return bot.pagesTaken > 0
+		end,
+		1800,
+		1 / 20,
+		function()
+			tick(bot)
+		end
+	)
+	assert(taken, "no page came up")
+	sim:run(1) -- the bot leaves the ledger open and makes no call
+	local tells = lookAtPassenger(sim)
+	assert(tells, "nobody at the window")
+	model = tells.model
+	return model
+end
+
+T.test("the passenger's line is never under the HUD or over their face, from any stand, on any screen", function()
+	for _, screen in
+		{
+			{
+				label = "a 16:9 monitor",
+				screen = roblox.Vector2.new(1280, 720),
+				safeArea = roblox.Vector2.new(1280, 662),
+				snug = true,
+			},
+			{
+				label = "a notched phone",
+				screen = roblox.Vector2.new(844, 390),
+				safeArea = roblox.Vector2.new(750, 332),
+				input = roblox.Enum.PreferredInput.Touch,
+			},
+			{
+				label = "an iPhone SE",
+				screen = roblox.Vector2.new(667, 375),
+				safeArea = roblox.Vector2.new(667, 317),
+				input = roblox.Enum.PreferredInput.Touch,
+			},
+		}
+	do
+		local sim = boot({
+			root = ROOT,
+			screen = screen.screen,
+			safeArea = screen.safeArea,
+			preferredInput = screen.input,
+		})
+		-- Everyone says the longest line in the game, so the bubble is as big as it gets.
+		local longest = sim:execute(LONGEST_LINE)
+		local alice = sim:addPlayer("Alice", 101)
+		sim.cameraFollows = alice
+		local bot = newBot(sim, alice, { takePages = true })
+		local model = takeAPage(sim, bot)
+		T.equal(speechBubble(alice).Bubble.Line.Text, longest, `{screen.label}: the longest line`)
+		local root = alice.PlayerGui.LastFerryHud.Root
+		T.expect(sim:shown(root.Play.Ledger), `{screen.label}: the ledger opened`)
+		checkSpeechPlacement(sim, alice, model, `{screen.label}, ledger open`, screen.snug == true)
+		sim:click(root.Play.Ledger.Close)
+		checkSpeechPlacement(sim, alice, model, `{screen.label}, rules showing`, screen.snug == true)
+		sim:click(root.Play.Side.Tabs.HIDE)
+		checkSpeechPlacement(sim, alice, model, `{screen.label}, rules hidden`, screen.snug == true)
+		clean(sim, screen.label)
+	end
 end)
 
 T.test("all five torn pages reach the ledger and the epilogue", function()
@@ -967,12 +1257,17 @@ T.test("an idle clerk: windows close, lanterns go out, the tide comes in, the ni
 end)
 
 T.test("on phones the HUD scales down but the main buttons stay at least 44 px", function()
-	-- Safe areas in landscape: a notched phone, and an iPhone SE.
-	for _, safeArea in { roblox.Vector2.new(750, 330), roblox.Vector2.new(667, 335) } do
+	-- In landscape, under Roblox's 58 px top bar: a notched phone, and an iPhone SE.
+	for _, phone in
+		{
+			{ screen = roblox.Vector2.new(844, 390), safeArea = roblox.Vector2.new(750, 332) },
+			{ screen = roblox.Vector2.new(667, 375), safeArea = roblox.Vector2.new(667, 317) },
+		}
+	do
 		local sim = boot({
 			root = ROOT,
-			screen = safeArea + roblox.Vector2.new(0, 40),
-			safeArea = safeArea,
+			screen = phone.screen,
+			safeArea = phone.safeArea,
 			preferredInput = roblox.Enum.PreferredInput.Touch,
 		})
 		local alice = sim:addPlayer("Alice", 101)
@@ -989,19 +1284,129 @@ T.test("on phones the HUD scales down but the main buttons stay at least 44 px",
 		local tab = root.Play.Desk.TicketHolder.PageTab
 		T.expect((tab.Size.X.Offset - 28) * scale >= 44, "the page tab shows at least 44 px")
 		-- Secondary controls (tabs, ledger) stay usable at 38 px or more.
-		for _, button in { root.Play.Side.Tabs.RULES, root.Play.Side.Tabs.MANIFEST, root.Play.TopBar.Right.Ledger } do
-			T.expect(button.Size.Y.Offset * scale >= 38, `{button.Name} is {button.Size.Y.Offset * scale} px`)
+		for _, button in { root.Play.Side.Tabs.RULES, root.Play.Side.Tabs.MANIFEST, topRow(alice).TopBar.Right.Ledger } do
+			T.expect(button.AbsoluteSize.Y >= 38, `{button.Name} is {button.AbsoluteSize.Y} px`)
 		end
 		T.expect(string.find(root.Play.Hint.Text, "Pinch", 1, true) ~= nil, "touch hint")
 		-- The rules panel stops short of Roblox's jump button (bottom right, 90 px up).
 		local side = root.Play.Side
-		local gap = (-side.Size.Y.Offset - 70) * scale
+		local screenBottom = root.Parent.AbsolutePosition.Y + root.Parent.AbsoluteSize.Y
+		local gap = screenBottom - (side.AbsolutePosition.Y + side.AbsoluteSize.Y)
 		T.expect(gap >= 112, `the rules panel ends {gap} px above the bottom, clear of the jump button`)
 		T.expect(
 			string.find(root.Lobby.How.Text, "Touch and hold", 1, true) ~= nil,
 			"the pier says to hold the prompt, as it needs"
 		)
 	end
+end)
+
+T.test("the status fits whatever room Roblox's own top bar buttons leave it", function()
+	local sim = boot()
+	local alice = sim:addPlayer("Alice", 101)
+	local bot = newBot(sim, alice, { idle = true })
+	local play = alice.PlayerGui.LastFerryHud.Root.Play
+	T.expect(
+		sim:runUntil(
+			function()
+				return sim:shown(play)
+			end,
+			120,
+			1 / 20,
+			function()
+				tick(bot)
+			end
+		),
+		"the first night started"
+	)
+	local bar = topRow(alice).TopBar
+	local function check(label: string, shown: { [string]: boolean })
+		sim:run(0.5)
+		local leftEnd, rightStart = -math.huge, math.huge
+		for _, pill in bar.Left:GetChildren() do
+			if pill:IsA("GuiObject") and pill.Visible then
+				leftEnd = math.max(leftEnd, pill.AbsolutePosition.X + pill.AbsoluteSize.X)
+			end
+		end
+		for _, pill in bar.Right:GetChildren() do
+			if pill:IsA("GuiObject") and pill.Visible then
+				rightStart = math.min(rightStart, pill.AbsolutePosition.X)
+			end
+		end
+		local row = bar.Parent
+		T.expect(
+			leftEnd < rightStart,
+			`{label}: the pills on the left ({leftEnd}) run into those on the right ({rightStart})`
+		)
+		T.expect(
+			rightStart >= row.AbsolutePosition.X and leftEnd <= row.AbsolutePosition.X + row.AbsoluteSize.X,
+			`{label}: the pills stay in the row`
+		)
+		for name, want in shown do
+			local pill = bar.Left:FindFirstChild(name) or bar.Right:FindFirstChild(name)
+			T.equal(pill.Visible, want, `{label}: {name} showing`)
+		end
+	end
+	check("plenty of room", { NightPill = true, ClockPill = true, DatePill = true, QueuePill = true, Lanterns = true })
+	sim:setTopbarInset(roblox.Rect.new(700, 0, 1280, 58))
+	check("Roblox's buttons take more room", { NightPill = true, ClockPill = true, DatePill = false, Lanterns = true })
+	sim:setTopbarInset(roblox.Rect.new(900, 0, 1280, 58))
+	check("and more", { NightPill = true, DatePill = false, QueuePill = false, Lanterns = true })
+	sim:setTopbarInset(roblox.Rect.new(200, 0, 1280, 58))
+	check(
+		"and then less again",
+		{ NightPill = true, ClockPill = true, DatePill = true, QueuePill = true, Lanterns = true }
+	)
+	clean(sim, "top bar room")
+end)
+
+T.test("with no top bar row to put it in, the status sits at the top of the HUD instead", function()
+	-- An old 36 px top bar: too short for the status's pills.
+	local sim = boot({
+		root = ROOT,
+		screen = roblox.Vector2.new(1280, 720),
+		safeArea = roblox.Vector2.new(1280, 684),
+	})
+	local alice = sim:addPlayer("Alice", 101)
+	local bot = newBot(sim, alice, { idle = true })
+	local play = alice.PlayerGui.LastFerryHud.Root.Play
+	local onShift = sim:runUntil(
+		function()
+			return sim:shown(play)
+		end,
+		120,
+		1 / 20,
+		function()
+			tick(bot)
+		end
+	)
+	T.expect(onShift, "the first night started")
+	local row = play:FindFirstChild("Row")
+	T.expect(row ~= nil, "the status row is in the HUD")
+	T.expect(sim:shown(row.TopBar.Left.NightPill), "and showing")
+	local rowBottom = row.AbsolutePosition.Y + row.AbsoluteSize.Y
+	T.expect(play.Desk.AbsolutePosition.Y >= rowBottom, "the desk starts under it")
+	T.expect(play.Side.AbsolutePosition.Y >= rowBottom, "and so does the rules panel")
+	T.expect(row.TopBar.Right.Lanterns.AbsoluteSize.Y >= 38, "its pills are big enough to see and tap")
+	-- The passenger's line stays clear of it, from every stand.
+	sim.cameraFollows = alice
+	local model
+	T.expect(
+		sim:runUntil(
+			function()
+				local tells = lookAtPassenger(sim)
+				model = tells and tells.model
+				return model ~= nil and heard(bot, model) ~= ""
+			end,
+			120,
+			1 / 20,
+			function()
+				tick(bot)
+			end
+		),
+		"a passenger is at the window, talking"
+	)
+	checkSpeechPlacement(sim, alice, model, "no top bar row", true)
+	clean(sim, "no top bar row")
 end)
 
 T.test("on tablets the rules panel clears Roblox's bigger jump button", function()
@@ -1017,10 +1422,11 @@ T.test("on tablets the rules panel clears Roblox's bigger jump button", function
 	sim:run(3)
 	clean(sim, "tablet boot")
 	local root = alice.PlayerGui.LastFerryHud.Root
-	local scale = root.UIScale.Scale
-	local gap = (-root.Play.Side.Size.Y.Offset - 70) * scale
+	local side = root.Play.Side
+	local screenBottom = root.Parent.AbsolutePosition.Y + root.Parent.AbsoluteSize.Y
+	local gap = screenBottom - (side.AbsolutePosition.Y + side.AbsoluteSize.Y)
 	T.expect(gap >= 232, `the rules panel ends {gap} px above the bottom, clear of the jump button`)
-	local height = root.Play.Side.Size.Y.Scale * safeArea.Y + root.Play.Side.Size.Y.Offset * scale
+	local height = side.AbsoluteSize.Y
 	T.expect(height >= 300, `and still has room for the rules ({height} px)`)
 end)
 
@@ -1047,8 +1453,8 @@ T.test("co-op: a friend who joins late sees the same shift, and the Continue wai
 	T.equal(bob:GetAttribute("OnShift"), true, "Bob is on shift")
 	T.expect(bob.Character:FindFirstChild("ClerkCap") ~= nil, "Bob wears the cap")
 	T.expect(tostring(feet(bob)) ~= tostring(feet(alice)), "Bob gets his own stand")
-	local aliceNight = alice.PlayerGui.LastFerryHud.Root.Play.TopBar.Left.Night.Text
-	local bobNight = bob.PlayerGui.LastFerryHud.Root.Play.TopBar.Left.Night.Text
+	local aliceNight = topRow(alice).TopBar.Left.NightPill.Night.Text
+	local bobNight = topRow(bob).TopBar.Left.NightPill.Night.Text
 	T.equal(bobNight, aliceNight, "Bob sees the same night")
 
 	-- Only Alice presses Continue, so the next card shows 1 of 2 ready and runs its timer.

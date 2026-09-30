@@ -61,45 +61,50 @@ const ColorCorrectionShader = {
     }`,
 };
 
-function drawTopBar(ctx, screen) {
-  // The Roblox menu button and the chat pill in the top-left, roughly as the current
-  // client draws them. Decorative: it shows what the safe area is keeping clear.
+function drawTopBar(ctx, screen, safe) {
+  // Roblox's own buttons at the left of the top bar row, as its client draws them: the
+  // Roblox button (x 16 to 60 from the safe area's edge, y 12 to 56), then the unibar
+  // with the menu and chat (x 68 to 164), near-black at 8% see-through. Decorative: it
+  // shows what the game's status pills sit beside.
+  const x0 = safe.x + 16;
   const y = 12;
   const size = 44;
+  const fill = 'rgba(18, 18, 21, 0.92)';
   ctx.save();
-  ctx.fillStyle = 'rgba(18, 18, 21, 0.72)';
+  ctx.fillStyle = fill;
   ctx.beginPath();
-  ctx.arc(12 + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
+  ctx.roundRect(x0, y, size, size, size / 2);
   ctx.fill();
-  ctx.translate(12 + size / 2, y + size / 2);
+  ctx.translate(x0 + size / 2, y + size / 2);
   ctx.rotate((15 * Math.PI) / 180);
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = '#f7f7f8';
   ctx.fillRect(-9, -9, 18, 18);
   ctx.fillStyle = 'rgba(18, 18, 21, 1)';
   ctx.fillRect(-3, -3, 6, 6);
   ctx.restore();
   ctx.save();
-  const x = 12 + size + 8;
-  ctx.fillStyle = 'rgba(18, 18, 21, 0.72)';
+  const x = x0 + size + 8;
+  ctx.fillStyle = fill;
   ctx.beginPath();
   ctx.roundRect(x, y, 96, size, size / 2);
   ctx.fill();
-  ctx.strokeStyle = '#ffffff';
+  // The menu (three bars) and chat (a speech balloon) icons.
+  ctx.strokeStyle = '#f7f7f8';
   ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.roundRect(x + 14, y + 13, 20, 15, 4);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(x + 19, y + 28);
-  ctx.lineTo(x + 17, y + 33);
-  ctx.lineTo(x + 24, y + 28);
-  ctx.stroke();
   for (let i = 0; i < 3; i++) {
-    ctx.fillStyle = '#ffffff';
     ctx.beginPath();
-    ctx.arc(x + 58 + i * 8, y + size / 2, 2.2, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(x + 15, y + 15 + i * 7);
+    ctx.lineTo(x + 33, y + 15 + i * 7);
+    ctx.stroke();
   }
+  ctx.beginPath();
+  ctx.roundRect(x + 58, y + 13, 20, 15, 4);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x + 63, y + 28);
+  ctx.lineTo(x + 61, y + 33);
+  ctx.lineTo(x + 68, y + 28);
+  ctx.stroke();
   ctx.restore();
   return screen;
 }
@@ -325,6 +330,9 @@ async function main() {
     w: data.safeArea[0],
     h: data.safeArea[1],
   };
+  // Where TopbarSafeInsets puts a ScreenGui: the part of Roblox's top bar row left free.
+  const [tx0, ty0, tx1, ty1] = data.topbarInset ?? [0, 0, 0, 0];
+  const topbar = { x: tx0, y: ty0, w: tx1 - tx0, h: ty1 - ty0 };
 
   const content = collectContent(data.workspace, collectContent(data.playerGui, new Set()));
   const textures = new Map();
@@ -396,9 +404,9 @@ async function main() {
   if (data.playerGui) {
     await loadFontsFor(data.playerGui);
     drawBillboards(ctx, data.playerGui, world.partsById, camera, W, H, imageFor);
-    drawScreenGuis(ctx, data.playerGui, { w: W, h: H }, safe, imageFor);
+    drawScreenGuis(ctx, data.playerGui, { w: W, h: H }, safe, imageFor, topbar);
   }
-  if (params.get('topbar') !== '0') drawTopBar(ctx, { w: W, h: H });
+  if (params.get('topbar') !== '0') drawTopBar(ctx, { w: W, h: H }, safe);
   window.__previewDone = true;
 }
 

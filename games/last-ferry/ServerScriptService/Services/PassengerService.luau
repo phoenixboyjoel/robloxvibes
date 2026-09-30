@@ -303,7 +303,6 @@ function PassengerService.setPuddle(model: Model, on: boolean)
 	local puddle = Instance.new("Part")
 	puddle.Name = "Puddle"
 	puddle.Shape = Enum.PartType.Cylinder
-	puddle.Size = Vector3.new(0.04, 0.6, 0.6)
 	puddle.CFrame = CFrame.new(centre) * CFrame.Angles(0, 0, math.rad(90))
 	puddle.Color = Color3.fromRGB(18, 30, 36)
 	puddle.Material = Enum.Material.Glass
@@ -314,8 +313,9 @@ function PassengerService.setPuddle(model: Model, on: boolean)
 	puddle.CanTouch = false
 	puddle.CanQuery = false
 	puddle.CastShadow = false
+	-- It spreads on each client, so it grows smoothly there.
+	Glide.spread(puddle, Vector3.new(0.04, 0.6, 0.6), Vector3.new(0.04, 5.6, 5.6), 6)
 	puddle.Parent = model.Parent
-	TweenService:Create(puddle, TweenInfo.new(6, Enum.EasingStyle.Sine), { Size = Vector3.new(0.04, 5.6, 5.6) }):Play()
 	figure.puddle = puddle
 end
 

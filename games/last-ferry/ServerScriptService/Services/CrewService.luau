@@ -259,10 +259,10 @@ local function onCharacter(player: Player, character: Model)
 	end
 end
 
--- Whether a character's feet are inside the booth (seen from above).
+-- Whether a character is inside the booth: within its walls and under its roof.
 local function inBooth(root: BasePart): boolean
 	local at = root.Position
-	return math.abs(at.X) < 4.9 and at.Z > 0.2 and at.Z < 7.9
+	return math.abs(at.X) < 4.9 and at.Z > 0.2 and at.Z < 7.9 and at.Y < 8
 end
 
 -- Mid-shift, puts any clerk who has ended up outside the booth back at their stand: a

@@ -150,8 +150,9 @@ otherwise. Don't weaken or skip a test to get green.
 - Keep the bottom centre of the screen clear: the passenger's shadow falls
   there, and it's a rule from night 4.
 - Nothing may cover a passenger's face while they're at the window: breath is
-  a rule from night 3. That's why the radio waits for an empty window and
-  warnings show as a banner over the top bar.
+  a rule from night 3. That's why the radio waits for an empty window,
+  warnings show as a banner across the status in Roblox's top bar row, and
+  the speech bubble never goes lower than the top of their head.
 - In co-op, the other clerks are in the booth too: anyone standing between you
   and the window turns see-through on your screen (`CameraController`), and an
   invisible guard over the counter stops anyone standing on it. Keep the space
@@ -162,8 +163,12 @@ otherwise. Don't weaken or skip a test to get green.
   button on touch screens; `Game.spec` checks both.
 - A passenger's line is in a bubble over their head for the whole window
   (`Ui/Speech`), not Roblox's own bubble: it's a rule on night 5, and must be
-  readable on every device, consoles included. On a phone the top bar drops the
-  date to make room for it.
+  readable on every device, consoles included. It's drawn over the HUD but kept
+  to the room the HUD leaves it (`updateSpeechRoom` in `HudController`); add
+  any new HUD piece there. The shift's status lives in Roblox's own top bar row
+  (`Ui/TopBar`, `TopbarSafeInsets`) so that, on a phone, the longest line fits
+  between the top of the screen and a passenger's head. `Game.spec` checks the
+  longest line from every stand on a monitor, a notched phone and an iPhone SE.
 - Every tell must be visible from the front stand's first-person view (the eye
   is held at y = 5.1 for every avatar). The sill hides the planks closer than
   z ≈ −4.1, and a passenger's body hides everything straight behind them.

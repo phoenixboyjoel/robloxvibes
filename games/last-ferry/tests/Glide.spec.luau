@@ -94,6 +94,48 @@ T.test("a glide eases along, turns ahead of the move if asked, and ends exactly"
 	clean(sim)
 end)
 
+T.test("a glide that carries straight on from the last keeps its lag, so a walk's corners join up", function()
+	local sim = Sim.new({ root = "." })
+	local r = sim:execute([[
+		local Glide = require("../ReplicatedStorage/Shared/Glide")
+		local function leg(from, to, start, time)
+			return {
+				id = 1,
+				from = CFrame.new(from),
+				to = CFrame.new(to),
+				start = start,
+				time = time,
+				style = Enum.EasingStyle.Linear,
+				direction = Enum.EasingDirection.Out,
+				turn = 0,
+			}
+		end
+		local first = leg(Vector3.zero, Vector3.new(10, 0, 0), 0, 2)
+		local next = leg(Vector3.new(10, 0, 0), Vector3.new(10, 0, 10), 2, 2)
+		local elsewhere = leg(Vector3.new(0, 0, 5), Vector3.new(10, 0, 10), 2, 2)
+		local later = leg(Vector3.new(10, 0, 0), Vector3.new(10, 0, 10), 3, 2)
+		return {
+			Glide.lagFor(first, 0.2, next, 0.2),
+			Glide.lagFor(first, 0.2, next, 0.05),
+			Glide.lagFor(first, 0.2, next, 0.45),
+			Glide.lagFor(first, 0.2, next, 1.5),
+			Glide.lagFor(first, 0.2, elsewhere, 0.3),
+			Glide.lagFor(first, 0.2, elsewhere, 0.7),
+			Glide.lagFor(first, 0.2, later, 0.05),
+			Glide.lagFor(nil, 0, next, 0.3),
+		}
+	]])
+	T.equal(r[1], 0.2, "the next leg, arriving as late as the last, plays just as far behind")
+	T.equal(r[2], 0.2, "arriving sooner, it still waits for the last to finish here: no skip at the corner")
+	T.equal(r[3], 0.45, "arriving later, it plays from when it arrives: a pause at the corner, not a skip")
+	T.equal(r[4], 0.7, "very late, it's joined no more than LATE behind the last")
+	T.equal(r[5], 0.3, "a glide from somewhere else is timed on its own")
+	T.equal(r[6], 0, "and joined where it has got to if it's very late")
+	T.equal(r[7], 0.05, "as is one that starts a second after the last ended")
+	T.equal(r[8], 0.3, "the first glide is timed on its own")
+	clean(sim)
+end)
+
 T.test("the server sends a glide once; each client moves it every frame", function()
 	local sim, crate = crateSim()
 	sim:addPlayer("Alice", 101)
@@ -134,6 +176,53 @@ T.test("the server's copy waits at the start, and a player who joins mid-glide s
 	)
 	sim:run(2.2)
 	near(crate.Position, V.new(10, 1, 0), "and at the end with everyone else")
+	clean(sim)
+end)
+
+T.test("with no players, the server's copy still ends up where the glide ends, moved just once", function()
+	local sim, crate = crateSim()
+	sim:execute(GLIDE .. "Glide.start(crate, CFrame.new(10, 1, 0), 2)")
+	local writes = sim:countWrites(crate, "CFrame")
+	sim:run(1)
+	near(crate.Position, V.new(0, 1, 0), "at the start while it glides")
+	sim:run(1.2)
+	near(crate.Position, V.new(10, 1, 0), "at the end once it's over")
+	T.equal(writes.server, 1, "the server moved it once, at the end")
+	clean(sim)
+end)
+
+T.test("a spreading part is full size on the server and grows on each client", function()
+	local sim = Sim.new({ root = "." })
+	sim:addPlayer("Alice", 101)
+	sim:run(0.2)
+	local full = sim:execute([[
+		local Glide = require("../ReplicatedStorage/Shared/Glide")
+		local puddle = Instance.new("Part")
+		puddle.Name = "Puddle"
+		puddle.Anchored = true
+		Glide.spread(puddle, Vector3.new(0.04, 0.6, 0.6), Vector3.new(0.04, 5.6, 5.6), 2)
+		local size = puddle.Size
+		puddle.Parent = workspace
+		return size
+	]])
+	near(full, V.new(0.04, 5.6, 5.6), "the server's copy is its full size at once")
+	local puddle = sim.workspace.Puddle
+	local writes = sim:countWrites(puddle, "Size")
+	local sizes = {}
+	sim:run(2.2, FRAME, function()
+		table.insert(sizes, puddle.Size.Y)
+	end)
+	T.expect(sizes[1] < 1, `on Alice's screen it starts small ({sizes[1]})`)
+	for i = 2, #sizes do
+		T.expect(sizes[i] >= sizes[i - 1], `frame {i}: it only grows ({sizes[i - 1]} to {sizes[i]})`)
+	end
+	T.expect(sizes[30] > 3 and sizes[30] < 5.6, `part way at 1 s ({sizes[30]})`)
+	near(puddle.Size, V.new(0.04, 5.6, 5.6), "and full size at the end")
+	local grown = writes["client:101"] or 0
+	T.expect(grown >= 55, `Alice's client grew it every frame ({grown})`)
+	sim:run(1)
+	T.equal(writes["client:101"], grown, "and it stays that size")
+	T.equal(writes.server or 0, 0, "the server never touched it again")
 	clean(sim)
 end)
 

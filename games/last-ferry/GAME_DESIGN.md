@@ -132,15 +132,17 @@ Not in the first build. Planned:
   back and to the right across the planks, clear of their own body. A lamp
   straight overhead would hide the shadow behind the passenger, and the shadow
   is a rule.
-- **HUD, laid out on a 960 × 420 canvas and scaled to the screen:**
+- **HUD.** The status is up in Roblox's own top bar row, beside Roblox's
+  buttons, as pills like Roblox's; the rest is laid out on a 960 × 420 canvas
+  and scaled to the screen:
 
   | Where | What |
   | --- | --- |
-  | Top | the night, the clock and date · the ledger, the queue, three lanterns; banners for lost lanterns and found pages |
+  | Roblox's top bar | the night, the clock and date · the ledger, the queue, three lanterns; banners for lost lanterns and found pages |
   | Left, the "desk" | ticket, countdown, BOARD / TURN AWAY |
   | Right | rules card and manifest, which you can hide |
   | Top centre | Pike's radio |
-  | Over each passenger | what they say, in a bubble drawn like Roblox's chat bubble, up for the whole window and on every device (and in the chat window) |
+  | Over each passenger | what they say, in a bubble drawn like Roblox's chat bubble, up for the whole window and on every device (and in the chat window), over the HUD but clear of it and never over their face |
   | Bottom centre | kept clear, because that's where the shadows fall |
 
 - In Roblox's chunky house style: thick dark outlines, rounded corners, hard

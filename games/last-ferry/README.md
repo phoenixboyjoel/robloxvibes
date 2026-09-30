@@ -21,9 +21,10 @@ queue, trying to get home.
   own avatar, with your friends; hold **E** at the time clock and the whole
   server clocks in. You work the window in first person, side by side at the
   counter in the harbor's captain's caps. Passengers are classic Robloxians who
-  talk in Roblox-style chat bubbles and walk smoothly on every screen, the HUD
-  is Roblox's chunky house style, and the player list keeps your Endings and
-  Shifts.
+  talk in Roblox-style chat bubbles and walk smoothly on every screen, the
+  night, the clock and your lanterns sit in Roblox's own top bar beside its
+  buttons, the HUD is Roblox's chunky house style, and the player list keeps
+  your Endings and Shifts.
 - **One to four players** share the booth, and anyone can make the call.
 - **Controls:**
   - On the pier: Roblox's usual controls, camera, chat and emotes.
@@ -57,10 +58,13 @@ the banner say what to do; the time clock by the back door has Roblox's own
 | ![First-person booth view with a living passenger](docs/preview-living.png) | ![First-person booth view with a drowned passenger](docs/preview-drowned.png) |
 
 **The window, in first person.** Passengers are classic Robloxians and talk in
-bubbles drawn like Roblox's own, which stay up for the whole window. The living
-breathe fog and cast a shadow back and to the right of them under the lamp. The drowned carry old tickets with the blue anchor stamp;
-this one drips seawater and wears seaweed. The HUD is Roblox's chunky style:
-green BOARD, red TURN AWAY, lanterns top right, rules on the right.
+bubbles drawn like Roblox's own, which stay up for the whole window, over their
+heads and clear of the HUD. The living breathe fog and cast a shadow back and to
+the right of them under the lamp. The drowned carry old tickets with the blue
+anchor stamp; this one drips seawater and wears seaweed. The night, the clock
+and the lanterns are pills in Roblox's own top bar, beside its buttons; below
+them the HUD is Roblox's chunky style: the ticket, green BOARD, red TURN AWAY,
+and the rules on the right.
 
 | The clerks, seen from the dock | On a phone |
 | --- | --- |
@@ -68,9 +72,9 @@ green BOARD, red TURN AWAY, lanterns top right, rules on the right.
 
 **Friends share the booth** in the harbor's captain's cap, each at a stand behind
 the counter; whoever stands between you and the window turns see-through on
-your screen. **On a phone** the HUD scales down, stays below Roblox's top bar,
-keeps the rules panel clear of the jump button, and makes room for the
-passenger's bubble.
+your screen. **On a phone** the status stays up in Roblox's top bar, the HUD
+scales down and keeps the rules panel clear of the jump button, and there's
+room above the passenger's head for even the longest line.
 
 ## Status
 
@@ -79,7 +83,7 @@ passenger's bubble.
 | Game logic (rules, queue generation, runs, endings) | Built, fuzz-tested over thousands of generated nights |
 | Shift flow (intro, window, summary, retry, ending, co-op Continue) | Built, simulated end to end |
 | Server (world, passengers, crew, remotes, saves) and client (cameras, HUD, crowd, sounds) | Built, run together in a headless Roblox simulator with players' characters |
-| Roblox look and feel (avatars and pier lobby, classic Robloxian passengers, chat bubbles, chunky HUD, player list, built-in sounds, smooth movement on every screen) | Built, tested headless, previewed with an approximate renderer |
+| Roblox look and feel (avatars and pier lobby, classic Robloxian passengers, chat bubbles, status in Roblox's top bar, chunky HUD, player list, built-in sounds, smooth movement on every screen) | Built, tested headless, previewed with an approximate renderer |
 | Looks, lighting, feel, pacing in real Roblox | **Not yet seen.** It needs a playtest in Roblox Studio on your machine ([PLAYTEST.md](PLAYTEST.md)) |
 | Store page, badges, icon, questionnaire | To do before publishing (checklist below) |
 
@@ -123,7 +127,7 @@ GitHub Actions runs all of these on every pull request
 same pinned versions. It keeps the built place file as a download on each run.
 
 At the time of this build every check comes back clean:
-- 80 tests pass.
+- 90 tests pass.
 - There are 0 selene findings.
 - There are 0 strict type errors.
 
@@ -152,6 +156,24 @@ The Roblox-look overhaul's review found, and this build fixes:
   the booth, hat sparkles hidden under the cap, a click sound every device has,
   and Roblox's classic controls pinned so gamepad A doesn't board and jump.
 
+The second review, of the fixes above and the smooth movement, found, and this
+build fixes:
+- **The passenger's line under the HUD:** Roblox draws every ScreenGui over
+  BillboardGuis, so on a phone the HUD covered the bubble over a passenger's
+  head. The bubble is now on its own layer over the HUD, kept to the room the
+  HUD leaves it and never lower than the top of their head, and the night, the
+  clock and the lanterns moved up into Roblox's own top bar row, beside its
+  buttons, to make room on phones. The tests check the longest line in the game
+  from every stand, on a monitor, a notched phone and an iPhone SE.
+- **Every stand looks at the passenger:** side and back stands now start each
+  night turned to the passenger's face, aimed from the booth's eye height (the
+  first try aimed from the avatar's own eye for a frame, and looked up).
+- **Plus:** a walk's legs join up under uneven network timing, wet passengers'
+  puddles spread on each screen, the countdown and cards cope with a dropped
+  connection, a respawn during the flood keeps the flood's view, the
+  thumbstick's area allows for the top bar, and a clerk found on the booth's
+  roof is put back at their stand.
+
 Smooth movement came out of the same research: nothing is tweened on the
 server any more. The server sends each move once and every client plays it
 smoothly (`Shared/Glide`), so passengers, the ferry and the door don't stutter,
@@ -168,8 +190,8 @@ The tests have three layers:
    timeouts, retries, co-op Continue and ignored junk input. A bot that sees only
    the screen state plays perfectly, and nothing on screen reveals who is
    drowned.
-3. **The real game, headless** (`Game.spec`, `Glide.spec`, `Passenger.spec`,
-   `Sim.spec`):
+3. **The real game, headless** (`Game.spec`, `Glide.spec`, `Speech.spec`,
+   `Passenger.spec`, `Sim.spec`):
    - The actual server and client scripts run together in `tests/sim`, a mock
      Roblox checked against the engine's API dump, on a virtual clock, with
      players' characters, spawns, accessories, ProximityPrompts,
@@ -183,6 +205,11 @@ The tests have three layers:
      and restored), gamepad A boarding instead of jumping, what players hear,
      button sizes and the jump-button gap on phones and tablets, passengers'
      lines on a console, the co-op view, respawns, and the error path.
+   - The simulator lays GUI out as Roblox does, so the tests check where things
+     are on screen: the longest line clear of every piece of the HUD and above
+     the passenger's head from every stand, on three screens; the status
+     fitting however much of the top bar Roblox's buttons leave; every stand's
+     view aimed at the passenger.
    - Passengers walk a steady stride every frame on each client while the
      server sends each leg once (`sim:countWrites` counts who moved what), and
      glides survive late joiners, changes of course and late server moves.

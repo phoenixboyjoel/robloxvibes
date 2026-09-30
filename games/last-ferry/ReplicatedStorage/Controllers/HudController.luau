@@ -6,9 +6,11 @@
 	(hold E at the time clock by the booth door) and the endings found so far. Roblox's
 	own UI does the rest: the player list, chat, emotes, the touch controls.
 
-	On shift, on a canvas at least 960 x 420 scaled to fit the screen (see Theme):
-		top bar        night, date and clock · lanterns, queue, ledger; a lost lantern
-		               or a found page shows as a banner over it for a few seconds
+	On shift, the status is up in Roblox's own top bar row, beside Roblox's buttons
+	(Ui/TopBar): the night, the clock and the date; the ledger, the queue and the
+	lanterns. A lost lantern or a found page shows as a banner across it for a few
+	seconds. Everything else is on a canvas at least 960 x 420 scaled to fit the
+	screen (see Theme):
 		left "desk"    the ticket, the window countdown, BOARD / TURN AWAY
 		right          the rules card and, from night 3, the manifest (can be hidden);
 		               the ledger opens over it without blocking anything. On touch
@@ -22,7 +24,8 @@
 	Passengers talk the Roblox way: each line is a bubble over their head in Roblox's
 	chat-bubble style (Ui/Speech), up for as long as they're at the window, and a
 	line in the chat window, so it can be read again. "{name}" becomes the local
-	player's display name.
+	player's display name. The bubble is drawn over the HUD but kept to the part of
+	the screen the HUD leaves free, so neither ever covers the other.
 
 	Keys, bound with ContextActionService above Roblox's own controls, and only taken
 	when they do something (otherwise gamepad A still jumps): B / gamepad A board,
@@ -49,6 +52,7 @@ local Sfx = require("../Ui/Sfx")
 local Speech = require("../Ui/Speech")
 local Theme = require("../Ui/Theme")
 local Ticket = require("../Ui/Ticket")
+local TopBar = require("../Ui/TopBar")
 local Ui = require("../Ui/Ui")
 local Widgets = require("../Ui/Widgets")
 local CameraController = require("./CameraController")
@@ -59,7 +63,11 @@ local F = Theme.Fonts
 
 local DESK_WIDTH = 250
 local SIDE_WIDTH = 250
-local TOP = 70 -- below the top bar
+-- Where the desk and the rules panel start: just under Roblox's top bar row, where the
+-- status is; or, where there's no such row, under the status at the top of the HUD.
+local TOP_UNDER_ROW = 16
+local TOP_UNDER_BAR = 70
+local SPEECH_GAP = 8 -- between the speech bubble and the HUD
 -- Screen px kept clear above the bottom-right corner for Roblox's touch jump button
 -- (TouchJump): 70 px, 90 px up, when the screen's short side is 500 px or less, else
 -- 120 px, 210 px up; plus a margin.
@@ -208,8 +216,12 @@ function HudController.start()
 	cursor.Visible = false
 	cursor.Parent = hud
 
-	-- What the passenger at the window says, over their head.
-	local speech = Speech.new(playerGui)
+	-- What the passenger at the window says, over their head, in the room the HUD leaves
+	-- (see updateSpeechRoom).
+	local speechRoom: Speech.Area? = nil
+	local speech = Speech.new(playerGui, function(): Speech.Area?
+		return speechRoom
+	end)
 
 	local play = Ui.frame(root, "Play", UDim2.fromScale(1, 1))
 	play.ZIndex = 1
@@ -248,83 +260,13 @@ function HudController.start()
 	lobbyFound.LayoutOrder = 3
 
 	-- Top bar -------------------------------------------------------------------
-	-- Left: the night in a pill, then the clock and the date. Right: the ledger, the
-	-- queue and the three lanterns.
-	local topBar = Ui.frame(play, "TopBar", UDim2.new(1, -32, 0, 56), UDim2.fromOffset(16, 6))
-	local topLeft = Ui.frame(topBar, "Left", UDim2.fromScale(0.62, 1))
-	Ui.list(topLeft, Enum.FillDirection.Horizontal, 12, Enum.HorizontalAlignment.Left, Enum.VerticalAlignment.Center)
-	local nightLabel = Widgets.tag(topLeft, "Night", "", C.panel, C.lamp, 22)
-	nightLabel.FontFace = F.display
-	nightLabel.LayoutOrder = 1
-	Ui.textStroke(nightLabel, 2)
-	Ui.shadow(nightLabel, 4)
-	local clockLabel = Ui.label(topLeft, "Clock", {
-		font = F.title,
-		size = 28,
-		frameSize = UDim2.fromScale(0, 1),
-		autoSize = Enum.AutomaticSize.X,
-		order = 2,
-	})
-	Ui.textStroke(clockLabel, 2.5)
-	local dateLabel = Ui.label(topLeft, "Date", {
-		font = F.bodyBold,
-		size = 16,
-		color = C.muted,
-		frameSize = UDim2.fromScale(0, 1),
-		autoSize = Enum.AutomaticSize.X,
-		order = 3,
-	})
-	Ui.textStroke(dateLabel, 2)
-
-	local topRight = Ui.frame(topBar, "Right", UDim2.fromScale(0.38, 1), UDim2.fromScale(1, 0), Vector2.new(1, 0))
-	Ui.list(topRight, Enum.FillDirection.Horizontal, 12, Enum.HorizontalAlignment.Right, Enum.VerticalAlignment.Center)
-	local ledgerButton = Ui.button(topRight, "Ledger", "LEDGER", UDim2.fromOffset(150, 56), {
-		fill = C.paper,
-		deep = C.paperMuted,
-		text = C.paperInk,
-		textSize = 17,
-		icon = "page",
-	})
-	ledgerButton.LayoutOrder = 1
-	ledgerButton.Visible = false
-	local queueLabel = Widgets.tag(topRight, "Queue", "", C.panel, C.text, 16)
-	queueLabel.LayoutOrder = 2
-	Ui.shadow(queueLabel, 4)
-	local lanternRow = Ui.frame(topRight, "Lanterns", UDim2.fromOffset(86, 34))
-	lanternRow.LayoutOrder = 3
-	Ui.list(lanternRow, Enum.FillDirection.Horizontal, 7, Enum.HorizontalAlignment.Left, Enum.VerticalAlignment.Center)
-	local lanterns: { Frame } = {}
-	for i = 1, 3 do
-		table.insert(lanterns, Widgets.lantern(lanternRow, i))
-	end
-
-	-- A banner over the top bar: a lantern going out, or a page someone found. A round
-	-- badge on the left says which at a glance.
-	local alert = Ui.panel(play, "Alert", UDim2.new(1, -32, 0, 0), UDim2.fromOffset(16, 6))
-	alert.AutomaticSize = Enum.AutomaticSize.Y
-	alert.BackgroundTransparency = 0
-	alert.ZIndex = 3
-	alert.Visible = false
-	Ui.padding(alert, 8, 16, 10, 64)
-	local alertBadge =
-		Ui.frame(alert, "Badge", UDim2.fromOffset(40, 40), UDim2.new(0, -52, 0.5, 0), Vector2.new(0, 0.5))
-	alertBadge.BackgroundTransparency = 0
-	Ui.corner(alertBadge, UDim.new(0.5, 0))
-	Ui.stroke(alertBadge, C.outline, 3)
-	local alertIcons: { [string]: Frame } = {}
-	for _, kind in { "bang", "page" } do
-		local icon = Ui.icon(alertBadge, kind, 24, C.text)
-		icon.AnchorPoint = Vector2.new(0.5, 0.5)
-		icon.Position = UDim2.fromScale(0.5, 0.5)
-		alertIcons[kind] = icon
-	end
-	local alertTitle = Widgets.caption(alert, "", C.bad, 1)
-	alertTitle.Size = UDim2.new(1, 0, 0, 20)
-	local alertText = Widgets.paragraph(alert, "", { size = 16, order = 2 })
-	alertText.Position = UDim2.fromOffset(0, 22)
+	-- Up in Roblox's own top bar row, beside Roblox's buttons: the night, the clock and the
+	-- date; the ledger, the queue and the lanterns. A lost lantern or a found page shows as a
+	-- banner across it for a few seconds.
+	local status = TopBar.new(playerGui, play)
 
 	-- Desk: ticket, countdown, and the two calls -----------------------------------
-	local desk = Ui.frame(play, "Desk", UDim2.fromOffset(DESK_WIDTH, 320), UDim2.fromOffset(16, TOP))
+	local desk = Ui.frame(play, "Desk", UDim2.fromOffset(DESK_WIDTH, 320), UDim2.fromOffset(16, TOP_UNDER_ROW))
 	local ticket = Ticket.new(desk, UDim2.fromOffset(0, 0))
 	local idle = Ui.label(desk, "Idle", {
 		text = "The next passenger is coming up the dock...",
@@ -393,8 +335,13 @@ function HudController.start()
 	end
 
 	-- Side panel: rules and manifest -----------------------------------------------
-	local side =
-		Ui.panel(play, "Side", UDim2.new(0, SIDE_WIDTH, 1, -(TOP + 16)), UDim2.new(1, -16, 0, TOP), Vector2.new(1, 0))
+	local side = Ui.panel(
+		play,
+		"Side",
+		UDim2.fromOffset(SIDE_WIDTH, 300),
+		UDim2.new(1, -16, 0, TOP_UNDER_ROW),
+		Vector2.new(1, 0)
+	)
 	local tabs = Ui.frame(side, "Tabs", UDim2.new(1, -16, 0, 56), UDim2.fromOffset(8, 6))
 	Ui.list(tabs, Enum.FillDirection.Horizontal, 4, Enum.HorizontalAlignment.Left, Enum.VerticalAlignment.Center)
 	local rulesTab = tabButton(tabs, "RULES", 76, 1)
@@ -424,11 +371,12 @@ function HudController.start()
 		textSize = 18,
 	})
 	showSide.AnchorPoint = Vector2.new(1, 0)
-	showSide.Position = UDim2.new(1, -16, 0, TOP)
+	showSide.Position = UDim2.new(1, -16, 0, TOP_UNDER_ROW)
 	showSide.Visible = false
 
 	-- Top centre: Pike's radio -----------------------------------------------------------
-	local center = Ui.frame(play, "Center", UDim2.fromOffset(300, 0), UDim2.new(0.5, 30, 0, 60), Vector2.new(0.5, 0))
+	local center =
+		Ui.frame(play, "Center", UDim2.fromOffset(300, 0), UDim2.new(0.5, 30, 0, TOP_UNDER_ROW), Vector2.new(0.5, 0))
 	center.AutomaticSize = Enum.AutomaticSize.Y
 	Ui.list(center, Enum.FillDirection.Vertical, 8, Enum.HorizontalAlignment.Center)
 
@@ -459,8 +407,13 @@ function HudController.start()
 
 	-- Ledger: the harbormaster's torn pages found this run. It opens over the rules
 	-- panel and blocks nothing else, so the window can still be worked.
-	local ledger =
-		Ui.frame(play, "Ledger", UDim2.new(0, SIDE_WIDTH, 1, -(TOP + 16)), UDim2.new(1, -16, 0, TOP), Vector2.new(1, 0))
+	local ledger = Ui.frame(
+		play,
+		"Ledger",
+		UDim2.fromOffset(SIDE_WIDTH, 300),
+		UDim2.new(1, -16, 0, TOP_UNDER_ROW),
+		Vector2.new(1, 0)
+	)
 	ledger.ZIndex = 2
 	ledger.Visible = false
 	ledger.BackgroundTransparency = 0
@@ -563,18 +516,77 @@ function HudController.start()
 		return UserInputService.PreferredInput == Enum.PreferredInput.Touch
 	end
 
-	-- The rules panel and the ledger run down the right side, stopping short of Roblox's
-	-- jump button on touch screens.
+	-- Whether a piece of the HUD is on screen: it, everything it's in, and its ScreenGui.
+	local function showing(object: GuiObject): boolean
+		local node: Instance? = object
+		while node and not node:IsA("LayerCollector") do
+			if node:IsA("GuiObject") and not node.Visible then
+				return false
+			end
+			node = node.Parent
+		end
+		return node ~= nil and (node :: LayerCollector).Enabled
+	end
+
+	-- The part of the screen the passenger's speech bubble may use, while the window is
+	-- being worked: right of the desk (and the page tab), left of the rules panel (or the
+	-- ledger, or the RULES button), below the status and its banner (when they're in the HUD
+	-- rather than Roblox's top bar) and the radio, and above the hint. From where those
+	-- are on screen, whenever the HUD changes.
+	local function updateSpeechRoom()
+		local state = lastState
+		if not (state and (state.phase == "queue" or state.phase == "window")) then
+			speechRoom = nil
+			return
+		end
+		local at, size = hud.AbsolutePosition, hud.AbsoluteSize
+		local left, top, right, bottom = at.X, at.Y, at.X + size.X, at.Y + size.Y
+		local gap = SPEECH_GAP * uiScale.Scale
+		local onLeft: { GuiObject } = { desk, ticket.pageTab }
+		for _, object in onLeft do
+			if showing(object) then
+				left = math.max(left, object.AbsolutePosition.X + object.AbsoluteSize.X + gap)
+			end
+		end
+		local onRight: { GuiObject } = { side, ledger, showSide }
+		for _, object in onRight do
+			if showing(object) then
+				right = math.min(right, object.AbsolutePosition.X - gap)
+			end
+		end
+		local above: { GuiObject } = { status.bar, status.alert, radio }
+		for _, object in above do
+			if showing(object) then
+				top = math.max(top, object.AbsolutePosition.Y + object.AbsoluteSize.Y + gap)
+			end
+		end
+		if showing(hint) then
+			bottom = math.min(bottom, hint.AbsolutePosition.Y - gap)
+		end
+		speechRoom = { left = left, top = top, right = right, bottom = bottom }
+	end
+
+	-- The desk down the left side, and the rules panel and the ledger down the right, from
+	-- just under the status to the bottom, where the rules panel stops short of Roblox's
+	-- jump button on touch screens. Pike's radio is at the top, between them.
 	local function layoutSide()
+		local topY = if status.inRow() then TOP_UNDER_ROW else TOP_UNDER_BAR
 		local bottom = 16
 		if touchControls() then
 			local size = hud.AbsoluteSize
 			local clearance = if math.min(size.X, size.Y) <= 500 then JUMP_CLEARANCE_SMALL else JUMP_CLEARANCE_BIG
 			bottom += math.ceil(clearance / uiScale.Scale)
 		end
-		side.Size = UDim2.new(0, SIDE_WIDTH, 1, -(TOP + bottom))
+		desk.Position = UDim2.fromOffset(16, topY)
+		side.Position = UDim2.new(1, -16, 0, topY)
+		side.Size = UDim2.new(0, SIDE_WIDTH, 1, -(topY + bottom))
+		ledger.Position = side.Position
 		ledger.Size = side.Size
+		showSide.Position = side.Position
+		center.Position = UDim2.new(0.5, 30, 0, topY)
+		updateSpeechRoom()
 	end
+	status.onPlaced(layoutSide)
 
 	local function rescale()
 		local size = hud.AbsoluteSize
@@ -589,9 +601,6 @@ function HudController.start()
 		uiScale.Scale = scale
 		root.Size = UDim2.fromScale(1 / scale, 1 / scale)
 		overlay.resize(size / scale)
-		-- On a phone the passenger's speech bubble floats up beside the clock, so the date
-		-- (on the rules card too) makes room for it.
-		dateLabel.Visible = scale >= 0.9
 		layoutSide()
 	end
 
@@ -632,14 +641,7 @@ function HudController.start()
 		background: Color3,
 		seconds: number
 	)
-		alertTitle.Text = title
-		alertTitle.TextColor3 = color
-		alertText.Text = text
-		alert.BackgroundColor3 = background
-		alertBadge.BackgroundColor3 = color:Lerp(Color3.new(0, 0, 0), 0.25)
-		for kind, frame in alertIcons do
-			frame.Visible = kind == icon
-		end
+		status.setAlert(title, text, icon, color, background)
 		alertUntil = os.clock() + seconds
 	end
 
@@ -651,6 +653,7 @@ function HudController.start()
 		setTabSelected(rulesTab, not showingManifest)
 		setTabSelected(manifestTab, showingManifest)
 		scroller.CanvasPosition = Vector2.zero
+		updateSpeechRoom()
 	end
 
 	local function renderRules(state: View.State)
@@ -720,12 +723,14 @@ function HudController.start()
 		end
 		renderLedger(state)
 		ledger.Visible = true
+		updateSpeechRoom()
 		ledgerToken += 1
 		local token = ledgerToken
 		if autoClose then
 			task.delay(14, function()
 				if ledgerToken == token then
 					ledger.Visible = false
+					updateSpeechRoom()
 				end
 			end)
 		end
@@ -744,8 +749,10 @@ function HudController.start()
 		local state = lastState
 		-- The radio never covers someone at the window: the shift pauses for it.
 		radio.Visible = now < radioUntil and not (state and state.phase == "window")
-		alert.Visible = now < alertUntil
-		topBar.Visible = not alert.Visible and state ~= nil and state.night > 0
+		status.alert.Visible = now < alertUntil
+		status.bar.Visible = not status.alert.Visible and state ~= nil and state.night > 0
+		status.fit()
+		updateSpeechRoom()
 	end
 
 	local function render(state: View.State)
@@ -756,6 +763,7 @@ function HudController.start()
 		-- out on the pier with only the lobby banner up.
 		local cardPhase = phase == "intro" or phase == "summary"
 		play.Visible = phase == "queue" or phase == "window" or phase == "failed"
+		status.setShown(play.Visible)
 		lobby.Visible = phase == "waiting"
 		dim.BackgroundTransparency = if cardPhase then 0.45 elseif phase == "ending" then 0.8 else 1
 		EffectsController.setBlur(cardPhase)
@@ -763,6 +771,11 @@ function HudController.start()
 		overlay.render(state, progress)
 		if cardPhase or phase == "ending" or phase == "waiting" then
 			ledger.Visible = false
+		end
+		if not (phase == "queue" or phase == "window") then
+			-- A card, the flood or the pier: nobody's talking at the window.
+			speech.clear()
+			speechPassenger = nil
 		end
 
 		if phase ~= previousPhase then
@@ -782,16 +795,16 @@ function HudController.start()
 		end
 
 		-- Top bar.
-		nightLabel.Text = `NIGHT {state.night} / {state.finalNight}`
-		clockLabel.Text = state.clock
-		dateLabel.Text = state.date
-		queueLabel.Text = `IN LINE {state.waiting}`
-		for i, lantern in lanterns do
+		status.night.Text = `NIGHT {state.night} / {state.finalNight}`
+		status.clock.Text = state.clock
+		status.date.Text = state.date
+		status.queue.Text = `IN LINE {state.waiting}`
+		for i, lantern in status.lanterns do
 			Widgets.setLantern(lantern, i <= state.lanterns)
 			lantern.Visible = i <= state.maxLanterns
 		end
-		ledgerButton.Visible = #state.ledger > 0
-		Ui.buttonLabel(ledgerButton).Text = `LEDGER {#state.ledger}/{state.finalNight}`
+		status.ledger.Visible = #state.ledger > 0
+		status.ledgerLabel.Text = `{#state.ledger}/{state.finalNight}`
 		if ledger.Visible then
 			renderLedger(state)
 		end
@@ -933,9 +946,12 @@ function HudController.start()
 	end)
 
 	-- Clocking in or out: a moment of black hides the jump between the pier and the booth,
-	-- and the cursor is freed for the HUD while on shift.
+	-- and the cursor is freed for the HUD while on shift. Roblox's player list (top right on
+	-- a computer) would sit over the rules panel, so it's put away for the shift; it's back
+	-- on the pier, with the Endings and Shifts it keeps.
 	local function onShiftChanged()
 		local onShift = player:GetAttribute("OnShift") == true
+		StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, not onShift)
 		cursor.Visible = onShift
 		blackout.BackgroundTransparency = 0
 		TweenService:Create(blackout, TweenInfo.new(0.9, Enum.EasingStyle.Sine), { BackgroundTransparency = 1 }):Play()
@@ -963,12 +979,14 @@ function HudController.start()
 		sideHidden = false
 		refreshSide()
 	end)
-	ledgerButton.Activated:Connect(function()
+	status.ledger.Activated:Connect(function()
+		Sfx.click()
 		openLedger(false)
 	end)
 	closeLedger.Activated:Connect(function()
 		ledgerToken += 1
 		ledger.Visible = false
+		updateSpeechRoom()
 	end)
 
 	hud:GetPropertyChangedSignal("AbsoluteSize"):Connect(rescale)
@@ -985,8 +1003,9 @@ function HudController.start()
 			return
 		end
 		local passenger = if state.phase == "window" then state.passenger else nil
-		if passenger then
-			local left = math.max(0, passenger.deadline - workspace:GetServerTimeNow())
+		local serverNow = Net.serverTime()
+		if passenger and serverNow then
+			local left = math.max(0, passenger.deadline - serverNow)
 			local share = math.clamp(left / Config.DecisionTime, 0, 1)
 			trackFill.Size = UDim2.fromScale(share, 1)
 			trackFill.BackgroundColor3 = if left < 10 then C.bad else C.lamp

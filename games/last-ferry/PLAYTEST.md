@@ -30,6 +30,15 @@ Disabled**.
 - [ ] A moment of black, then you're inside the booth at the counter in first
       person, the door thunks shut behind you, and the "Night 1" card shows two
       rules and Pike's radio message. **OPEN THE WINDOW** starts the night.
+- [ ] **The status up top:** the night, the clock and the date, then IN LINE
+      and the three lanterns, sit as dark pills in Roblox's own top bar row,
+      beside Roblox's buttons, level with them and the same height. Open
+      Roblox's menu and its chat: nothing of ours sits under Roblox's buttons,
+      and if they take more room (join voice, say) the date drops out first,
+      then IN LINE. On a computer, Roblox's player list (top right) is put
+      away for the shift, so it doesn't cover the rules, and it's back on the
+      pier. With a gamepad, Roblox hides its buttons until you press Menu:
+      check the pills move over and back smoothly.
 
 ## 2. In the booth (first person)
 
@@ -59,6 +68,9 @@ Disabled**.
       invisible guard stops you.
 - [ ] **Respawn mid-shift** (Esc → Reset Character): you're back at a stand,
       looking out of the window, capped.
+- [ ] **Every stand looks at the passenger:** with three or more players, at the
+      start of a night each clerk's view is turned from their own stand to the
+      passenger's face, not straight ahead.
 
 ## 3. The harbor at night (tune these first)
 
@@ -118,6 +130,11 @@ Disabled**.
       read again). The bubble stays up for the whole window (45 s), and shows
       over the wall above the window from every stand, even for a tall
       passenger in a hat. It goes a moment after they leave.
+- [ ] The bubble follows their head smoothly as you look around (no lag or
+      jitter behind the view), is never under or over the ticket, the rules
+      panel or the ledger, and never covers their face: look down at the
+      planks and it stays above their head (off the top of the screen if it
+      has to).
 - [ ] **BOARD** (green, with a check): the button squashes and clicks, the
       ticket gets a BOARDED stamp with a thud and slides away. They walk
       through the gate and up the gangway, then fade.
@@ -128,7 +145,8 @@ Disabled**.
       - a lantern goes out, with a gust of wind: in the top bar, and on the
         counter;
       - the screen flashes red and shakes;
-      - a red banner across the top says why.
+      - a red banner across the top bar row says why, for six seconds, then
+        the status comes back.
 - [ ] The countdown bar under the ticket turns red in the last 10 seconds. At 0
       the window closes, which counts as TURN AWAY.
 
@@ -175,8 +193,10 @@ Disabled**.
         rules panel; the part by their feet, and the shadow mark, should
         stay clear.
       - Roblox's chat window opens bottom left, not over the ticket.
-      - On phones the passenger's bubble sits between the clock and IN LINE,
-        clear of the top bar (the top bar leaves out the date there).
+      - On phones the passenger's bubble sits over their head, between the
+        ticket and the rules panel, with the longest lines (three lines of
+        text) still clear of the top of the screen. The top bar row shows the
+        night, the clock, IN LINE and the lanterns (no date).
       - On an iPad the rules panel stops above the bigger jump button.
       - On the Xbox (a TV screen) there's no Roblox chat at all, but the
         passenger's bubble still shows, in bigger type.
@@ -200,7 +220,9 @@ Disabled**.
 | Clerks' walking speed on shift | `SHIFT_WALK_SPEED` in `CrewService` | 10 studs/s |
 | Eye height in the booth | `EYE_HEIGHT` in `CameraController` | 5.1 studs |
 | How far out the pier camera can zoom | `StarterPlayer.CameraMaxZoomDistance` (project file) | 25 studs |
-| The passenger's speech bubble (text size, width, height above the head) | `ReplicatedStorage/Ui/Speech.luau` | 16 px, 300 px wide (260 on phones), 0.4 studs up |
+| The passenger's speech bubble (text size, width, height above the head) | `ReplicatedStorage/Ui/Speech.luau` | 16 px (24 on a TV), text up to 300 px wide (or the room between the ticket and the rules), 0.4 studs up |
+| The gap between the bubble and the HUD | `SPEECH_GAP` in `HudController` | 8 design px |
+| The status pills in Roblox's top bar row | `ReplicatedStorage/Ui/TopBar.luau` | 44 px pills, 12 px down, near-black at 8% see-through (Roblox's own numbers) |
 | Sound volumes and pitches | `ReplicatedStorage/Shared/Sounds.luau` | |
 | Queue sizes and difficulty per night | `Content.Nights` | 6 to 9 passengers |
 | All story text | `ServerScriptService/Shift/Content.luau` | |

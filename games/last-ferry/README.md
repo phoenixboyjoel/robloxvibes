@@ -40,10 +40,12 @@ will render the fog, light, materials and particles very differently.
 | ![Booth view with a living passenger](docs/preview-living.png) | ![Booth view with a drowned passenger](docs/preview-drowned.png) |
 
 What they show:
-- **Left:** the regular's breath fogs in front of their face. The lighthouse is
-  far off to the left, and the *Petrel*'s lit cabin is on the right.
-- **Right:** a drowned passenger is pale, with a darkened coat and seaweed, and
-  no breath. The previous passenger heads through the gate to the gangway.
+- **Left:** the regular's breath fogs in front of their face, and their shadow
+  falls on the planks behind and to their right. The lighthouse is far off to
+  the left, and the *Petrel*'s lit cabin is on the right.
+- **Right:** a drowned passenger is pale, with a darkened coat, seaweed, and no
+  breath. Water drips from their cuffs and coat, and a puddle spreads around
+  them. There is a torn ledger page tucked in their coat.
 
 ![The lamp's shadow tinted red, with the HUD regions outlined](docs/preview-shadow-and-hud.png)
 

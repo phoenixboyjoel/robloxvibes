@@ -35,7 +35,8 @@ type Sim = {
 	atWindow: Facts?,
 	arrivedAt: number,
 	decided: { [number]: boolean },
-	sentOff: { { night: number, passenger: Types.Passenger, exit: Director.Exit } },
+	sentOff: { { night: number, passenger: Types.Passenger, exit: Director.Exit, time: number } },
+	calledAt: { number },
 	recorded: { { ending: string, secret: boolean } },
 	scenes: { string },
 	flood: boolean,
@@ -127,6 +128,7 @@ local function newSim(seed: number, policy: Policy, actors: { number }?, presser
 	sim.arrivedAt = 0
 	sim.decided = {}
 	sim.sentOff = {}
+	sim.calledAt = {}
 	sim.recorded = {}
 	sim.scenes = {}
 	sim.flood = false
@@ -191,12 +193,13 @@ local function newSim(seed: number, policy: Policy, actors: { number }?, presser
 			assert(passenger, `callToWindow({index}) with no such passenger`)
 			sim.atWindow = { wet = passenger.wet, breath = passenger.breath, shadow = passenger.shadow }
 			sim.arrivedAt = sim.time
+			table.insert(sim.calledAt, sim.time)
 			-- Walking up to the window takes a moment.
 			sim.time += 1.5
 		end,
 		sendOff = function(index: number, exit: Director.Exit)
 			table.insert(sim.log, `sendOff {index} {exit}`)
-			table.insert(sim.sentOff, { night = sim.night, passenger = sim.queue[index], exit = exit })
+			table.insert(sim.sentOff, { night = sim.night, passenger = sim.queue[index], exit = exit, time = sim.time })
 			sim.atWindow = nil
 		end,
 		removePage = function(index: number)
@@ -643,6 +646,43 @@ T.test("the radio checks in once, halfway through each night", function()
 		T.equal(fx.text, Content.Nights[i].radioMid)
 		T.equal(fx.night, i)
 	end
+end)
+
+T.test("Pike's radio plays with nobody at the window, and the last passenger gets to leave", function()
+	local sim = newSim(15, { decide = perfect })
+	play(sim)
+	local radio = fxOf(sim, "radio")
+	T.equal(#radio, Content.FinalNight)
+	-- Find each night's midway call and check the gap before the next passenger.
+	local calls = 0
+	local checkedRadio, checkedLast = 0, 0
+	for night = 1, Content.FinalNight do
+		local count = #Content.Regulars
+			+ Content.Nights[night].validExtras
+			+ Content.Nights[night].errors
+			+ Content.Nights[night].drowned
+			+ (if Content.Nights[night].anna then 1 else 0)
+			+ 1
+		local midway = math.ceil(count / 2)
+		local sentMidway = sim.sentOff[calls + midway]
+		local nextCall = sim.calledAt[calls + midway + 1]
+		T.expect(nextCall - sentMidway.time >= Config.RadioTime, `night {night}: the radio got its pause`)
+		checkedRadio += 1
+		local lastSent = sim.sentOff[calls + count]
+		for _, state in sim.states do
+			if state.phase == "summary" and state.night == night then
+				T.expect(
+					state.phaseEnds - Config.SummaryTime - lastSent.time >= Config.LastPassengerTime,
+					"walk-off time"
+				)
+				checkedLast += 1
+				break
+			end
+		end
+		calls += count
+	end
+	T.equal(checkedRadio, Content.FinalNight)
+	T.equal(checkedLast, Content.FinalNight)
 end)
 
 T.test("every call in the summary is explained", function()

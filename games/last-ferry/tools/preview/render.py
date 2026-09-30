@@ -225,8 +225,8 @@ def render(scene, hud=False, debug_shadows=False):
             puffs = [(position + ahead * s + np.array([0, 0.08 * s, 0]), r) for s, r in ((0.35, 0.16), (0.8, 0.3), (1.35, 0.45))]
             tint, alpha = np.array([0.85, 0.88, 0.92]), 0.28
         else:
-            puffs = [(position + np.array([dx, -dy, dz]), 0.06) for dx, dy, dz in ((0.2, 0.3, -0.1), (-0.25, 0.6, 0.1), (0.05, 0.9, 0.2), (-0.1, 0.25, -0.2))]
-            tint, alpha = np.array([0.55, 0.75, 0.85]), 0.8
+            puffs = [(position + np.array([0, -dy, 0]), 0.12) for dy in (0.15, 0.55, 0.95)]
+            tint, alpha = np.array([0.78, 0.88, 0.92]), 0.75
         for center, radius in puffs:
             t, _ = hit_ball(origins, dirs, center, [radius * 2] * 3)
             front = t < depth

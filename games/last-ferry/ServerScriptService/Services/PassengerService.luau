@@ -5,8 +5,14 @@
 	The tells players check are built here from the passenger's facts, never
 	from their kind, so what you see always matches what the rules judge:
 	- breath: fog puffs in front of the face (ParticleEmitter)
-	- wet: a darker, glossy coat, dripping water, and a puddle at the window
-	- shadow: every visible part has CastShadow = passenger.shadow
+	- wet: a darker, glossy coat; water dripping from the sleeve cuffs and the
+	  front of the hem; a wide puddle spreading out either side of them at the
+	  window; wet footprints where they walk. The window sill hides the planks
+	  closer than z ≈ -4.1, and a passenger's body hides the planks straight
+	  behind them, so these cues sit where the booth can see them.
+	- shadow: every visible part has CastShadow = passenger.shadow, plus a
+	  darkened patch on the planks where the lamp throws the shadow, so the tell
+	  survives phones that drop local-light shadows at low quality
 
 	A figure is an anchored, invisible Root with the visible parts welded to it,
 	so tweening the Root moves the whole figure.
@@ -56,6 +62,7 @@ type Figure = {
 	root: BasePart,
 	halfHeight: number,
 	puddle: BasePart?,
+	mark: BasePart?,
 	page: BasePart?,
 	walk: {}?,
 	tween: Tween?,
@@ -127,28 +134,34 @@ local function breathEmitter(head: BasePart, h: number)
 	emitter.Parent = mouth
 end
 
-local function dripEmitter(coat: BasePart, h: number)
-	local hem = Instance.new("Attachment")
-	hem.Name = "Hem"
-	hem.Position = Vector3.new(0, -1.35 * h, 0)
-	hem.Parent = coat
+-- Water dripping from `part` at `position` (in the part's space). Big, bright and
+-- slow enough to read from the booth at night.
+local function dripEmitter(part: BasePart, position: Vector3)
+	local drip = Instance.new("Attachment")
+	drip.Name = "Drip"
+	drip.Position = position
+	drip.Parent = part
 
 	local emitter = Instance.new("ParticleEmitter")
 	emitter.Name = "Drips"
 	emitter.Texture = DROP_TEXTURE
 	emitter.EmissionDirection = Enum.NormalId.Bottom
-	emitter.Rate = 12
-	emitter.Lifetime = NumberRange.new(0.35, 0.55)
-	emitter.Speed = NumberRange.new(0.2, 0.8)
-	emitter.SpreadAngle = Vector2.new(35, 35)
-	emitter.Acceleration = Vector3.new(0, -40, 0)
-	emitter.Size = NumberSequence.new(0.12)
-	emitter.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.1),
-		NumberSequenceKeypoint.new(1, 0.6),
+	emitter.Rate = 7
+	emitter.Lifetime = NumberRange.new(0.6, 0.9)
+	emitter.Speed = NumberRange.new(0.3, 0.7)
+	emitter.SpreadAngle = Vector2.new(12, 12)
+	emitter.Acceleration = Vector3.new(0, -10, 0)
+	emitter.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.26),
+		NumberSequenceKeypoint.new(1, 0.18),
 	})
-	emitter.Color = ColorSequence.new(Color3.fromRGB(170, 205, 215))
-	emitter.Parent = hem
+	emitter.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.05),
+		NumberSequenceKeypoint.new(1, 0.45),
+	})
+	emitter.Color = ColorSequence.new(Color3.fromRGB(200, 226, 236))
+	emitter.LightEmission = 0.3
+	emitter.Parent = drip
 end
 
 -- Builds the figure standing at `feet`, facing `facing`.
@@ -186,16 +199,23 @@ function PassengerService.spawn(passenger: Types.Passenger, feet: Vector3, facin
 	end
 	local coatColor = if isMara then MARA_COAT else COATS[math.clamp(look.coat, 1, #COATS)]
 	if passenger.wet then
-		coatColor = coatColor:Lerp(Color3.new(0, 0, 0), 0.35)
+		coatColor = coatColor:Lerp(Color3.new(0, 0, 0), 0.45)
 	end
 
+	local arms = {}
 	for _, side in { -1, 1 } do
 		piece(model, root, "Leg", Vector3.new(0.7, 2.2, 0.8) * h, at(0.42 * side, 1.1, 0), LEGS, shadow)
-		piece(model, root, "Arm", Vector3.new(0.55, 2.2, 0.6) * h, at(1.3 * side, 3.0, 0), coatColor, shadow)
+		table.insert(
+			arms,
+			piece(model, root, "Arm", Vector3.new(0.55, 2.2, 0.6) * h, at(1.3 * side, 3.0, 0), coatColor, shadow)
+		)
 	end
 	local coat = piece(model, root, "Coat", Vector3.new(2.1, 2.8, 1.25) * h, at(0, 2.8, 0), coatColor, shadow)
 	if passenger.wet then
-		coat.Reflectance = 0.15
+		coat.Reflectance = 0.25
+		for _, arm in arms do
+			arm.Reflectance = 0.25
+		end
 	end
 
 	local head = piece(model, root, "Head", Vector3.new(1.25, 1.25, 1.25) * h, at(0, 4.85, 0), skin, shadow)
@@ -303,7 +323,13 @@ function PassengerService.spawn(passenger: Types.Passenger, feet: Vector3, facin
 		breathEmitter(head, h)
 	end
 	if passenger.wet then
-		dripEmitter(coat, h)
+		-- From the sleeve cuffs and the front of the hem: high enough to clear the sill.
+		for _, arm in arms do
+			dripEmitter(arm, Vector3.new(0, -1.1 * h, -0.2 * h))
+		end
+		for _, side in { -1, 1 } do
+			dripEmitter(coat, Vector3.new(0.55 * side * h, -1.4 * h, -0.66 * h))
+		end
 	end
 
 	figures[model] = { root = root, halfHeight = halfHeight, puddle = nil, page = page, walk = nil, tween = nil }
@@ -384,12 +410,15 @@ function PassengerService.setPuddle(model: Model, on: boolean)
 	if not on then
 		return
 	end
-	local feet = figure.root.Position - Vector3.new(0, figure.halfHeight, 0)
+	-- The sill hides their feet, and from the booth their body hides the planks right
+	-- behind them, so the puddle spreads wide: its sides show either side of them.
+	local root = figure.root
+	local centre = root.Position - Vector3.new(0, figure.halfHeight - 0.03, 0) - root.CFrame.LookVector * 0.9
 	local puddle = Instance.new("Part")
 	puddle.Name = "Puddle"
 	puddle.Shape = Enum.PartType.Cylinder
 	puddle.Size = Vector3.new(0.04, 0.6, 0.6)
-	puddle.CFrame = CFrame.new(feet + Vector3.new(0, 0.03, 0)) * CFrame.Angles(0, 0, math.rad(90))
+	puddle.CFrame = CFrame.new(centre) * CFrame.Angles(0, 0, math.rad(90))
 	puddle.Color = Color3.fromRGB(18, 30, 36)
 	puddle.Material = Enum.Material.Glass
 	puddle.Reflectance = 0.35
@@ -400,8 +429,104 @@ function PassengerService.setPuddle(model: Model, on: boolean)
 	puddle.CanQuery = false
 	puddle.CastShadow = false
 	puddle.Parent = model.Parent
-	TweenService:Create(puddle, TweenInfo.new(6, Enum.EasingStyle.Sine), { Size = Vector3.new(0.04, 3.4, 3.4) }):Play()
+	TweenService:Create(puddle, TweenInfo.new(6, Enum.EasingStyle.Sine), { Size = Vector3.new(0.04, 5.6, 5.6) }):Play()
 	figure.puddle = puddle
+end
+
+local function flatPart(name: string, size: Vector3, cframe: CFrame, color: Color3, transparency: number): Part
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Size = size
+	p.CFrame = cframe
+	p.Color = color
+	p.Material = Enum.Material.SmoothPlastic
+	p.Transparency = transparency
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanTouch = false
+	p.CanQuery = false
+	p.CastShadow = false
+	return p
+end
+
+-- Wet footprints along the walk from where they stand now to `to` (foot level), laid
+-- as they reach each step. They dry out after half a minute.
+function PassengerService.footprints(model: Model, to: Vector3, speed: number)
+	local figure = figures[model]
+	if figure == nil then
+		return
+	end
+	local from = figure.root.Position - Vector3.new(0, figure.halfHeight, 0)
+	local flat = Vector3.new(to.X - from.X, 0, to.Z - from.Z)
+	local length = flat.Magnitude
+	if length < 1 then
+		return
+	end
+	local direction = flat.Unit
+	local side = direction:Cross(Vector3.yAxis)
+	local folder = model.Parent
+	local step = 0
+	for distance = 0.6, length - 0.8, 1.15 do
+		step += 1
+		local foot = from + direction * distance + side * (if step % 2 == 0 then 0.28 else -0.28)
+		local at = Vector3.new(foot.X, 0.02, foot.Z)
+		task.delay(distance / speed, function()
+			if folder == nil or folder.Parent == nil then
+				return
+			end
+			local footprint = flatPart(
+				"Footprint",
+				Vector3.new(0.34, 0.02, 0.62),
+				CFrame.lookAt(at, at + direction),
+				Color3.fromRGB(16, 26, 30),
+				0.2
+			)
+			footprint.Material = Enum.Material.Glass
+			footprint.Reflectance = 0.3
+			footprint.Parent = folder
+			task.delay(18, function()
+				local dry = TweenService:Create(footprint, TweenInfo.new(6), { Transparency = 1 })
+				dry.Completed:Once(function()
+					footprint:Destroy()
+				end)
+				dry:Play()
+			end)
+		end)
+	end
+end
+
+-- A darkened patch on the planks where the lamp at `lamp` throws this passenger's
+-- shadow, or nothing when `lamp` is nil. Only for passengers who cast a shadow.
+function PassengerService.setShadowMark(model: Model, lamp: Vector3?)
+	local figure = figures[model]
+	if figure == nil then
+		return
+	end
+	if figure.mark then
+		figure.mark:Destroy()
+		figure.mark = nil
+	end
+	if lamp == nil then
+		return
+	end
+	local feet = figure.root.Position - Vector3.new(0, figure.halfHeight, 0)
+	local away = Vector3.new(feet.X - lamp.X, 0, feet.Z - lamp.Z)
+	if away.Magnitude < 0.1 then
+		return
+	end
+	local direction = away.Unit
+	local scale = figure.halfHeight / 2.5
+	local length = 4.6 * scale
+	local centre = feet + direction * (length / 2 - 0.2) + Vector3.new(0, 0.025, 0)
+	local mark = flatPart(
+		"ShadowMark",
+		Vector3.new(1.9 * scale, 0.02, length),
+		CFrame.lookAt(centre, centre + direction),
+		Color3.new(0, 0, 0),
+		0.55
+	)
+	mark.Parent = model
+	figure.mark = mark
 end
 
 function PassengerService.removePage(model: Model)

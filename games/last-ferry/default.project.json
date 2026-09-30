@@ -18,7 +18,9 @@
     },
     "Lighting": {
       "$properties": {
-        "Technology": "Future"
+        "Technology": "Future",
+        "LightingStyle": "Realistic",
+        "PrioritizeLightingQuality": true
       }
     },
     "Players": {

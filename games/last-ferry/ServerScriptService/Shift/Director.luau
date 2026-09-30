@@ -274,7 +274,7 @@ function Director.action(self: Director, actor: number, kind: string, value: unk
 		local night = Run.takeLedgerPage(run, value :: number)
 		if night then
 			self.stage.removePage(run.index)
-			self.stage.fx({ kind = "page", text = Content.Ledger[night] })
+			self.stage.fx({ kind = "page", text = Content.Ledger[night], by = actor })
 			broadcast(self)
 		end
 	elseif kind == "continue" then
@@ -355,10 +355,17 @@ local function playNight(self: Director, retry: boolean): "done" | "failed"
 		if Run.isNightFailed(run) then
 			return "failed"
 		end
-		if run.index == midway then
+		if Run.remaining(run) == 0 then
+			-- Let the last passenger walk off (Mara up the gangway, on the final night)
+			-- before the summary card covers the view.
+			self.clock.sleep(Config.LastPassengerTime)
+		elseif run.index == midway then
+			-- Pike checks in with nobody at the window, so his message covers no one.
 			stage.fx({ kind = "radio", text = def.radioMid })
+			self.clock.sleep(Config.RadioTime)
+		else
+			self.clock.sleep(Config.BetweenPassengers)
 		end
-		self.clock.sleep(Config.BetweenPassengers)
 	end
 end
 

@@ -1561,6 +1561,24 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		drain()
 	end
 
+	-- A key (or gamepad button) press reaching the game, not eaten by the UI.
+	function sim:pressKey(keyCode: EnumItem)
+		local inputType = if string.sub(keyCode.Name, 1, 6) == "Button"
+			then Enum.UserInputType.Gamepad1
+			else Enum.UserInputType.Keyboard
+		local inputObject = {
+			KeyCode = keyCode,
+			UserInputType = inputType,
+			UserInputState = Enum.UserInputState.Begin,
+			Position = roblox.Vector3.zero,
+			Delta = roblox.Vector3.zero,
+		}
+		fire(eventFor(input, state[input], "InputBegan"), function(context)
+			return clientPlayer[context] ~= nil
+		end, inputObject, false)
+		drain()
+	end
+
 	function sim:className(instance): string
 		return state[instance].className
 	end

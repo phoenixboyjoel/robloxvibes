@@ -5,7 +5,9 @@
 		intro   - "Night 3": tonight's rules (new ones marked) and Pike on the radio
 		summary - every call from the night, and why it was right or wrong
 		failed  - the tide came in (no button; the night restarts on a timer)
-		ending  - the ending, the ledger epilogue if earned, and endings found so far
+		ending  - the ending, the ledger epilogue if earned, and endings found so far.
+		          For the first few seconds only a title strip shows, so the ending's
+		          scene (the lighthouse, the Marigold, the ferry leaving) is seen first.
 
 	Continue marks this player ready; the phase moves on when everyone is ready
 	or its timer runs out. The HUD decides what is blurred or dimmed behind.
@@ -21,6 +23,7 @@ export type Overlay = {
 	render: (state: View.State, progress: View.Progress?) -> (),
 	tick: (state: View.State) -> (),
 	onContinue: (callback: () -> ()) -> (),
+	pressContinue: () -> (), -- the Continue key or gamepad button
 	resize: (designSize: Vector2) -> (),
 }
 
@@ -28,6 +31,7 @@ local C = Theme.Colors
 local F = Theme.Fonts
 
 local HEADER, FOOTER, PAD = 92, 76, 20
+local ENDING_SCENE_TIME = 7 -- seconds of ending scene before the text card rises
 
 local Overlay = {}
 
@@ -136,8 +140,33 @@ function Overlay.new(parent: Instance): Overlay
 	continue.AnchorPoint = Vector2.new(1, 1)
 	continue.Position = UDim2.fromScale(1, 1)
 
+	-- The ending's title alone, shown while its scene plays.
+	local strip = Ui.panel(root, "EndingStrip", UDim2.fromOffset(560, 0), UDim2.new(0.5, 0, 0, 14), Vector2.new(0.5, 0))
+	strip.AutomaticSize = Enum.AutomaticSize.Y
+	strip.BackgroundColor3 = C.ink
+	strip.Visible = false
+	Ui.padding(strip, 10, 16)
+	Ui.list(strip, Enum.FillDirection.Vertical, 2, Enum.HorizontalAlignment.Center)
+	Ui.label(strip, "Kicker", {
+		text = "5:00 AM",
+		font = F.title,
+		size = 15,
+		color = C.muted,
+		xAlign = Enum.TextXAlignment.Center,
+		order = 1,
+	})
+	local stripTitle = Ui.label(strip, "Title", {
+		font = F.title,
+		size = 34,
+		color = C.lamp,
+		xAlign = Enum.TextXAlignment.Center,
+		frameSize = UDim2.new(1, 0, 0, 44),
+		order = 2,
+	})
+
 	local contentKey = ""
 	local phase = ""
+	local phaseStarted = 0
 	local lastState: View.State? = nil
 	-- The hold (identified by its end time) this player pressed Continue in, so the
 	-- button stays pressed until the next one.
@@ -150,16 +179,16 @@ function Overlay.new(parent: Instance): Overlay
 		if phase == "failed" then
 			card.AnchorPoint = Vector2.new(0.5, 0)
 			card.Position = UDim2.new(0.5, 0, 0, 64)
-			card.Size = UDim2.fromOffset(width, 230)
+			card.Size = UDim2.fromOffset(width, math.min(320, designSize.Y - 80))
 		elseif phase == "ending" then
-			-- Low on the screen, so the harbor (the lighthouse, the ferry leaving) stays in view.
+			-- Low on the screen, so the top of the harbor stays in view behind it.
 			card.AnchorPoint = Vector2.new(0.5, 1)
 			card.Position = UDim2.new(0.5, 0, 1, -12)
-			card.Size = UDim2.fromOffset(math.min(700, width), math.min(340, designSize.Y - 24))
+			card.Size = UDim2.fromOffset(math.min(700, width), math.min(420, designSize.Y - 24))
 		else
 			card.AnchorPoint = Vector2.new(0.5, 0.5)
 			card.Position = UDim2.fromScale(0.5, 0.5)
-			card.Size = UDim2.fromOffset(width, math.min(if phase == "waiting" then 240 else 460, designSize.Y - 24))
+			card.Size = UDim2.fromOffset(width, math.min(if phase == "waiting" then 240 else 520, designSize.Y - 24))
 		end
 	end
 
@@ -188,23 +217,23 @@ function Overlay.new(parent: Instance): Overlay
 					order = 50,
 				})
 			end
-
-			local radio = column(content, "Radio", UDim.new(0.5, -10), UDim.new(0.5, 10))
-			caption(radio, "ON THE RADIO · PIKE, AT THE LIGHTHOUSE", C.radio, 1)
-			paragraph(radio, state.text or "", { size = 17, order = 2 })
 			if state.night == 1 then
 				local tip = paragraph(
-					radio,
-					"<b>HOW TO WORK THE WINDOW</b>\nDrag to look around. Scroll, pinch or hold R2 to lean in.\n"
-						.. "Read the ticket, look at the passenger, check the rules, then press BOARD or TURN AWAY.\n"
+					rules,
+					"<b>HOW TO WORK THE WINDOW</b>\nRead the ticket, look at the passenger, check the rules, "
+						.. "then press BOARD or TURN AWAY. Drag to look around; scroll, pinch or hold R2 to lean in.\n"
 						.. "Each wrong call puts out a lantern. Lose all three and the tide comes in.",
-					{ size = 15, color = C.text, order = 3, rich = true }
+					{ size = 15, color = C.text, order = 60, rich = true }
 				)
 				tip.BackgroundTransparency = 0.3
 				tip.BackgroundColor3 = C.panelLight
 				Ui.padding(tip, 8)
 				Ui.corner(tip, UDim.new(0, 6))
 			end
+
+			local radio = column(content, "Radio", UDim.new(0.5, -10), UDim.new(0.5, 10))
+			caption(radio, "ON THE RADIO · PIKE, AT THE LIGHTHOUSE", C.radio, 1)
+			paragraph(radio, state.text or "", { size = 17, order = 2 })
 		elseif state.phase == "summary" then
 			local pages = #state.ledger
 			kicker.Text = "END OF SHIFT · 5:00 AM"
@@ -265,6 +294,16 @@ function Overlay.new(parent: Instance): Overlay
 		body.CanvasPosition = Vector2.zero
 	end
 
+	-- During the ending's first seconds, only the title strip shows.
+	local function updateEndingReveal(state: View.State)
+		local scene = state.phase == "ending" and os.clock() - phaseStarted < ENDING_SCENE_TIME
+		strip.Visible = scene
+		card.Visible = not scene
+		if scene and state.ending then
+			stripTitle.Text = state.ending.title
+		end
+	end
+
 	local function updateFooter(state: View.State)
 		local label = CONTINUE_TEXT[state.phase]
 		local ready = state.ready
@@ -289,14 +328,22 @@ function Overlay.new(parent: Instance): Overlay
 		status.Text = table.concat(parts, " · ")
 	end
 
-	continue.Activated:Connect(function()
+	local function press()
 		local state = lastState
-		if state and continue.Interactable and continueCallback then
+		if
+			state
+			and root.Visible
+			and card.Visible
+			and continue.Visible
+			and continue.Interactable
+			and continueCallback
+		then
 			pressedFor = state.phaseEnds
 			continueCallback()
 			updateFooter(state)
 		end
-	end)
+	end
+	continue.Activated:Connect(press)
 
 	local overlay: Overlay = {
 		root = root,
@@ -307,10 +354,12 @@ function Overlay.new(parent: Instance): Overlay
 			if not visible then
 				phase = state.phase
 				contentKey = ""
+				strip.Visible = false
 				return
 			end
 			if state.phase ~= phase then
 				phase = state.phase
+				phaseStarted = os.clock()
 				layout()
 			end
 			local key = table.concat({
@@ -327,15 +376,18 @@ function Overlay.new(parent: Instance): Overlay
 				rebuild(state, progress)
 			end
 			updateFooter(state)
+			updateEndingReveal(state)
 		end,
 		tick = function(state: View.State)
 			if root.Visible then
 				updateFooter(state)
+				updateEndingReveal(state)
 			end
 		end,
 		onContinue = function(callback: () -> ())
 			continueCallback = callback
 		end,
+		pressContinue = press,
 		resize = function(size: Vector2)
 			designSize = size
 			layout()

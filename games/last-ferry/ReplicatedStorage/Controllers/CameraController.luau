@@ -24,7 +24,6 @@ local targetYaw, targetPitch = 0, 0
 local fov, targetFov = WIDE, WIDE
 local shakeStrength, shakeUntil = 0, 0
 local stick = Vector2.zero
-local zoomStick = 0
 local dragInput: InputObject? = nil
 local mouseDragging = false
 local pinchFov = WIDE
@@ -84,7 +83,9 @@ local function connectInput()
 				stick = Vector2.zero
 			end
 		elseif input.KeyCode == Enum.KeyCode.ButtonR2 then
-			zoomStick = input.Position.Z
+			-- The trigger leans in as far as it's pressed.
+			targetFov = WIDE - (WIDE - NARROW) * input.Position.Z
+			clampTargets()
 		end
 	end)
 
@@ -99,7 +100,7 @@ local function connectInput()
 		elseif input.KeyCode == Enum.KeyCode.Thumbstick2 then
 			stick = Vector2.zero
 		elseif input.KeyCode == Enum.KeyCode.ButtonR2 then
-			zoomStick = 0
+			targetFov = WIDE
 		end
 	end)
 
@@ -152,10 +153,9 @@ function CameraController.start()
 	RunService:BindToRenderStep("LastFerryCamera", Enum.RenderPriority.Camera.Value + 1, function(dt: number)
 		local horizontal = keyAxis({ Enum.KeyCode.Left, Enum.KeyCode.A }, { Enum.KeyCode.Right, Enum.KeyCode.D })
 		local vertical = keyAxis({ Enum.KeyCode.Up, Enum.KeyCode.W }, { Enum.KeyCode.Down, Enum.KeyCode.S })
-		if horizontal ~= 0 or vertical ~= 0 or stick ~= Vector2.zero or zoomStick ~= 0 then
+		if horizontal ~= 0 or vertical ~= 0 or stick ~= Vector2.zero then
 			targetYaw += (horizontal * KEY_SPEED - stick.X * STICK_SPEED) * dt
 			targetPitch += (vertical * KEY_SPEED + stick.Y * STICK_SPEED * 0.7) * dt
-			targetFov = WIDE - (WIDE - NARROW) * zoomStick
 			clampTargets()
 		end
 

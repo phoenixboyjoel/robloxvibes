@@ -16,6 +16,8 @@ local Config = {
 	FailedTime = 9,
 	EndingTime = 60,
 	BetweenPassengers = 1.5, -- after a call, before the next passenger steps up
+	RadioTime = 9, -- Pike's mid-night message plays with nobody at the window
+	LastPassengerTime = 6, -- watch the night's last passenger leave before the summary
 
 	WalkSpeed = 7, -- studs per second
 

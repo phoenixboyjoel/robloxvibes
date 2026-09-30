@@ -73,12 +73,14 @@ local function drawAnchor(stamp: Frame)
 	local blue = C.stampBlue
 	ring(stamp, 56, UDim2.fromScale(0.5, 0.5), blue, 3)
 	ring(stamp, 9, UDim2.new(0.5, 0, 0.5, -17), blue, 2) -- eye
-	bar(stamp, Vector2.new(4, 32), Vector2.new(0, 3), 0, blue) -- shank
+	bar(stamp, Vector2.new(4, 30), Vector2.new(0, 2), 0, blue) -- shank
 	bar(stamp, Vector2.new(18, 4), Vector2.new(0, -9), 0, blue) -- stock
-	-- Crown: the lower half of a ring, clipped.
-	local crown = Ui.frame(stamp, "Crown", UDim2.fromOffset(34, 16), UDim2.new(0.5, 0, 0.5, 7), Vector2.new(0.5, 0))
-	crown.ClipsDescendants = true
-	ring(crown, 26, UDim2.new(0.5, 0, 0, 1), blue, 3)
+	-- Crown: a flat bottom and two arms curving up, drawn with bars. (ClipsDescendants
+	-- would be simpler, but it's ignored under the stamp's rotated frame.)
+	local crown = Ui.frame(stamp, "Crown", UDim2.fromOffset(30, 14), UDim2.new(0.5, 0, 0.5, 6), Vector2.new(0.5, 0))
+	bar(crown, Vector2.new(12, 4), Vector2.new(0, 5), 0, blue)
+	bar(crown, Vector2.new(12, 4), Vector2.new(-9, 1), -50, blue)
+	bar(crown, Vector2.new(12, 4), Vector2.new(9, 1), 50, blue)
 end
 
 local function drawEmpty(stamp: Frame)

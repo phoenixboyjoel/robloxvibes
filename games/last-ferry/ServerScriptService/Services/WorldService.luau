@@ -4,10 +4,11 @@
 	place needs no assets and the whole world lives in git.
 
 	Layout (studs; dock surface at y = 0, the booth window faces -Z):
-		camera              (0, 5.1, 3.4)   inside the booth, looking out
-		passenger at window (0, 0, -3.2)    the planks closer than z ≈ -3.3 are hidden by the wall
-		booth lamp          (-3.4, 8.3, -1) front-left, so each shadow falls back and to the
-		                                    right, where the camera can see it
+		camera              (0, 5.1, 3.4)       inside the booth, looking out
+		passenger at window (0, 0, -3.2)        the sill hides the planks closer than z ≈ -4.1,
+		                                        so their feet, but not what's behind them
+		booth lamp          (-3.4, 8.1, -1.05)  front-left, so each shadow falls back and to the
+		                                        right, where the camera can see it
 		queue               (-2, 0, -11) → (0.5, 0, -17) → (-1.5, 0, -23), fog beyond
 		gate → gangway → Petrel, moored along the right edge of the dock
 		lighthouse far front-left; the Marigold's ghost out in the fog
@@ -27,6 +28,7 @@ export type Markers = {
 	board: { Vector3 },
 	away: { Vector3 },
 	water: { Vector3 },
+	lamp: Vector3,
 }
 
 type PartProps = {
@@ -74,6 +76,7 @@ local marigold: Model
 local marigoldParts: { BasePart } = {}
 local marigoldMover: CFrameValue
 local marigoldTween: Tween? = nil
+local marigoldFades: { Tween } = {}
 local sceneToken = 0 -- bumped on reset, so a late ending effect can't leak into the next run
 local flood: BasePart
 local passengers: Folder
@@ -159,6 +162,11 @@ local function setUpLighting()
 	Lighting.EnvironmentSpecularScale = 0.6
 	Lighting.ExposureCompensation = 0.25
 	Lighting.GlobalShadows = true
+	-- The shadow rule needs crisp local-light shadows, and needs them kept when a
+	-- device lowers its quality level. (The project file sets these too.)
+	Lighting.LightingStyle = Enum.LightingStyle.Realistic
+	Lighting.PrioritizeLightingQuality = true
+	Lighting.ShadowSoftness = 0.15
 
 	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
 	if atmosphere == nil then
@@ -214,7 +222,9 @@ local function buildDock(parent: Folder)
 			})
 		end
 	end
-	-- Queue rope: posts either side of the line with a dull rope between them.
+	-- Queue rope: posts either side of the line with a dull rope between them. None of it
+	-- casts a shadow, so the only shadows on the planks by the window are passengers'.
+	local sag = Vector3.new(0, 0.15, 0)
 	for _, x in { -4.5, 3.5 } do
 		local previous: Vector3? = nil
 		for z = -7, -27, -5 do
@@ -226,6 +236,7 @@ local function buildDock(parent: Folder)
 				color = METAL,
 				material = Enum.Material.Metal,
 				shape = Enum.PartType.Cylinder,
+				castShadow = false,
 				parent = dock,
 			})
 			if previous then
@@ -233,7 +244,7 @@ local function buildDock(parent: Folder)
 				part({
 					name = "Rope",
 					size = Vector3.new(0.12, 0.12, (top - previous).Magnitude),
-					cframe = CFrame.lookAt(mid - Vector3.new(0, 0.15, 0), top),
+					cframe = CFrame.lookAt(mid - sag, top - sag),
 					color = Color3.fromRGB(150, 124, 54),
 					material = Enum.Material.Fabric,
 					castShadow = false,
@@ -243,21 +254,23 @@ local function buildDock(parent: Folder)
 			previous = top
 		end
 	end
-	-- Gate to the gangway.
-	for _, x in { 6.5, 10 } do
+	-- Gate to the gangway: taller and wider than any passenger, so nobody clips it.
+	for _, x in { 5.9, 10.6 } do
 		part({
 			name = "GatePost",
-			size = Vector3.new(0.4, 4, 0.4),
-			cframe = CFrame.new(x, 2, -9),
+			size = Vector3.new(0.4, 7, 0.4),
+			cframe = CFrame.new(x, 3.5, -9),
 			color = TRIM,
+			castShadow = false,
 			parent = dock,
 		})
 	end
 	local gateSign = part({
 		name = "GateSign",
-		size = Vector3.new(3.4, 0.9, 0.2),
-		cframe = CFrame.new(8.25, 3.6, -9) * CFrame.Angles(0, math.rad(180), 0),
+		size = Vector3.new(4.9, 0.9, 0.2),
+		cframe = CFrame.new(8.25, 6.6, -9) * CFrame.Angles(0, math.rad(180), 0),
 		color = Color3.fromRGB(28, 34, 44),
+		castShadow = false,
 		parent = dock,
 	})
 	sign(gateSign, Enum.NormalId.Front, "GANGWAY · PETREL →", TRIM)
@@ -665,7 +678,7 @@ function WorldService.build(): Markers
 		camera = cameraCFrame,
 		window = Vector3.new(0, 0, -3.2),
 		queue = { Vector3.new(-2, 0, -11), Vector3.new(0.5, 0, -17), Vector3.new(-1.5, 0, -23) },
-		spawn = Vector3.new(-4, 0, -50),
+		spawn = Vector3.new(-0.5, 0, -50), -- the middle of the rope lane
 		board = {
 			Vector3.new(4.5, 0, -5.6),
 			Vector3.new(8.25, 0, -8.2),
@@ -674,8 +687,10 @@ function WorldService.build(): Markers
 			Vector3.new(27, 2.2, -24.5), -- top of the gangway
 			Vector3.new(30, 1.9, -25.5),
 		},
-		away = { Vector3.new(-6, 0, -5), Vector3.new(-8.5, 0, -30), Vector3.new(-7, 0, -56) },
-		water = { Vector3.new(-6, 0, -5), Vector3.new(-18.6, 0, -21), Vector3.new(-21.4, -1.2, -21.4) },
+		away = { Vector3.new(-6, 0, -4.2), Vector3.new(-8.5, 0, -30), Vector3.new(-7, 0, -56) },
+		-- Off the dock's left edge about 32° left of straight out, inside the window's view.
+		water = { Vector3.new(-6, 0, -4.2), Vector3.new(-18.6, 0, -30), Vector3.new(-21.4, -1.2, -31) },
+		lamp = lampBulb.Position,
 	}
 
 	-- The lamp over the window flickers now and then. It means nothing, and players will
@@ -734,7 +749,9 @@ end
 -- The old ferry fades up out of the fog, then sails away.
 local function showMarigold(token: number)
 	for _, p in marigoldParts do
-		TweenService:Create(p, TweenInfo.new(4, Enum.EasingStyle.Sine), { Transparency = 0.55 }):Play()
+		local fade = TweenService:Create(p, TweenInfo.new(4, Enum.EasingStyle.Sine), { Transparency = 0.55 })
+		table.insert(marigoldFades, fade)
+		fade:Play()
 	end
 	task.delay(6, function()
 		if sceneToken ~= token then
@@ -768,8 +785,9 @@ function WorldService.endingScene(ending: string)
 	end)
 end
 
+-- The tide rises in the booth, over the counter, where the camera can see it.
 function WorldService.setFlood(on: boolean)
-	local cframe = if on then CFrame.new(0, 1.8, 4) else CFrame.new(0, 0.1, 4)
+	local cframe = if on then CFrame.new(0, 3.1, 4) else CFrame.new(0, 0.1, 4)
 	TweenService:Create(flood, TweenInfo.new(if on then 4 else 1, Enum.EasingStyle.Sine), {
 		CFrame = cframe,
 		Transparency = if on then 0.25 else 1,
@@ -794,6 +812,11 @@ function WorldService.reset()
 		marigoldTween = nil
 	end
 	marigoldMover.Value = MARIGOLD_HOME
+	-- Setting Transparency doesn't stop a running fade, so cancel them first.
+	for _, fade in marigoldFades do
+		fade:Cancel()
+	end
+	table.clear(marigoldFades)
 	for _, p in marigoldParts do
 		p.Transparency = 1
 	end

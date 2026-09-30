@@ -30,7 +30,9 @@ Codex reads it directly.
   three properties scripts can't:
   - `Workspace.StreamingEnabled = false`: the client needs the whole harbor for
     the fixed camera;
-  - `Lighting.Technology = Future`: local-light shadows;
+  - `Lighting.LightingStyle = Realistic` with `PrioritizeLightingQuality`
+    (plus the older `Technology = Future`): crisp local-light shadows, which the
+    shadow rule depends on. `setUpLighting` sets the new two again at runtime;
   - `Players.CharacterAutoLoads = false`.
 - One server Script, one client Script (in ReplicatedStorage, RunContext
   Client). Everything else is a ModuleScript. Never put a `.client.luau` file in
@@ -129,6 +131,13 @@ otherwise. Don't weaken or skip a test to get green.
   least 44 px: keep them 64 design px or more. `Game.spec` checks this.
 - Keep the bottom centre of the screen clear: the passenger's shadow falls
   there, and it's a rule from night 4.
+- Nothing may cover a passenger's face while they're at the window: breath is
+  a rule from night 3. That's why the radio waits for an empty window and
+  warnings show as a banner over the top bar.
+- Every tell must be visible from the fixed camera. The sill hides the planks
+  closer than z ≈ −4.1, and a passenger's body hides everything straight
+  behind them. Check new cues with `tools/preview` (export, then render) before
+  a Studio playtest.
 - Every cue is visual; the first build has no audio.
 
 ## Definition of done

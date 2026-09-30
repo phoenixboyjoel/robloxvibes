@@ -992,6 +992,110 @@
    "service": false,
    "superclass": "PVInstance"
   },
+  "ChatWindowConfiguration": {
+   "creatable": false,
+   "events": {},
+   "functions": {
+    "DeriveNewMessageProperties": {
+     "deprecated": false,
+     "yields": false
+    }
+   },
+   "properties": {
+    "AbsolutePosition": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "Vector2"
+    },
+    "AbsoluteSize": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "Vector2"
+    },
+    "BackgroundColor3": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    },
+    "BackgroundTransparency": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "double"
+    },
+    "Enabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "FontFace": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Font"
+    },
+    "HeightScale": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "HorizontalAlignment": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "HorizontalAlignment"
+    },
+    "TextChannelDisplayMode": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "TextChannelDisplayMode"
+    },
+    "TextColor3": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    },
+    "TextSize": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "int64"
+    },
+    "TextStrokeColor3": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    },
+    "TextStrokeTransparency": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "double"
+    },
+    "VerticalAlignment": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "VerticalAlignment"
+    },
+    "WidthScale": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    }
+   },
+   "service": false,
+   "superclass": "TextChatConfigurations"
+  },
   "ColorCorrectionEffect": {
    "creatable": true,
    "events": {},
@@ -4448,6 +4552,90 @@
    },
    "service": false,
    "superclass": "GuiButton"
+  },
+  "TextChatConfigurations": {
+   "creatable": false,
+   "events": {},
+   "functions": {},
+   "properties": {},
+   "service": false,
+   "superclass": "Instance"
+  },
+  "TextChatService": {
+   "creatable": false,
+   "events": {
+    "BubbleDisplayed": {
+     "deprecated": false
+    },
+    "MessageReceived": {
+     "deprecated": false
+    },
+    "SendingMessage": {
+     "deprecated": false
+    }
+   },
+   "functions": {
+    "CanUserChatAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "CanUsersChatAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "CanUsersDirectChatAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "DisplayBubble": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetChatGroupsAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "OnBubbleAdded": {
+     "deprecated": false,
+     "yields": false
+    },
+    "OnChatWindowAdded": {
+     "deprecated": false,
+     "yields": false
+    },
+    "OnIncomingMessage": {
+     "deprecated": false,
+     "yields": false
+    }
+   },
+   "properties": {
+    "ChatTranslationEnabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "ChatVersion": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "ChatVersion"
+    },
+    "CreateDefaultCommands": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "CreateDefaultTextChannels": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "bool"
+    }
+   },
+   "service": true,
+   "superclass": "Instance"
   },
   "TextLabel": {
    "creatable": true,

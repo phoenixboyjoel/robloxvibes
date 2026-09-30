@@ -32,7 +32,7 @@ something.
 | `ServerScriptService/Shift/Run.luau` | Five-night run state: lanterns, decisions, retries, ledger pages, ending |
 | `ServerScriptService/Shift/Director.luau` | The shift itself: phases, timers, Continue, player actions. Talks to the world only through a `Stage` and waits only through a `Clock` |
 | `ServerScriptService/Services/WorldService.luau` | Builds Gull Harbor: dock, booth, lamp, lanterns, ferry, lighthouse, the *Marigold*, flood; exposes path markers and scene effects |
-| `ServerScriptService/Services/PassengerService.luau` | Builds passenger figures from parts, with visible tells (breath emitter, drips and puddle, CastShadow); walks and vanishes them |
+| `ServerScriptService/Services/PassengerService.luau` | Builds passenger figures from parts, with visible tells: breath emitter; drips from cuffs and hem, a wide puddle, footprints; CastShadow plus a shadow mark on the planks. Walks and vanishes them |
 | `ServerScriptService/Services/ShiftService.luau` | The Roblox `Stage` for the Director (queue on the dock, remotes, world calls) and the action handler |
 | `ServerScriptService/Services/ProgressService.luau` | Endings found per player (DataStore) and badges |
 | `ReplicatedStorage/Shared/Config.luau` | Remote names and tunables both sides read (timers, walk speed, look limits) |
@@ -41,7 +41,7 @@ something.
 | `ReplicatedStorage/Client.client.luau` | Client entry: starts the effects, camera and HUD controllers |
 | `ReplicatedStorage/Controllers/CameraController.luau` | Fixed booth camera: drag, keys and stick to look; scroll, pinch and R2 to lean in; shake |
 | `ReplicatedStorage/Controllers/EffectsController.luau` | Blur behind cards, flood tint, lantern-out pulse, client-side lighthouse spin |
-| `ReplicatedStorage/Controllers/HudController.luau` | The whole HUD and its wiring to the remotes |
+| `ReplicatedStorage/Controllers/HudController.luau` | The whole HUD and its wiring to the remotes; keyboard and gamepad shortcuts; moves Roblox's chat window off the ticket |
 | `ReplicatedStorage/Ui/Theme.luau` | Colours, fonts, design canvas and scale limits |
 | `ReplicatedStorage/Ui/Ui.luau` | Typed UI builders (frames, labels, buttons, layout) |
 | `ReplicatedStorage/Ui/Widgets.luau` | Shared pieces: captions, paragraphs, rule rows, text outlines |
@@ -66,6 +66,9 @@ Server.server.luau
             queue    Stage.callToWindow: walk them up; the queue steps forward
             window   wait up to DecisionTime for board / deny (timeout = deny)
             call     Run.decide -> lanterns, exit path, effects, ferry load
+            pause    BetweenPassengers; RadioTime after the midway passenger (Pike's
+                     message plays with nobody at the window); LastPassengerTime
+                     after the last one (so their exit is seen before the summary)
           if lanterns = 0: failed (flood, FailedTime), Run.restartNight, intro again
           summary    hold up to SummaryTime / Continue
         ending       endingScene, recordEnding, hold up to EndingTime / Continue
@@ -81,9 +84,13 @@ All live in `ReplicatedStorage.Remotes`, created by the server through `Net`.
 | Remote | Direction | Payload |
 | --- | --- | --- |
 | `ShiftState` | server → clients | `Types.State`: the whole screen, sent on every change |
-| `ShiftFx` | server → clients | `Types.Fx`: `call`, `lanternOut`, `say`, `page`, `radio` |
+| `ShiftFx` | server → clients | `Types.Fx`: `call`, `lanternOut`, `say`, `page` (with `by`, the finder's UserId), `radio` |
 | `ShiftProgress` | server → one client | `Types.Progress`: titles of endings found |
 | `ShiftAction` | client → server | `("board" \| "deny" \| "page", passengerId)`, `("continue")`, `("sync")` |
+
+A player counts as present (for Continue and for starting a run) only after
+their client has loaded and sent `sync`, so a slow phone doesn't lose the first
+intro's timer.
 
 Every action is checked in this order:
 1. **Rate limit** (4 a second, bursts of 6).
@@ -122,11 +129,11 @@ Studs; dock surface at y = 0; the booth window faces −Z.
 
 | Thing | Where |
 | --- | --- |
-| Camera | (0, 5.1, 3.4), fixed; looks out through the window. The planks closer than z ≈ −3.3 are hidden by the wall |
+| Camera | (0, 5.1, 3.4), fixed; looks out through the window. The sill hides the planks closer than z ≈ −4.1, and a passenger's body hides the planks straight behind them |
 | Passenger at the window | (0, 0, −3.2), facing the booth |
-| Booth lamp | (−3.4, 8.1, −1.05), aimed at (1.2, 0, −4.6). Shadows fall back and to the right, in view |
-| Queue slots | (−2, 0, −11), (0.5, 0, −17), (−1.5, 0, −23); spawn in the fog at (−4, 0, −50) |
-| Exits | board: gate → gangway → the *Petrel*'s deck; away: left of the rope line into the fog; water: the dock's left edge, then sink |
+| Booth lamp | (−3.4, 8.1, −1.05), aimed at (1.2, 0, −4.6). Shadows fall back and to the right, in view. Lighting is pinned to `LightingStyle = Realistic` and `PrioritizeLightingQuality = true` (project file and `setUpLighting`). Passengers who cast a shadow also get a dark `ShadowMark` part there, for devices that drop local-light shadows |
+| Queue slots | (−2, 0, −11), (0.5, 0, −17), (−1.5, 0, −23); spawn in the fog at (−0.5, 0, −50), mid-lane |
+| Exits | board: gate (posts at x 5.9 and 10.6, 7 tall) → gangway → the *Petrel*'s deck; away: round the first rope post, left of the rope line into the fog; water: off the dock's left edge at z −31 (about 32° left, in view), then sink |
 | *Petrel* | Moored along the dock's right edge, bow into the fog; sits lower for each drowned passenger aboard |
 | Lighthouse | (−60, 0, −130); the beam turns on each client while the rotor's `Spinning` attribute is true |
 

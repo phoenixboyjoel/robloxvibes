@@ -40,6 +40,12 @@ function ShiftService.start(markers: WorldService.Markers)
 	local tonight: { Types.Passenger } = {}
 	local figures: { [number]: Model } = {}
 	local slots = #markers.queue
+	-- Players whose game has loaded and asked for the screen. Only they count as present,
+	-- so the first intro's timer doesn't run down while a phone is still loading.
+	local synced: { [Player]: boolean } = {}
+	Players.PlayerRemoving:Connect(function(player)
+		synced[player] = nil
+	end)
 
 	-- The figure for tonight's passenger `index`, spawned out in the fog if it isn't yet.
 	local function figure(index: number): Model?
@@ -51,7 +57,7 @@ function ShiftService.start(markers: WorldService.Markers)
 		if existing then
 			return existing
 		end
-		local jitter = Vector3.new(random:NextNumber(-1.5, 1.5), 0, random:NextNumber(-2, 2))
+		local jitter = Vector3.new(random:NextNumber(-1, 1), 0, random:NextNumber(-2, 2))
 		local model = PassengerService.spawn(passenger, markers.spawn + jitter, Vector3.zAxis, folder)
 		figures[index] = model
 		return model
@@ -79,7 +85,9 @@ function ShiftService.start(markers: WorldService.Markers)
 		actors = function(): { number }
 			local ids = {}
 			for _, player in Players:GetPlayers() do
-				table.insert(ids, player.UserId)
+				if synced[player] then
+					table.insert(ids, player.UserId)
+				end
 			end
 			return ids
 		end,
@@ -109,8 +117,13 @@ function ShiftService.start(markers: WorldService.Markers)
 			local model = figure(index)
 			stepUp(index)
 			if model then
+				local passenger = tonight[index]
+				if passenger.wet then
+					PassengerService.footprints(model, markers.window, Config.WalkSpeed)
+				end
 				PassengerService.walk(model, { markers.window }, Config.WalkSpeed, Vector3.zAxis)
-				PassengerService.setPuddle(model, tonight[index].wet)
+				PassengerService.setPuddle(model, passenger.wet)
+				PassengerService.setShadowMark(model, if passenger.shadow then markers.lamp else nil)
 			end
 		end,
 		sendOff = function(index: number, exit: Director.Exit)
@@ -123,8 +136,14 @@ function ShiftService.start(markers: WorldService.Markers)
 				then markers.board
 				elseif exit == "water" then markers.water
 				else markers.away
+			local passenger = tonight[index]
 			task.spawn(function()
 				PassengerService.setPuddle(model, false)
+				PassengerService.setShadowMark(model, nil)
+				if passenger and passenger.wet then
+					-- A wet trail off to the side, where it can be seen.
+					PassengerService.footprints(model, path[1], Config.WalkSpeed)
+				end
 				if PassengerService.walk(model, path, Config.WalkSpeed) then
 					-- The drowned sink back into the harbor; everyone else fades into the fog.
 					PassengerService.vanish(model, if exit == "water" then 2.5 else 1.2, exit == "water")
@@ -154,6 +173,7 @@ function ShiftService.start(markers: WorldService.Markers)
 			return
 		end
 		if kind == "sync" then
+			synced[player] = true
 			stateRemote:FireClient(player, Director.state(director))
 			ProgressService.send(player)
 			return

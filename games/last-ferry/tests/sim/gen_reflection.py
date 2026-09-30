@@ -27,7 +27,7 @@ CLASSES = [
     "DataModel", "Workspace", "Players", "Player", "PlayerGui", "ReplicatedStorage",
     "ServerScriptService", "RunService", "TweenService", "Tween", "Lighting", "Terrain",
     "Camera", "DataStoreService", "DataStore", "BadgeService", "StarterGui", "GuiService",
-    "UserInputService", "InputObject",
+    "UserInputService", "InputObject", "TextChatService", "ChatWindowConfiguration",
 ]
 
 SCRIPT_OK = {"None"}

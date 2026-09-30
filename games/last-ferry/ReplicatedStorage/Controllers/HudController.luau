@@ -3,12 +3,19 @@
 	HudController: everything on screen while you work the window, wired to the
 	server's remotes.
 
-	Layout, on a canvas at least 960 x 480 scaled to fit the screen (see Theme):
-		top bar        night, date and clock · lanterns, queue, ledger
+	Layout, on a canvas at least 960 x 420 scaled to fit the screen (see Theme):
+		top bar        night, date and clock · lanterns, queue, ledger; a lost lantern
+		               or a found page shows as a banner over it for a few seconds
 		left "desk"    the ticket, the window countdown, BOARD / TURN AWAY
-		right          the rules card and, from night 3, the manifest (can be hidden)
-		top centre     what the passenger says, the radio, lost-lantern notes
+		right          the rules card and, from night 3, the manifest (can be hidden);
+		               the ledger opens over it without blocking anything
+		top centre     what the passenger says; Pike's radio, only while nobody is at
+		               the window, so nothing covers a passenger's face or breath
 		bottom centre  kept clear: that's where the planks and the shadows are
+
+	Keys: B / gamepad A board, T / B turn away, P / X take a torn page, Enter,
+	Space or A continue. Roblox's chat window is moved to the bottom left, clear
+	of the ticket; the player list is hidden.
 
 	The server sends the whole screen state on every change (ShiftState) plus
 	one-off effects (ShiftFx). Nothing here decides anything; it only draws what
@@ -19,6 +26,7 @@ local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
+local TextChatService = game:GetService("TextChatService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
@@ -46,6 +54,16 @@ local CALL_INK: { [string]: Color3 } = {
 	["WINDOW CLOSED"] = C.paperMuted,
 }
 
+local KEYS = {
+	board = { Enum.KeyCode.B, Enum.KeyCode.ButtonA },
+	deny = { Enum.KeyCode.T, Enum.KeyCode.ButtonB },
+	page = { Enum.KeyCode.P, Enum.KeyCode.ButtonX },
+	continue = { Enum.KeyCode.Return, Enum.KeyCode.Space, Enum.KeyCode.ButtonA },
+}
+
+-- Looking down into the booth while the tide comes in (degrees).
+local FLOOD_VIEW = Vector2.new(0, -26)
+
 -- Where the camera turns for each ending (degrees; positive yaw is left).
 local ENDING_VIEWS: { [string]: Vector2 } = {
 	CLEAN_SHIFT = Vector2.new(24, 12), -- the lighthouse
@@ -59,7 +77,15 @@ local function quietCoreGui()
 	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
 	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Health, false)
 	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.EmotesMenu, false)
+	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
 	GuiService.TouchControlsEnabled = false
+	-- The chat window opens top left by default, right over the ticket.
+	local chat = TextChatService:FindFirstChildOfClass("ChatWindowConfiguration")
+	if chat then
+		chat.HorizontalAlignment = Enum.HorizontalAlignment.Left
+		chat.VerticalAlignment = Enum.VerticalAlignment.Bottom
+		chat.HeightScale = 0.6
+	end
 	-- There's no avatar to reset. SetCore fails until the core scripts are ready, so retry.
 	task.spawn(function()
 		for _ = 1, 30 do
@@ -190,6 +216,17 @@ function HudController.start()
 		table.insert(lanterns, { frame = lantern, glow = Ui.stroke(lantern, C.lamp, 2, 0.35) })
 	end
 
+	-- A banner over the top bar: a lantern going out, or a page someone found.
+	local alert = Ui.panel(play, "Alert", UDim2.new(1, -32, 0, 0), UDim2.fromOffset(16, 6))
+	alert.AutomaticSize = Enum.AutomaticSize.Y
+	alert.BackgroundTransparency = 0.04
+	alert.ZIndex = 3
+	alert.Visible = false
+	Ui.padding(alert, 8, 14)
+	Ui.list(alert, Enum.FillDirection.Vertical, 2)
+	local alertTitle = Widgets.caption(alert, "", C.bad, 1)
+	local alertText = Widgets.paragraph(alert, "", { size = 16, order = 2 })
+
 	-- Desk: ticket, countdown, and the two calls -----------------------------------
 	local desk = Ui.frame(play, "Desk", UDim2.fromOffset(DESK_WIDTH, 300), UDim2.fromOffset(16, TOP))
 	local ticket = Ticket.new(desk, UDim2.fromOffset(0, 0))
@@ -227,6 +264,19 @@ function HudController.start()
 	local denyButton =
 		Ui.button(desk, "Deny", "TURN AWAY", UDim2.fromOffset(half, 64), { fill = C.deny, textSize = 22 })
 	denyButton.Position = UDim2.fromOffset(half + 12, 236)
+	local keyHints: { [TextButton]: TextLabel } = {}
+	for _, button in { boardButton, denyButton } do
+		local key = Ui.label(button, "Key", {
+			font = F.title,
+			size = 14,
+			color = C.text,
+			xAlign = Enum.TextXAlignment.Right,
+			frameSize = UDim2.new(1, -8, 0, 16),
+			position = UDim2.new(0, 0, 1, -18),
+		})
+		key.TextTransparency = 0.35
+		keyHints[button] = key
+	end
 
 	-- Side panel: rules and manifest -----------------------------------------------
 	local side =
@@ -282,10 +332,6 @@ function HudController.start()
 	local radio = bubble("Radio", 2)
 	Widgets.caption(radio, "RADIO · PIKE, AT THE LIGHTHOUSE", C.radio, 1)
 	local radioText = Widgets.paragraph(radio, "", { size = 16, order = 2 })
-	local message = bubble("Message", 3)
-	message.BackgroundColor3 = Color3.fromRGB(58, 18, 18)
-	Widgets.caption(message, "A LANTERN GOES OUT", C.bad, 1)
-	local messageText = Widgets.paragraph(message, "", { size = 16, order = 2 })
 
 	-- Bottom centre: how to look around, on the first night only.
 	local hint = Ui.label(play, "Hint", {
@@ -298,21 +344,21 @@ function HudController.start()
 	})
 	Widgets.outline(hint)
 
-	-- Ledger: the harbormaster's torn pages found this run ---------------------------------
-	local ledger = Ui.frame(root, "LedgerModal", UDim2.fromScale(1, 1))
-	ledger.ZIndex = 10
-	ledger.Active = true
+	-- Ledger: the harbormaster's torn pages found this run. It opens over the rules
+	-- panel and blocks nothing else, so the window can still be worked.
+	local ledger =
+		Ui.frame(play, "Ledger", UDim2.new(0, SIDE_WIDTH, 1, -(TOP + 16)), UDim2.new(1, -16, 0, TOP), Vector2.new(1, 0))
+	ledger.ZIndex = 2
 	ledger.Visible = false
-	local sheet =
-		Ui.frame(ledger, "Sheet", UDim2.fromOffset(470, 380), UDim2.fromScale(0.5, 0.5), Vector2.new(0.5, 0.5))
-	sheet.BackgroundTransparency = 0
-	sheet.BackgroundColor3 = C.paper
-	sheet.Active = true
-	Ui.corner(sheet, UDim.new(0, 8))
-	Ui.stroke(sheet, C.paperShade, 2)
-	Ui.padding(sheet, 16)
+	ledger.BackgroundTransparency = 0
+	ledger.BackgroundColor3 = C.paper
+	ledger.Active = true
+	Ui.corner(ledger, UDim.new(0, 8))
+	Ui.stroke(ledger, C.paperShade, 2)
+	Ui.padding(ledger, 12)
+	local sheet = ledger
 	Ui.label(sheet, "Heading", {
-		text = "HARBORMASTER'S LEDGER · R. VELL",
+		text = "HARBORMASTER'S LEDGER",
 		font = F.title,
 		size = 18,
 		color = C.paperInk,
@@ -320,15 +366,15 @@ function HudController.start()
 	})
 	local ledgerCount = Ui.label(sheet, "Count", {
 		font = F.title,
-		size = 15,
+		size = 14,
 		color = C.paperMuted,
-		xAlign = Enum.TextXAlignment.Right,
-		frameSize = UDim2.new(1, 0, 0, 24),
+		frameSize = UDim2.new(1, 0, 0, 18),
+		position = UDim2.fromOffset(0, 24),
 	})
 	local pages = Instance.new("ScrollingFrame")
 	pages.Name = "Pages"
-	pages.Position = UDim2.fromOffset(0, 32)
-	pages.Size = UDim2.new(1, 0, 1, -32 - 72)
+	pages.Position = UDim2.fromOffset(0, 48)
+	pages.Size = UDim2.new(1, 0, 1, -48 - 72)
 	pages.BackgroundTransparency = 1
 	pages.BorderSizePixel = 0
 	pages.CanvasSize = UDim2.new()
@@ -337,13 +383,13 @@ function HudController.start()
 	pages.ScrollBarThickness = 5
 	pages.ScrollBarImageColor3 = C.paperShade
 	pages.Parent = sheet
-	local closeLedger = Ui.button(sheet, "Close", "PUT IT AWAY", UDim2.fromOffset(190, 64), {
+	local closeLedger = Ui.button(sheet, "Close", "PUT IT AWAY", UDim2.new(1, 0, 0, 64), {
 		fill = C.paperInk,
 		text = C.paper,
 		textSize = 20,
 	})
-	closeLedger.AnchorPoint = Vector2.new(1, 1)
-	closeLedger.Position = UDim2.fromScale(1, 1)
+	closeLedger.AnchorPoint = Vector2.new(0, 1)
+	closeLedger.Position = UDim2.fromScale(0, 1)
 
 	-- State -------------------------------------------------------------------------
 	local lastState: View.State? = nil
@@ -355,8 +401,9 @@ function HudController.start()
 	local sideHidden = false
 	local sayText: string? = nil
 	local sayUntil = 0
+	local speechPassenger: number? = nil -- whose line the speech bubble belongs to
 	local radioUntil = 0
-	local messageUntil = 0
+	local alertUntil = 0
 	local ledgerToken = 0
 	local previousPhase = ""
 	local myName = player.DisplayName
@@ -384,13 +431,26 @@ function HudController.start()
 
 	local function refreshHint()
 		local input = UserInputService.PreferredInput
+		local boardKey, denyKey = "", ""
 		if input == Enum.PreferredInput.Touch then
 			hint.Text = "Drag to look around · Pinch to lean in"
 		elseif input == Enum.PreferredInput.Gamepad then
-			hint.Text = "Right stick to look around · Hold R2 to lean in"
+			hint.Text = "Right stick to look · Hold R2 to lean in · A board · B turn away · X take a page"
+			boardKey, denyKey = "A", "B"
 		else
-			hint.Text = "Drag to look around · Scroll to lean in · Arrow keys work too"
+			hint.Text = "Drag or arrow keys to look · Scroll to lean in · B board · T turn away · P take a page"
+			boardKey, denyKey = "B", "T"
 		end
+		keyHints[boardButton].Text = boardKey
+		keyHints[denyButton].Text = denyKey
+	end
+
+	local function showAlert(title: string, text: string, color: Color3, background: Color3, seconds: number)
+		alertTitle.Text = title
+		alertTitle.TextColor3 = color
+		alertText.Text = text
+		alert.BackgroundColor3 = background
+		alertUntil = os.clock() + seconds
 	end
 
 	local function refreshSide()
@@ -502,8 +562,10 @@ function HudController.start()
 		if text then
 			speechText.Text = `“{text}”`
 		end
-		radio.Visible = now < radioUntil
-		message.Visible = now < messageUntil
+		-- The radio never covers someone at the window: the shift pauses for it.
+		radio.Visible = now < radioUntil and not (state and state.phase == "window")
+		alert.Visible = now < alertUntil
+		topBar.Visible = not alert.Visible and state ~= nil and state.night > 0
 	end
 
 	local function render(state: View.State)
@@ -524,6 +586,9 @@ function HudController.start()
 		if phase ~= previousPhase then
 			if phase == "intro" then
 				CameraController.lookTo(0, 0)
+				calledFor = nil
+			elseif phase == "failed" then
+				CameraController.lookTo(FLOOD_VIEW.X, FLOOD_VIEW.Y)
 			elseif phase == "ending" and state.ending then
 				local view = ENDING_VIEWS[state.ending.id]
 				if view then
@@ -534,7 +599,6 @@ function HudController.start()
 		end
 
 		-- Top bar.
-		topBar.Visible = state.night > 0
 		nightLabel.Text = `NIGHT {state.night} OF {state.finalNight}`
 		whenLabel.Text = `{state.date} · {state.clock}`
 		queueLabel.Text = `IN LINE: {state.waiting}`
@@ -554,6 +618,11 @@ function HudController.start()
 		local passenger = if phase == "window" then state.passenger else nil
 		if passenger then
 			ticket.show(passenger)
+			if passenger.id ~= speechPassenger then
+				-- Someone new at the window: whatever the last passenger said is over.
+				speechPassenger = passenger.id
+				sayUntil = 0
+			end
 		else
 			ticket.clear()
 		end
@@ -572,8 +641,7 @@ function HudController.start()
 		if fx.kind == "call" then
 			ticket.stamp(text, CALL_INK[text] or C.paperMuted)
 		elseif fx.kind == "lanternOut" then
-			messageText.Text = text
-			messageUntil = os.clock() + 6
+			showAlert("A LANTERN GOES OUT", text, C.bad, Color3.fromRGB(58, 18, 18), 6)
 			EffectsController.lanternOut()
 			CameraController.shake(1.4, 0.5)
 			flash.BackgroundTransparency = 0.55
@@ -597,8 +665,18 @@ function HudController.start()
 				radioText.MaxVisibleGraphemes = -1
 			end)
 		elseif fx.kind == "page" then
-			-- The state with the new page arrives right after; open the ledger then.
-			task.defer(openLedger, true)
+			if fx.by == player.UserId then
+				-- The state with the new page arrives right after; open the ledger then.
+				task.defer(openLedger, true)
+			else
+				showAlert(
+					"A TORN PAGE",
+					"Someone found a page tucked behind a ticket. It's in the LEDGER.",
+					C.lamp,
+					C.panel,
+					5
+				)
+			end
 		end
 		refreshSpeech()
 	end
@@ -620,11 +698,31 @@ function HudController.start()
 	denyButton.Activated:Connect(function()
 		call("deny")
 	end)
-	ticket.onTakePage(function()
+	local function takePage()
 		local state = lastState
-		local passenger = if state then state.passenger else nil
+		local passenger = if state and state.phase == "window" then state.passenger else nil
 		if passenger and passenger.hasPage then
 			actionRemote:FireServer("page", passenger.id)
+		end
+	end
+	ticket.onTakePage(takePage)
+
+	UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
+		local state = lastState
+		if processed or state == nil then
+			return
+		end
+		local key = input.KeyCode
+		if state.phase == "window" then
+			if table.find(KEYS.board, key) then
+				call("board")
+			elseif table.find(KEYS.deny, key) then
+				call("deny")
+			elseif table.find(KEYS.page, key) then
+				takePage()
+			end
+		elseif table.find(KEYS.continue, key) then
+			overlay.pressContinue()
 		end
 	end)
 	overlay.onContinue(function()

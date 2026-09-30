@@ -18,6 +18,11 @@ queue, trying to get home.
 - **Four endings, one of them secret.** Plus a little girl in a red coat who
   asks every night whether this is the ferry home.
 - **One to four players** share the booth, and anyone can make the call.
+- **Controls:**
+  - Drag, arrow keys or the right stick to look around; scroll, pinch or R2 to
+    lean in.
+  - **B** / **T** (gamepad **A** / **B**) to board or turn away, **P** (**X**)
+    to take a torn page, and **Enter** to continue.
 
 Everything is built from parts and code: no asset IDs, no licences to check.
 The story design is in [GAME_DESIGN.md](GAME_DESIGN.md) and the code map is in
@@ -88,9 +93,21 @@ rojo build -o LastFerry.rbxl
 ```
 
 At the time of this build every check comes back clean:
-- 48 tests pass.
+- 51 tests pass.
 - There are 0 selene findings.
 - There are 0 strict type errors.
+
+An independent review then checked what the tests can't: geometry against
+Roblox's real conventions, replication, rendering and layering, and
+readability. Its fixes are in:
+- **Wet passengers:** drips and the puddle moved to where the booth can see
+  them.
+- **Lighting:** pinned for reliable shadows, with a fallback shadow mark for
+  low-quality devices.
+- **Radio and warnings:** Pike's radio pauses the queue, and lantern warnings
+  moved to a top banner, so neither covers a passenger's face.
+- **Plus:** taller cards, a delayed ending reveal, keyboard and gamepad
+  shortcuts, and a gate the passengers fit through.
 
 The tests have three layers:
 

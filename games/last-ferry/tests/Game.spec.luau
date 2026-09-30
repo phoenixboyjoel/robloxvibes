@@ -18,6 +18,7 @@ local T = require("./TestLib")
 T.suite("Game (headless)")
 
 local ROOT = "."
+local LAMP = roblox.Color3.fromRGB(255, 198, 132)
 
 type Bot = {
 	sim: any,
@@ -31,11 +32,13 @@ type Bot = {
 	ending: string?,
 	endingText: string,
 	lanternsLost: number,
-	lastMessage: string,
+	lit: number,
+	alerts: { string },
 	pagesTaken: number,
 	nights: { [number]: boolean },
 	sawFailed: boolean,
 	sawRetry: boolean,
+	sawLedger: boolean?,
 	calls: number,
 }
 
@@ -143,7 +146,8 @@ local function newBot(sim, player, policy): Bot
 		ending = nil,
 		endingText = "",
 		lanternsLost = 0,
-		lastMessage = "",
+		lit = 3,
+		alerts = {},
 		pagesTaken = 0,
 		nights = {},
 		sawFailed = false,
@@ -159,21 +163,30 @@ local function tick(bot: Bot)
 		return
 	end
 
-	-- A lantern going out shows a message; count each new one.
-	local message = root.Play.Center.Message
-	if sim:shown(message) then
-		local text = message.Paragraph.Text
-		if text ~= bot.lastMessage then
-			bot.lastMessage = text
-			bot.lanternsLost += 1
+	-- Count lanterns going out from the top bar (they're relit each night).
+	local lit = 0
+	for _, lantern in root.Play.TopBar.Right.Lanterns:GetChildren() do
+		if lantern:IsA("Frame") and lantern.BackgroundColor3 == LAMP then
+			lit += 1
 		end
-	else
-		bot.lastMessage = ""
+	end
+	if lit < bot.lit then
+		bot.lanternsLost += bot.lit - lit
+	end
+	bot.lit = lit
+
+	local alert = root.Play.Alert
+	if sim:shown(alert) then
+		local line = `{alert.Caption.Text}: {alert.Paragraph.Text}`
+		if bot.alerts[#bot.alerts] ~= line then
+			table.insert(bot.alerts, line)
+		end
 	end
 
-	local ledger = root.LedgerModal
+	local ledger = root.Play.Ledger
 	if ledger.Visible then
-		sim:click(ledger.Sheet.Close)
+		bot.sawLedger = true
+		sim:click(ledger.Close)
 		return
 	end
 
@@ -213,7 +226,11 @@ local function tick(bot: Bot)
 		local continue = card.Footer.Continue
 		if bot.policy.pressContinue ~= false and sim:shown(continue) and continue.Interactable then
 			if sim.now - bot.cardSince > 1 then
-				sim:click(continue)
+				if bot.policy.useKeys then
+					sim:pressKey(roblox.Enum.KeyCode.Return)
+				else
+					sim:click(continue)
+				end
 			end
 		end
 		return
@@ -238,7 +255,11 @@ local function tick(bot: Bot)
 
 	local tab = desk.TicketHolder.PageTab
 	if bot.policy.takePages and sim:shown(tab) then
-		sim:click(tab)
+		if bot.policy.useKeys then
+			sim:pressKey(roblox.Enum.KeyCode.P)
+		else
+			sim:click(tab)
+		end
 		bot.pagesTaken += 1
 		return
 	end
@@ -254,7 +275,11 @@ local function tick(bot: Bot)
 	end
 	bot.decided[ticketKey] = true
 	bot.calls += 1
-	sim:click(if call == "board" then board else deny)
+	if bot.policy.useKeys then
+		sim:pressKey(if call == "board" then roblox.Enum.KeyCode.B else roblox.Enum.KeyCode.T)
+	else
+		sim:click(if call == "board" then board else deny)
+	end
 end
 
 local function boot(options): (any, any)
@@ -326,6 +351,61 @@ T.test("all five torn pages reach the ledger and the epilogue", function()
 	T.expect(string.find(bot.endingText, "THE LEDGER", 1, true) ~= nil, "the ledger epilogue is on the ending card")
 	local saved = sim.stores.LastFerryProgress_v1.u_101
 	T.expect(saved.endings.THE_LEDGER and saved.endings.CLEAN_SHIFT, "both endings saved")
+end)
+
+T.test("keyboard shortcuts work the window, the page tab and the cards", function()
+	local sim = boot()
+	local alice = sim:addPlayer("Alice", 101)
+	local bot = newBot(sim, alice, { useKeys = true, takePages = true })
+	sim:runUntil(
+		function()
+			return bot.ending ~= nil
+		end,
+		3600,
+		1 / 20,
+		function()
+			tick(bot)
+		end
+	)
+	sim:run(3)
+	clean(sim, "keyboard run")
+	T.equal(bot.ending, "The Petrel Sails")
+	T.equal(bot.lanternsLost, 0)
+	T.equal(bot.pagesTaken, 5)
+	T.expect(bot.sawLedger, "taking a page opened the ledger")
+end)
+
+T.test("in co-op the ledger opens only for whoever took the page", function()
+	local sim = boot()
+	local alice = sim:addPlayer("Alice", 101)
+	local bob = sim:addPlayer("Bob", 202)
+	local finder = newBot(sim, alice, { takePages = true })
+	local friend = newBot(sim, bob, { idle = true, pressContinue = false })
+	sim:runUntil(
+		function()
+			return finder.pagesTaken >= 2
+		end,
+		3600,
+		1 / 20,
+		function()
+			tick(finder)
+			tick(friend)
+		end
+	)
+	sim:run(2, 1 / 20, function()
+		tick(finder)
+		tick(friend)
+	end)
+	clean(sim, "co-op pages")
+	T.expect(finder.sawLedger, "the finder's ledger opened")
+	T.expect(not friend.sawLedger, "the friend's ledger stayed shut")
+	local noticed = false
+	for _, line in friend.alerts do
+		if string.find(line, "A TORN PAGE", 1, true) then
+			noticed = true
+		end
+	end
+	T.expect(noticed, "the friend was told a page was found")
 end)
 
 T.test("waving Mara through on the last night brings the Marigold", function()

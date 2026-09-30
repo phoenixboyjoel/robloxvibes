@@ -66,10 +66,10 @@ Each rule is a tell with a counter: read or look, then turn them away.
 | 1 | Tickets must show tonight's date | Date on the ticket |
 | 1 | Destination must read GULL ISLAND | Destination on the ticket |
 | 2 | Every ticket needs the red gull stamp | Stamp on the ticket |
-| 2 | It hasn't rained tonight; nobody wet may board | Dripping water, puddle, dark soaked coat |
+| 2 | It hasn't rained tonight; nobody wet may board | Water dripping from their cuffs and coat, a puddle spreading around them, a dark soaked coat |
 | 3 | Only names on tonight's manifest may board | Manifest tab |
 | 3 | The living breathe fog in the cold | Breath puffs at the face |
-| 4 | Everyone under the lamp casts a shadow | The planks under their feet |
+| 4 | Everyone under the lamp casts a shadow | The planks behind and to the right of them |
 | 5 | Nobody here knows your name | What they say |
 
 The drowned get better at hiding every night:

@@ -71,7 +71,12 @@ local done = sim:runUntil(function()
 	return false
 end, 1200, 1 / 20)
 assert(done, "never reached the scenario")
-sim:run(0.5) -- let the puddle start
+sim:run(6.5) -- let the puddle spread to full size
+-- Don't catch the booth lamp mid-flicker.
+sim:runUntil(function()
+	local bulb = sim.workspace.World.Booth:FindFirstChild("LampBulb")
+	return bulb ~= nil and bulb.Transparency == 0
+end, 3, 1 / 20)
 
 local parts = {}
 local emitters = {}

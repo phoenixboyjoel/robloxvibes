@@ -73,6 +73,7 @@ export type State = {
 export type Fx = {
 	kind: string, -- "call" | "lanternOut" | "say" | "page" | "radio"
 	text: string?,
+	by: number?, -- "page": the UserId of whoever took it
 }
 
 export type Progress = {

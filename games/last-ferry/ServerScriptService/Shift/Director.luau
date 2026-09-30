@@ -419,17 +419,19 @@ local function showEnding(self: Director, result: Run.EndingResult)
 	self.ending = nil
 end
 
--- Waits until at least one player is in the server.
-function Director.waitForPlayers(self: Director)
-	if #self.stage.actors() > 0 then
-		return
-	end
+-- Between runs: nothing on the desk, and everyone's out on the pier until someone clocks in.
+function Director.toLobby(self: Director)
 	self.run = nil
 	self.phase = "waiting"
+	self.phaseEnds = nil
+	self.title = nil
+	self.text = nil
+	self.summary = nil
+	self.ending = nil
+	self.skippable = false
+	self.pending = nil
+	table.clear(self.ready)
 	broadcast(self)
-	while #self.stage.actors() == 0 do
-		self.clock.sleep(1)
-	end
 end
 
 -- Plays one run, five nights and an ending. Yields throughout.

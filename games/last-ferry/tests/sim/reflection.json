@@ -1376,6 +1376,27 @@
    "service": false,
    "superclass": "PVInstance"
   },
+  "CanvasGroup": {
+   "creatable": true,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "GroupColor3": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    },
+    "GroupTransparency": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    }
+   },
+   "service": false,
+   "superclass": "GuiObject"
+  },
   "CharacterAppearance": {
    "creatable": false,
    "events": {},
@@ -1520,6 +1541,82 @@
    },
    "service": false,
    "superclass": "PostEffect"
+  },
+  "ContextActionService": {
+   "creatable": false,
+   "events": {
+    "LocalToolEquipped": {
+     "deprecated": false
+    },
+    "LocalToolUnequipped": {
+     "deprecated": false
+    }
+   },
+   "functions": {
+    "BindAction": {
+     "deprecated": false,
+     "yields": false
+    },
+    "BindActionAtPriority": {
+     "deprecated": false,
+     "yields": false
+    },
+    "BindActionToInputTypes": {
+     "deprecated": true,
+     "yields": false
+    },
+    "BindActivate": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetAllBoundActionInfo": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetBoundActionInfo": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetButton": {
+     "deprecated": false,
+     "yields": true
+    },
+    "GetCurrentLocalToolIcon": {
+     "deprecated": false,
+     "yields": false
+    },
+    "SetDescription": {
+     "deprecated": false,
+     "yields": false
+    },
+    "SetImage": {
+     "deprecated": false,
+     "yields": false
+    },
+    "SetPosition": {
+     "deprecated": false,
+     "yields": false
+    },
+    "SetTitle": {
+     "deprecated": false,
+     "yields": false
+    },
+    "UnbindAction": {
+     "deprecated": false,
+     "yields": false
+    },
+    "UnbindActivate": {
+     "deprecated": false,
+     "yields": false
+    },
+    "UnbindAllActions": {
+     "deprecated": false,
+     "yields": false
+    }
+   },
+   "properties": {},
+   "service": true,
+   "superclass": "Instance"
   },
   "DataModel": {
    "creatable": false,
@@ -3123,6 +3220,111 @@
    "service": false,
    "superclass": "Instance"
   },
+  "ImageButton": {
+   "creatable": true,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "HoverImage": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ContentId"
+    },
+    "HoverImageContent": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Content"
+    },
+    "Image": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ContentId"
+    },
+    "ImageColor3": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    },
+    "ImageContent": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Content"
+    },
+    "ImageRectOffset": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector2"
+    },
+    "ImageRectSize": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector2"
+    },
+    "ImageTransparency": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "IsLoaded": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": true,
+     "type": "bool"
+    },
+    "PressedImage": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ContentId"
+    },
+    "PressedImageContent": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Content"
+    },
+    "ResampleMode": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ResamplerMode"
+    },
+    "ScaleType": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ScaleType"
+    },
+    "SliceCenter": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Rect"
+    },
+    "SliceScale": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "TileSize": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "UDim2"
+    }
+   },
+   "service": false,
+   "superclass": "GuiButton"
+  },
   "ImageLabel": {
    "creatable": true,
    "events": {},
@@ -3473,6 +3675,28 @@
    },
    "service": false,
    "superclass": "Object"
+  },
+  "IntValue": {
+   "creatable": true,
+   "events": {
+    "Changed": {
+     "deprecated": false
+    },
+    "changed": {
+     "deprecated": true
+    }
+   },
+   "functions": {},
+   "properties": {
+    "Value": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "int64"
+    }
+   },
+   "service": false,
+   "superclass": "ValueBase"
   },
   "JointInstance": {
    "creatable": false,
@@ -3910,6 +4134,28 @@
    },
    "service": false,
    "superclass": "Motor"
+  },
+  "NumberValue": {
+   "creatable": true,
+   "events": {
+    "Changed": {
+     "deprecated": false
+    },
+    "changed": {
+     "deprecated": true
+    }
+   },
+   "functions": {},
+   "properties": {
+    "Value": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "double"
+    }
+   },
+   "service": false,
+   "superclass": "ValueBase"
   },
   "Object": {
    "creatable": false,
@@ -4947,6 +5193,191 @@
     }
    },
    "service": false,
+   "superclass": "Instance"
+  },
+  "ProximityPrompt": {
+   "creatable": true,
+   "events": {
+    "IndicatorHidden": {
+     "deprecated": false
+    },
+    "IndicatorShown": {
+     "deprecated": false
+    },
+    "PromptButtonHoldBegan": {
+     "deprecated": false
+    },
+    "PromptButtonHoldEnded": {
+     "deprecated": false
+    },
+    "PromptHidden": {
+     "deprecated": false
+    },
+    "PromptShown": {
+     "deprecated": false
+    },
+    "TriggerEnded": {
+     "deprecated": false
+    },
+    "Triggered": {
+     "deprecated": false
+    }
+   },
+   "functions": {
+    "InputHoldBegin": {
+     "deprecated": false,
+     "yields": false
+    },
+    "InputHoldEnd": {
+     "deprecated": false,
+     "yields": false
+    }
+   },
+   "properties": {
+    "ActionText": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "string"
+    },
+    "AutoLocalize": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "ClickablePrompt": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "Enabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "Exclusivity": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ProximityPromptExclusivity"
+    },
+    "GamepadKeyCode": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "KeyCode"
+    },
+    "HoldDuration": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "KeyboardKeyCode": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "KeyCode"
+    },
+    "MaxActivationDistance": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "MaxIndicatorDistance": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "ObjectText": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "string"
+    },
+    "RequiresLineOfSight": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "RootLocalizationTable": {
+     "category": "Class",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "LocalizationTable"
+    },
+    "Style": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ProximityPromptStyle"
+    },
+    "UIOffset": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Vector2"
+    }
+   },
+   "service": false,
+   "superclass": "Instance"
+  },
+  "ProximityPromptService": {
+   "creatable": false,
+   "events": {
+    "IndicatorHidden": {
+     "deprecated": false
+    },
+    "IndicatorShown": {
+     "deprecated": false
+    },
+    "PromptButtonHoldBegan": {
+     "deprecated": false
+    },
+    "PromptButtonHoldEnded": {
+     "deprecated": false
+    },
+    "PromptHidden": {
+     "deprecated": false
+    },
+    "PromptShown": {
+     "deprecated": false
+    },
+    "PromptTriggerEnded": {
+     "deprecated": false
+    },
+    "PromptTriggered": {
+     "deprecated": false
+    }
+   },
+   "functions": {},
+   "properties": {
+    "Enabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "MaxIndicatorsVisible": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "int"
+    },
+    "MaxPromptsVisible": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "int"
+    }
+   },
+   "service": true,
    "superclass": "Instance"
   },
   "RemoteEvent": {
@@ -6053,6 +6484,28 @@
    },
    "service": true,
    "superclass": "Instance"
+  },
+  "StringValue": {
+   "creatable": true,
+   "events": {
+    "Changed": {
+     "deprecated": false
+    },
+    "changed": {
+     "deprecated": true
+    }
+   },
+   "functions": {},
+   "properties": {
+    "Value": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "string"
+    }
+   },
+   "service": false,
+   "superclass": "ValueBase"
   },
   "SunRaysEffect": {
    "creatable": true,
@@ -7190,6 +7643,75 @@
      "deprecated": false,
      "readOnly": false,
      "type": "float"
+    }
+   },
+   "service": false,
+   "superclass": "UIComponent"
+  },
+  "UIShadow": {
+   "creatable": true,
+   "events": {},
+   "functions": {},
+   "properties": {
+    "BlurRadius": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "UDim"
+    },
+    "Color": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "Color3"
+    },
+    "Enabled": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "Inset": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "Mode": {
+     "category": "Enum",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "ApplyShadowMode"
+    },
+    "Offset": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "UDim2"
+    },
+    "ShowBehindParent": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "bool"
+    },
+    "Spread": {
+     "category": "DataType",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "UDim2"
+    },
+    "Transparency": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "float"
+    },
+    "ZIndex": {
+     "category": "Primitive",
+     "deprecated": false,
+     "readOnly": false,
+     "type": "int"
     }
    },
    "service": false,

@@ -428,6 +428,8 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 			TextSize = 14,
 			MaxVisibleGraphemes = -1,
 			LineHeight = 1,
+			CharacterAutoLoads = true,
+			RespawnTime = 5,
 		}
 		if overrides[key] ~= nil then
 			return overrides[key]
@@ -654,7 +656,8 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 			note(sim.deprecated, `{found.class}.{key}`)
 		end
 		checkValue(st.className, key, found.info, value, 3)
-		if key == "Position" and isA(st.className, "BasePart") then
+		if key == "Position" and (isA(st.className, "BasePart") or st.className == "Attachment") then
+			-- Position is the translation part of CFrame, for parts and attachments alike.
 			local cframe = st.props.CFrame or roblox.CFrame.new()
 			key, value = "CFrame", cframe.Rotation + value
 		end
@@ -978,6 +981,25 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 			return (st.props.CFrame or roblox.CFrame.new()).Position
 		end,
 	}
+	local function attachmentWorld(st)
+		local local_ = st.props.CFrame or roblox.CFrame.new()
+		local parent = st.parent
+		if parent and isA(state[parent].className, "BasePart") then
+			return (state[parent].props.CFrame or roblox.CFrame.new()) * local_
+		end
+		return local_
+	end
+	computed.Attachment = {
+		Position = function(_instance, st)
+			return (st.props.CFrame or roblox.CFrame.new()).Position
+		end,
+		WorldCFrame = function(_instance, st)
+			return attachmentWorld(st)
+		end,
+		WorldPosition = function(_instance, st)
+			return attachmentWorld(st).Position
+		end,
+	}
 	computed.LayerCollector = {
 		AbsoluteSize = function(_instance, st)
 			local insets = st.props.ScreenInsets
@@ -1080,6 +1102,273 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		end,
 	}
 
+	-- Characters ------------------------------------------------------------------------
+	-- A blocky R15 built to Roblox's default rig (Studio's content/avatar/characterR15.rbxm):
+	-- the same part sizes, joints and accessory attachments, as block Parts. The platform
+	-- would dress each player in their own avatar; here the colours come from the user id.
+	local R15_PARTS = {
+		-- name, size, offset from the root, colour slot
+		{ "HumanoidRootPart", { 2, 2, 1 }, { 0, 0, 0 }, "root" },
+		{ "LowerTorso", { 2, 0.4, 1 }, { 0, -0.15, 0 }, "pants" },
+		{ "UpperTorso", { 2, 1.6, 1 }, { 0, 0.85, 0 }, "shirt" },
+		{ "Head", { 2, 1, 1 }, { 0, 2.15, 0 }, "skin" },
+		{ "LeftUpperArm", { 1, 1.1687, 1 }, { -1.5, 1.0187, 0 }, "shirt" },
+		{ "RightUpperArm", { 1, 1.1687, 1 }, { 1.5, 1.0187, 0 }, "shirt" },
+		{ "LeftLowerArm", { 1, 1.0519, 1 }, { -1.5, 0.4259, 0 }, "skin" },
+		{ "RightLowerArm", { 1, 1.0519, 1 }, { 1.5, 0.4259, 0 }, "skin" },
+		{ "LeftHand", { 1, 0.3, 1 }, { -1.5, -0.2, 0 }, "skin" },
+		{ "RightHand", { 1, 0.3, 1 }, { 1.5, -0.2, 0 }, "skin" },
+		{ "LeftUpperLeg", { 1, 1.2166, 1 }, { -0.5, -0.7708, 0 }, "pants" },
+		{ "RightUpperLeg", { 1, 1.2166, 1 }, { 0.5, -0.7708, 0 }, "pants" },
+		{ "LeftLowerLeg", { 1, 1.1931, 1 }, { -0.5, -1.5509, 0 }, "pants" },
+		{ "RightLowerLeg", { 1, 1.1931, 1 }, { 0.5, -1.5509, 0 }, "pants" },
+		{ "LeftFoot", { 1, 0.3, 1 }, { -0.5, -2.2, 0 }, "shoes" },
+		{ "RightFoot", { 1, 0.3, 1 }, { 0.5, -2.2, 0 }, "shoes" },
+	}
+	local R15_JOINTS = {
+		-- name, Part0, Part1 (the joint's parent), C0 position, C1 position; all unrotated
+		{ "Root", "HumanoidRootPart", "LowerTorso", { 0, -0.35, 0 }, { 0, -0.2, 0 } },
+		{ "Waist", "LowerTorso", "UpperTorso", { 0, 0.2, 0 }, { 0, -0.8, 0 } },
+		{ "Neck", "UpperTorso", "Head", { 0, 0.8, 0 }, { 0, -0.5, 0 } },
+		{ "LeftShoulder", "UpperTorso", "LeftUpperArm", { -1, 0.563, 0 }, { 0.5, 0.3943, 0 } },
+		{ "RightShoulder", "UpperTorso", "RightUpperArm", { 1, 0.563, 0 }, { -0.5, 0.3943, 0 } },
+		{ "LeftElbow", "LeftUpperArm", "LeftLowerArm", { 0, -0.3341, 0 }, { 0, 0.2587, 0 } },
+		{ "RightElbow", "RightUpperArm", "RightLowerArm", { 0, -0.3341, 0 }, { 0, 0.2587, 0 } },
+		{ "LeftWrist", "LeftLowerArm", "LeftHand", { 0, -0.5009, 0 }, { 0, 0.125, 0 } },
+		{ "RightWrist", "RightLowerArm", "RightHand", { 0, -0.5009, 0 }, { 0, 0.125, 0 } },
+		{ "LeftHip", "LowerTorso", "LeftUpperLeg", { -0.5, -0.2, 0 }, { 0, 0.4208, 0 } },
+		{ "RightHip", "LowerTorso", "RightUpperLeg", { 0.5, -0.2, 0 }, { 0, 0.4208, 0 } },
+		{ "LeftKnee", "LeftUpperLeg", "LeftLowerLeg", { 0, -0.4011, 0 }, { 0, 0.379, 0 } },
+		{ "RightKnee", "RightUpperLeg", "RightLowerLeg", { 0, -0.4011, 0 }, { 0, 0.379, 0 } },
+		{ "LeftAnkle", "LeftLowerLeg", "LeftFoot", { 0, -0.5472, 0 }, { 0, 0.1019, 0 } },
+		{ "RightAnkle", "RightLowerLeg", "RightFoot", { 0, -0.5472, 0 }, { 0, 0.1019, 0 } },
+	}
+	local R15_ATTACHMENTS = {
+		HumanoidRootPart = { RootAttachment = { 0, 0, 0 } },
+		Head = {
+			HairAttachment = { 0, 0.6, 0 },
+			HatAttachment = { 0, 0.6, 0 },
+			FaceFrontAttachment = { 0, 0, -0.6 },
+			FaceCenterAttachment = { 0, 0, 0 },
+		},
+		UpperTorso = {
+			NeckAttachment = { 0, 0.8, 0 },
+			BodyFrontAttachment = { 0, -0.2, -0.5 },
+			BodyBackAttachment = { 0, -0.2, 0.5 },
+			LeftCollarAttachment = { -1, 0.8, 0 },
+			RightCollarAttachment = { 1, 0.8, 0 },
+		},
+		LowerTorso = {
+			WaistCenterAttachment = { 0, -0.2, 0 },
+			WaistFrontAttachment = { 0, -0.2, -0.5 },
+			WaistBackAttachment = { 0, -0.2, 0.5 },
+		},
+		LeftUpperArm = { LeftShoulderAttachment = { 0, 0.5843, 0 } },
+		RightUpperArm = { RightShoulderAttachment = { 0, 0.5843, 0 } },
+		LeftHand = { LeftGripAttachment = { 0, -0.15, 0 } },
+		RightHand = { RightGripAttachment = { 0, -0.15, 0 } },
+		LeftFoot = { LeftFootAttachment = { 0, -0.15, 0 } },
+		RightFoot = { RightFootAttachment = { 0, -0.15, 0 } },
+	}
+	local OUTFITS = {
+		{ skin = { 234, 184, 146 }, shirt = { 13, 105, 172 }, pants = { 27, 42, 53 }, shoes = { 27, 42, 53 } },
+		{ skin = { 124, 92, 70 }, shirt = { 196, 40, 28 }, pants = { 99, 95, 98 }, shoes = { 17, 17, 17 } },
+		{ skin = { 245, 205, 48 }, shirt = { 40, 127, 71 }, pants = { 13, 105, 172 }, shoes = { 27, 42, 53 } },
+		{ skin = { 204, 142, 105 }, shirt = { 107, 50, 124 }, pants = { 27, 42, 53 }, shoes = { 242, 243, 243 } },
+	}
+	local ROOT_HEIGHT = 2.35 -- ground to the root's centre: HipHeight 1.35 + half the root's height
+
+	local function buildCharacter(player)
+		local userId = state[player].props.UserId or 0
+		local outfit = OUTFITS[userId % #OUTFITS + 1]
+		local model = newInstance("Model")
+		state[model].props.Name = state[player].props.Name
+		local parts = {}
+		for _, spec in R15_PARTS do
+			local part = newInstance("Part")
+			local p = state[part].props
+			p.Name = spec[1]
+			p.Size = roblox.Vector3.new(spec[2][1], spec[2][2], spec[2][3])
+			p.CFrame = roblox.CFrame.new(spec[3][1], spec[3][2] + ROOT_HEIGHT, spec[3][3])
+			p.Material = Enum.Material.Plastic
+			p.CanCollide = spec[1] == "HumanoidRootPart"
+			p.Transparency = if spec[4] == "root" then 1 else 0
+			local rgb = outfit[spec[4]] or { 163, 162, 165 }
+			p.Color = roblox.Color3.fromRGB(rgb[1], rgb[2], rgb[3])
+			parts[spec[1]] = part
+			part.Parent = model
+		end
+		local mesh = newInstance("SpecialMesh")
+		state[mesh].props.Name = "Mesh"
+		mesh.MeshType = Enum.MeshType.Head
+		mesh.Scale = roblox.Vector3.new(1.25, 1.25, 1.25)
+		mesh.Parent = parts.Head
+		local face = newInstance("Decal")
+		state[face].props.Name = "face"
+		face.Texture = "rbxasset://textures/face.png"
+		face.Parent = parts.Head
+		for partName, list in R15_ATTACHMENTS do
+			for attachmentName, at in list do
+				local attachment = newInstance("Attachment")
+				state[attachment].props.Name = attachmentName
+				attachment.Position = roblox.Vector3.new(at[1], at[2], at[3])
+				attachment.Parent = parts[partName]
+			end
+		end
+		for _, spec in R15_JOINTS do
+			local joint = newInstance("Motor6D")
+			state[joint].props.Name = spec[1]
+			joint.C0 = roblox.CFrame.new(spec[4][1], spec[4][2], spec[4][3])
+			joint.C1 = roblox.CFrame.new(spec[5][1], spec[5][2], spec[5][3])
+			joint.Part0 = parts[spec[2]]
+			joint.Part1 = parts[spec[3]]
+			joint.Parent = parts[spec[3]]
+		end
+		local humanoid = newInstance("Humanoid")
+		humanoid.RigType = Enum.HumanoidRigType.R15
+		humanoid.HipHeight = 1.35
+		humanoid.Parent = model
+		model.PrimaryPart = parts.HumanoidRootPart
+		return model
+	end
+
+	-- Where a character appears: on top of an enabled, neutral SpawnLocation, facing the way
+	-- it faces, spread out a little so two players don't land on each other.
+	local spawnCount = 0
+	local function spawnFrame()
+		spawnCount += 1
+		for _, candidate in descendants(workspace, {}) do
+			local cst = state[candidate]
+			if cst.className == "SpawnLocation" and candidate.Enabled and candidate.Neutral then
+				local frame = candidate.CFrame
+				local look = frame.LookVector
+				local yaw = math.atan2(-look.X, -look.Z)
+				local slot = (spawnCount - 1) % 3 -- centre, then left, then right
+				local spread = roblox.Vector3.new(if slot == 0 then 0 elseif slot == 1 then -2.5 else 2.5, 0, 0)
+				local top = frame.Position + roblox.Vector3.new(0, candidate.Size.Y / 2 + ROOT_HEIGHT, 0)
+				return roblox.CFrame.new(top) * roblox.CFrame.Angles(0, yaw, 0) * roblox.CFrame.new(spread)
+			end
+		end
+		-- No spawn: Studio drops the character near the origin, high up.
+		return roblox.CFrame.new(0, 100, 0)
+	end
+
+	local function removeCharacter(player)
+		local old = state[player].props.Character
+		if old then
+			fire(eventFor(player, state[player], "CharacterRemoving"), nil, old)
+			drain()
+			old:Destroy()
+			state[player].props.Character = nil
+		end
+	end
+
+	-- Roblox's order: Character is set, CharacterAdded fires (deferred), the model is parented
+	-- to the workspace and moved to a spawn. Handlers run after all of that.
+	local function loadCharacter(player)
+		removeCharacter(player)
+		local character = buildCharacter(player)
+		state[player].props.Character = character
+		fire(eventFor(player, state[player], "CharacterAdded"), nil, character)
+		changed(player, state[player], "Character", character)
+		character.Parent = workspace
+		character:PivotTo(spawnFrame())
+		drain()
+		return character
+	end
+	sim.loadCharacter = function(_self, player)
+		return loadCharacter(player)
+	end
+
+	methods.Player = {
+		LoadCharacterAsync = function(self)
+			if currentContext() ~= "server" then
+				error("LoadCharacterAsync can only be called by the backend server", 2)
+			end
+			loadCharacter(self)
+		end,
+	}
+
+	computed.Humanoid = {
+		RootPart = function(instance, st)
+			local model = st.parent
+			return model and findChild(state[model], "HumanoidRootPart") or nil
+		end,
+		FloorMaterial = function()
+			return Enum.Material.Plastic -- no physics: everyone is standing on something
+		end,
+		MoveDirection = function()
+			return roblox.Vector3.zero
+		end,
+	}
+
+	local function findAttachment(model, name: string)
+		for _, descendant in descendants(model, {}) do
+			local dst = state[descendant]
+			if dst.className == "Attachment" and dst.props.Name == name then
+				local parent = dst.parent
+				-- Only the body's own attachments, not another accessory's.
+				if parent and isA(state[parent].className, "BasePart") and state[parent].parent == model then
+					return descendant
+				end
+			end
+		end
+		return nil
+	end
+
+	methods.Humanoid = {
+		-- Welds the accessory's Handle to the body part with the matching attachment, so the
+		-- two attachments meet. (Roblox's weld has Part0 = Handle; the simulator's joints pose
+		-- Part1 from Part0, so here Part0 is the body part. The result is the same.)
+		AddAccessory = function(self, accessory)
+			local model = state[self].parent
+			assert(model, "AddAccessory: the Humanoid has no character")
+			assert(
+				isInstance(accessory) and isA(state[accessory].className, "Accoutrement"),
+				"AddAccessory expects an Accessory"
+			)
+			local handle = findChild(state[accessory], "Handle")
+			accessory.Parent = model
+			if handle == nil then
+				return
+			end
+			for _, child in state[handle].children do
+				if state[child].className == "Attachment" then
+					local target = findAttachment(model, state[child].props.Name)
+					if target then
+						local weld = newInstance("Weld")
+						state[weld].props.Name = "AccessoryWeld"
+						weld.C0 = state[target].props.CFrame or roblox.CFrame.new()
+						weld.C1 = state[child].props.CFrame or roblox.CFrame.new()
+						weld.Part1 = handle
+						weld.Part0 = state[target].parent
+						weld.Parent = handle
+						return
+					end
+				end
+			end
+		end,
+		GetAccessories = function(self)
+			local model = state[self].parent
+			local list = {}
+			if model then
+				for _, child in state[model].children do
+					if isA(state[child].className, "Accoutrement") then
+						table.insert(list, child)
+					end
+				end
+			end
+			return list
+		end,
+		GetState = function()
+			return Enum.HumanoidStateType.Running
+		end,
+		ChangeState = function() end,
+		SetStateEnabled = function(_self, stateType, enabled)
+			assert(typeOf(stateType) == "EnumItem" and type(enabled) == "boolean", "SetStateEnabled(state, enabled)")
+		end,
+	}
+
 	-- Run service and input --------------------------------------------------------
 	local runService = service("RunService")
 	local renderSteps = {}
@@ -1139,6 +1428,115 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 			return false
 		end,
 	}
+
+	-- ContextActionService: bindings are per client. sim:pressKey offers each key press to
+	-- them in priority order (see dispatchAction).
+	service("ContextActionService")
+	local actionBindings = {}
+	local bindingSequence = 0
+
+	local function bindAction(name, fn, touchButton, priority, ...)
+		local context = currentContext()
+		if clientPlayer[context] == nil then
+			error("ContextActionService actions can only be bound on the client", 3)
+		end
+		assert(type(name) == "string" and type(fn) == "function", "BindAction(name, function, ...)")
+		assert(type(touchButton) == "boolean", "BindAction: createTouchButton must be a boolean")
+		assert(type(priority) == "number", "BindActionAtPriority: priority must be a number")
+		local inputs = table.pack(...)
+		assert(inputs.n > 0, "BindAction needs at least one input")
+		for i = 1, inputs.n do
+			local item = inputs[i]
+			assert(
+				typeOf(item) == "EnumItem"
+					and (
+						Enum.KeyCode[item.Name] == item
+						or Enum.UserInputType[item.Name] == item
+						or Enum.PlayerActions[item.Name] == item
+					),
+				`BindAction: input {i} must be a KeyCode, UserInputType or PlayerActions`
+			)
+		end
+		for i = #actionBindings, 1, -1 do
+			if actionBindings[i].context == context and actionBindings[i].name == name then
+				table.remove(actionBindings, i)
+			end
+		end
+		bindingSequence += 1
+		table.insert(actionBindings, {
+			name = name,
+			fn = fn,
+			priority = priority,
+			inputs = { table.unpack(inputs, 1, inputs.n) },
+			context = context,
+			seq = bindingSequence,
+		})
+	end
+
+	methods.ContextActionService = {
+		BindAction = function(_self, name, fn, touchButton, ...)
+			bindAction(name, fn, touchButton, Enum.ContextActionPriority.Default.Value, ...)
+		end,
+		BindActionAtPriority = function(_self, name, fn, touchButton, priority, ...)
+			bindAction(name, fn, touchButton, priority, ...)
+		end,
+		UnbindAction = function(_self, name)
+			local context = currentContext()
+			for i = #actionBindings, 1, -1 do
+				if actionBindings[i].context == context and actionBindings[i].name == name then
+					table.remove(actionBindings, i)
+				end
+			end
+		end,
+		GetButton = function()
+			return nil
+		end,
+		SetTitle = function() end,
+		SetImage = function() end,
+		SetPosition = function() end,
+		SetDescription = function() end,
+	}
+
+	-- Runs `fn` in a client's context right now and returns its first result (nil if it yields).
+	local function callIn(context: string, fn, ...)
+		local thread = coroutine.create(fn)
+		threadContext[thread] = context
+		local results = table.pack(coroutine.resume(thread, ...))
+		if not results[1] then
+			table.insert(sim.errors, `[{context}] {debug.traceback(thread, tostring(results[2]))}`)
+			return nil
+		end
+		return results[2]
+	end
+
+	-- Offers an input to one client's bound actions. Returns true if an action sank it.
+	local function dispatchAction(context: string, inputObject): boolean
+		local matching = {}
+		for _, binding in actionBindings do
+			if binding.context == context then
+				for _, item in binding.inputs do
+					if item == inputObject.KeyCode or item == inputObject.UserInputType then
+						table.insert(matching, binding)
+						break
+					end
+				end
+			end
+		end
+		table.sort(matching, function(a, b)
+			if a.priority ~= b.priority then
+				return a.priority > b.priority
+			end
+			return a.seq > b.seq
+		end)
+		for _, binding in matching do
+			local result = callIn(context, binding.fn, binding.name, inputObject.UserInputState, inputObject)
+			drain()
+			if result ~= Enum.ContextActionResult.Pass then
+				return true
+			end
+		end
+		return false
+	end
 	service("GuiService")
 	methods.StarterGui = {
 		SetCoreGuiEnabled = function(_self, kind, enabled)
@@ -1596,6 +1994,16 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		runScript("server", "ServerScriptService/Server", "ServerScriptService/Server.server.luau")
 	end
 
+	-- Runs `fn(env)` on a player's client, as their client scripts would, for testing the
+	-- simulator itself. `env` holds the globals a client script sees.
+	function sim:runAsClient(player, fn)
+		local context = `client:{state[player].props.UserId}`
+		assert(clientPlayer[context] == player, "runAsClient: that player isn't connected")
+		local thread = newThread(context, fn)
+		resume(thread, baseGlobals)
+		drain()
+	end
+
 	-- Runs a snippet of Luau as a server script, for testing the simulator itself.
 	-- Returns whatever the snippet returns.
 	function sim:execute(source: string)
@@ -1633,12 +2041,16 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		fire(eventFor(players, state[players], "PlayerAdded"), nil, player)
 		drain()
 		runScript(context, "ReplicatedStorage/Client", "ReplicatedStorage/Client.client.luau")
+		if players.CharacterAutoLoads then
+			loadCharacter(player)
+		end
 		return player
 	end
 
 	function sim:removePlayer(player)
 		fire(eventFor(players, state[players], "PlayerRemoving"), nil, player)
 		drain()
+		removeCharacter(player)
 		deadContexts[`client:{state[player].props.UserId}`] = true
 		for context, candidate in clientPlayer do
 			if candidate == player then
@@ -1649,9 +2061,48 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		drain()
 	end
 
+	-- Roblox's default camera, roughly, for one player (sim.cameraFollows): with CameraType
+	-- Custom it keeps the camera's direction and puts it on the subject point the way
+	-- BaseCamera:GetSubjectPosition does (1.5 studs above the root, plus Humanoid.CameraOffset),
+	-- half a stud behind it in first person (LockFirstPerson) or sim.cameraZoom behind it
+	-- otherwise. In first person it hides the character from its own camera
+	-- (LocalTransparencyModifier), as the TransparencyController does. Tests don't use it;
+	-- tools/preview does, so the pictures show what the player would see.
+	local function emulateCamera(player)
+		local character = state[player].props.Character
+		if character == nil or camera.CameraType ~= Enum.CameraType.Custom then
+			return
+		end
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		local root = humanoid and humanoid.RootPart
+		if root == nil then
+			return
+		end
+		local lift = 1.5
+		if humanoid.RigType == Enum.HumanoidRigType.R15 then
+			lift = 1.5 + (root.Size.Y - 2) / 2
+		end
+		local subject = root.Position
+			+ root.CFrame:VectorToWorldSpace(roblox.Vector3.new(0, lift, 0) + humanoid.CameraOffset)
+		local firstPerson = player.CameraMode == Enum.CameraMode.LockFirstPerson
+		local rotation = camera.CFrame.Rotation
+		local zoom = if firstPerson then 0.5 else (sim.cameraZoom or 12.5)
+		camera.CFrame = roblox.CFrame.new(subject - rotation.LookVector * zoom) * rotation
+		camera.Focus = roblox.CFrame.new(subject)
+		for _, descendant in descendants(character, {}) do
+			local className = state[descendant].className
+			if isA(className, "BasePart") or className == "Decal" then
+				descendant.LocalTransparencyModifier = if firstPerson then 1 else 0
+			end
+		end
+	end
+
 	function sim:step(dt: number)
 		sim.now += dt
 		sim.frames += 1
+		if sim.cameraFollows then
+			emulateCamera(sim.cameraFollows)
+		end
 		for _, step in table.clone(renderSteps) do
 			if not deadContexts[step.context] then
 				local thread = newThread(step.context, step.fn)
@@ -1738,21 +2189,83 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		drain()
 	end
 
-	-- A key (or gamepad button) press reaching the game, not eaten by the UI.
-	function sim:pressKey(keyCode: EnumItem)
+	-- A key (or gamepad button) press and release reaching the game, not eaten by the UI.
+	-- It goes to every player's client, or only `player`'s. As in Roblox, actions bound with
+	-- ContextActionService see it first, highest priority first (the latest binding first on
+	-- a tie); an action that doesn't return Pass sinks it, and UserInputService then reports
+	-- it as processed.
+	function sim:pressKey(keyCode: EnumItem, player: any?)
 		local inputType = if string.sub(keyCode.Name, 1, 6) == "Button"
 			then Enum.UserInputType.Gamepad1
 			else Enum.UserInputType.Keyboard
-		local inputObject = {
-			KeyCode = keyCode,
-			UserInputType = inputType,
-			UserInputState = Enum.UserInputState.Begin,
-			Position = roblox.Vector3.zero,
-			Delta = roblox.Vector3.zero,
-		}
-		fire(eventFor(input, state[input], "InputBegan"), function(context)
-			return clientPlayer[context] ~= nil
-		end, inputObject, false)
+		for context, owner in table.clone(clientPlayer) do
+			if (player == nil or owner == player) and not deadContexts[context] then
+				for _, phase in { Enum.UserInputState.Begin, Enum.UserInputState.End } do
+					local inputObject = {
+						KeyCode = keyCode,
+						UserInputType = inputType,
+						UserInputState = phase,
+						Position = roblox.Vector3.zero,
+						Delta = roblox.Vector3.zero,
+					}
+					local sunk = dispatchAction(context, inputObject)
+					local event = if phase == Enum.UserInputState.Begin then "InputBegan" else "InputEnded"
+					fire(eventFor(input, state[input], event), function(candidate)
+						return candidate == context
+					end, inputObject, sunk)
+					drain()
+				end
+			end
+		end
+	end
+
+	-- A player holding the prompt's key (for its HoldDuration) within reach of it, as the
+	-- engine requires: the prompt must be enabled and the player's character close enough.
+	function sim:triggerPrompt(player, prompt)
+		local st = state[prompt]
+		assert(st and st.className == "ProximityPrompt", "triggerPrompt expects a ProximityPrompt")
+		assert(prompt.Enabled, `{fullName(prompt)} is disabled`)
+		local parent = st.parent
+		assert(parent, "the prompt isn't in the world")
+		local position
+		if isA(state[parent].className, "BasePart") then
+			position = parent.Position
+		elseif state[parent].className == "Attachment" then
+			position = parent.WorldPosition
+		else
+			error(`sim: a ProximityPrompt under a {state[parent].className} never shows`)
+		end
+		local character = state[player].props.Character
+		assert(character, `{state[player].props.Name} has no character to reach the prompt with`)
+		local root = findChild(state[character], "HumanoidRootPart")
+		local distance = (root.Position - position).Magnitude
+		assert(
+			distance <= prompt.MaxActivationDistance,
+			`{state[player].props.Name} is {math.floor(distance * 10) / 10} studs from {fullName(prompt)} (reach {prompt.MaxActivationDistance})`
+		)
+		local function serverAndOwner(context)
+			return context == "server" or clientPlayer[context] == player
+		end
+		if prompt.HoldDuration > 0 then
+			fire(eventFor(prompt, st, "PromptButtonHoldBegan"), serverAndOwner, player)
+			sim:run(prompt.HoldDuration)
+			assert(prompt.Enabled, `{fullName(prompt)} was disabled during the hold`)
+		end
+		fire(eventFor(prompt, st, "Triggered"), serverAndOwner, player)
+		fire(eventFor(prompt, st, "TriggerEnded"), serverAndOwner, player)
+		drain()
+	end
+
+	-- Moves a player's character as if they had walked there: standing at `feet`, facing
+	-- `toward` (a point) if given.
+	function sim:moveCharacter(player, feet, toward)
+		local character = state[player].props.Character
+		assert(character, `{state[player].props.Name} has no character`)
+		local root = feet + roblox.Vector3.new(0, ROOT_HEIGHT, 0)
+		local frame = if toward
+			then lookAt(root, roblox.Vector3.new(toward.X, root.Y, toward.Z))
+			else roblox.CFrame.new(root) * character:GetPivot().Rotation
+		character:PivotTo(frame)
 		drain()
 	end
 
@@ -1762,6 +2275,8 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 
 	sim.game = game
 	sim.workspace = workspace
+	-- Roblox's CFrame.lookAt (Lune's faces the other way), for tests and tools.
+	sim.lookAt = lookAt
 	sim.drain = function(_self)
 		drain()
 	end

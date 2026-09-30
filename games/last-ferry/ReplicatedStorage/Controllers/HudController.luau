@@ -1,32 +1,38 @@
 --!strict
 --[[
-	HudController: everything on screen while you work the window, wired to the
-	server's remotes.
+	HudController: everything on screen, wired to the server's remotes.
 
-	Layout, on a canvas at least 960 x 420 scaled to fit the screen (see Theme):
+	On the pier between shifts there's only a banner: the game's name, how to start
+	(hold E at the time clock by the booth door) and the endings found so far. Roblox's
+	own UI does the rest: the player list, chat, emotes, the touch controls.
+
+	On shift, on a canvas at least 960 x 420 scaled to fit the screen (see Theme):
 		top bar        night, date and clock · lanterns, queue, ledger; a lost lantern
 		               or a found page shows as a banner over it for a few seconds
 		left "desk"    the ticket, the window countdown, BOARD / TURN AWAY
 		right          the rules card and, from night 3, the manifest (can be hidden);
-		               the ledger opens over it without blocking anything
+		               the ledger opens over it without blocking anything. On touch
+		               screens it stops short of Roblox's jump button.
 		top centre     Pike's radio, only while nobody is at the window, so nothing
 		               covers a passenger's face or breath
 		bottom centre  kept clear: that's where the planks and the shadows are
+	While on shift an invisible Modal button keeps the mouse cursor free, so the HUD
+	can be clicked in first person (hold the right button to look around).
 
 	Passengers talk the Roblox way: each line is a chat bubble over their head
 	(TextChatService:DisplayBubble) and a line in the chat window, so it can be
 	read again. "{name}" becomes the local player's display name.
 
-	Keys: B / gamepad A board, T / B turn away, P / X take a torn page, Enter,
-	Space or A continue. Roblox's chat window is moved to the bottom left, clear
-	of the ticket; the player list is hidden.
+	Keys, bound with ContextActionService above Roblox's own controls, and only taken
+	when they do something (otherwise gamepad A still jumps): B / gamepad A board,
+	T / B turn away, P / X take a torn page, Enter, Space or A continue.
 
 	The server sends the whole screen state on every change (ShiftState) plus
 	one-off effects (ShiftFx). Nothing here decides anything; it only draws what
 	it's told and sends the player's presses back.
 ]]
 
-local GuiService = game:GetService("GuiService")
+local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
@@ -51,6 +57,7 @@ local F = Theme.Fonts
 local DESK_WIDTH = 250
 local SIDE_WIDTH = 250
 local TOP = 70 -- below the top bar
+local JUMP_CLEARANCE = 112 -- screen px kept clear above the bottom-right corner (Roblox's jump button)
 
 local CALL_INK: { [string]: Color3 } = {
 	BOARDED = Color3.fromRGB(38, 112, 70),
@@ -65,6 +72,13 @@ local KEYS = {
 	continue = { Enum.KeyCode.Return, Enum.KeyCode.Space, Enum.KeyCode.ButtonA },
 }
 
+-- How to start a shift, by input: the time clock's ProximityPrompt keys.
+local CLOCK_IN_HOW: { [string]: string } = {
+	Touch = "Walk to the time clock by the booth door and hold <b>Clock in</b>.",
+	Gamepad = "Walk to the time clock by the booth door and hold <b>X</b>.",
+	KeyboardAndMouse = "Walk to the time clock by the booth door and hold <b>E</b>.",
+}
+
 -- Looking down into the booth while the tide comes in (degrees).
 local FLOOD_VIEW = Vector2.new(0, -26)
 
@@ -77,12 +91,11 @@ local ENDING_VIEWS: { [string]: Vector2 } = {
 
 local HudController = {}
 
-local function quietCoreGui()
+-- Roblox's own UI stays (player list, chat, emotes, touch controls); there are no tools
+-- and no damage, so the backpack and health bar go.
+local function setUpCoreGui()
 	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
 	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Health, false)
-	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.EmotesMenu, false)
-	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
-	GuiService.TouchControlsEnabled = false
 	-- The chat window opens top left by default, right over the ticket.
 	local chat = TextChatService:FindFirstChildOfClass("ChatWindowConfiguration")
 	if chat then
@@ -90,18 +103,15 @@ local function quietCoreGui()
 		chat.VerticalAlignment = Enum.VerticalAlignment.Bottom
 		chat.HeightScale = 0.6
 	end
-	-- There's no avatar to reset. SetCore fails until the core scripts are ready, so retry.
-	task.spawn(function()
-		for _ = 1, 30 do
-			local ok = pcall(function()
-				StarterGui:SetCore("ResetButtonCallback", false)
-			end)
-			if ok then
-				return
-			end
-			task.wait(0.5)
-		end
-	end)
+	-- Passengers' lines stay up a while (the engine default is 15 s), and a passenger at
+	-- the window is never far enough away to shrink to "...".
+	local bubbles = TextChatService:FindFirstChildOfClass("BubbleChatConfiguration")
+	if bubbles then
+		bubbles.Enabled = true
+		bubbles.BubbleDuration = 20
+		bubbles.MaxDistance = 100
+		bubbles.MinimizeDistance = 60
+	end
 end
 
 local function screenGui(parent: Instance, name: string, order: number, insets: Enum.ScreenInsets): ScreenGui
@@ -140,7 +150,7 @@ local function setTabSelected(button: TextButton, selected: boolean)
 end
 
 function HudController.start()
-	quietCoreGui()
+	setUpCoreGui()
 
 	local player = Players.LocalPlayer
 	local playerGui = player:WaitForChild("PlayerGui") :: PlayerGui
@@ -151,12 +161,16 @@ function HudController.start()
 	local progressRemote = Net.event(Config.Remotes.Progress)
 	local actionRemote = Net.event(Config.Remotes.Action)
 
-	-- Full-screen layers behind the HUD: a dim for the cards, and a red flash.
+	-- Full-screen layers behind the HUD: a dim for the cards, a red flash, and a blackout
+	-- that hides the jump between the pier and the booth.
 	local backdrop = screenGui(playerGui, "LastFerryBackdrop", 5, Enum.ScreenInsets.None)
 	local dim = Ui.frame(backdrop, "Dim", UDim2.fromScale(1, 1))
 	dim.BackgroundColor3 = C.ink
 	local flash = Ui.frame(backdrop, "Flash", UDim2.fromScale(1, 1))
 	flash.BackgroundColor3 = Color3.fromRGB(150, 16, 16)
+	local blackout = Ui.frame(backdrop, "Blackout", UDim2.fromScale(1, 1))
+	blackout.BackgroundColor3 = Color3.new(0, 0, 0)
+	blackout.ZIndex = 10
 
 	-- The HUD itself stays inside the safe area (clear of notches and Roblox's buttons),
 	-- laid out at design size and scaled to fit.
@@ -165,10 +179,60 @@ function HudController.start()
 	local uiScale = Instance.new("UIScale")
 	uiScale.Parent = root
 
+	-- In first person Roblox locks the mouse to the middle of the screen. A visible Modal
+	-- button frees it, so the HUD can be clicked; holding the right button still looks around.
+	local cursor = Instance.new("TextButton")
+	cursor.Name = "FreeCursor"
+	cursor.Size = UDim2.fromOffset(1, 1)
+	cursor.BackgroundTransparency = 1
+	cursor.Text = ""
+	cursor.AutoButtonColor = false
+	cursor.Selectable = false
+	cursor.Modal = true
+	cursor.Visible = false
+	cursor.Parent = hud
+
 	local play = Ui.frame(root, "Play", UDim2.fromScale(1, 1))
 	play.ZIndex = 1
 	local overlay = Overlay.new(root)
 	overlay.root.ZIndex = 5
+
+	-- The pier: the game's name, how to start a shift, and the endings found so far.
+	local lobby = Ui.panel(root, "Lobby", UDim2.fromOffset(560, 0), UDim2.new(0.5, 0, 0, 10), Vector2.new(0.5, 0))
+	lobby.AutomaticSize = Enum.AutomaticSize.Y
+	lobby.BackgroundColor3 = C.ink
+	lobby.BackgroundTransparency = 0.2
+	lobby.Visible = false
+	Ui.padding(lobby, 10, 18)
+	Ui.list(lobby, Enum.FillDirection.Vertical, 2, Enum.HorizontalAlignment.Center)
+	local lobbyTitle = Ui.label(lobby, "Title", {
+		text = "LAST FERRY",
+		font = F.title,
+		size = 34,
+		color = C.lamp,
+		xAlign = Enum.TextXAlignment.Center,
+		frameSize = UDim2.new(1, 0, 0, 40),
+		order = 1,
+	})
+	Widgets.outline(lobbyTitle)
+	local lobbyHow = Ui.label(lobby, "How", {
+		font = F.body,
+		size = 18,
+		rich = true,
+		wrap = true,
+		xAlign = Enum.TextXAlignment.Center,
+		frameSize = UDim2.fromScale(1, 0),
+		autoSize = Enum.AutomaticSize.Y,
+		order = 2,
+	})
+	local lobbyFound = Ui.label(lobby, "Found", {
+		font = F.body,
+		size = 15,
+		color = C.muted,
+		xAlign = Enum.TextXAlignment.Center,
+		frameSize = UDim2.new(1, 0, 0, 20),
+		order = 3,
+	})
 
 	-- Top bar -------------------------------------------------------------------
 	local topBar = Ui.frame(play, "TopBar", UDim2.new(1, -32, 0, 56), UDim2.fromOffset(16, 6))
@@ -436,15 +500,31 @@ function HudController.start()
 		end
 	end
 
-	-- A passenger says something: a bubble over their head, and a line in the chat.
+	-- A passenger says something: a bubble over them, and a line in the chat. The bubble goes
+	-- on the whole model (always the same instance for the same passenger), so Roblox floats
+	-- it above their hat.
 	local function speak(passengerId: number?, who: string, text: string)
 		local line = personalize(text)
 		local model = if passengerId then passengers:FindFirstChild(`Passenger{passengerId}`) else nil
-		local head = model and model:FindFirstChild("Head")
-		if head and head:IsA("BasePart") then
-			TextChatService:DisplayBubble(head, line)
+		if model and model:IsA("Model") then
+			TextChatService:DisplayBubble(model, line)
 		end
 		logToChat(who, "#FFC684", line)
+	end
+
+	local function touchControls(): boolean
+		return UserInputService.PreferredInput == Enum.PreferredInput.Touch
+	end
+
+	-- The rules panel and the ledger run down the right side, stopping short of Roblox's
+	-- jump button on touch screens.
+	local function layoutSide()
+		local bottom = 16
+		if touchControls() then
+			bottom += math.ceil(JUMP_CLEARANCE / uiScale.Scale)
+		end
+		side.Size = UDim2.new(0, SIDE_WIDTH, 1, -(TOP + bottom))
+		ledger.Size = side.Size
 	end
 
 	local function rescale()
@@ -460,6 +540,7 @@ function HudController.start()
 		uiScale.Scale = scale
 		root.Size = UDim2.fromScale(1 / scale, 1 / scale)
 		overlay.resize(size / scale)
+		layoutSide()
 	end
 
 	local function refreshHint()
@@ -471,11 +552,21 @@ function HudController.start()
 			hint.Text = "Right stick to look · Hold R2 to lean in · A board · B turn away · X take a page"
 			boardKey, denyKey = "A", "B"
 		else
-			hint.Text = "Drag or arrow keys to look · Scroll to lean in · B board · T turn away · P take a page"
+			hint.Text =
+				"Hold the right mouse button to look · Scroll to lean in · B board · T turn away · P take a page"
 			boardKey, denyKey = "B", "T"
 		end
 		keyHints[boardButton].Text = boardKey
 		keyHints[denyButton].Text = denyKey
+		lobbyHow.Text = CLOCK_IN_HOW[input.Name] or CLOCK_IN_HOW.KeyboardAndMouse
+		layoutSide()
+	end
+
+	local function refreshLobby()
+		local found = if progress then #progress.found else 0
+		local total = if progress then progress.total else 0
+		lobbyFound.Text = if total > 0 then `Endings found: {found} of {total}` else ""
+		lobbyFound.Visible = total > 0
 	end
 
 	local function showAlert(title: string, text: string, color: Color3, background: Color3, seconds: number)
@@ -595,20 +686,23 @@ function HudController.start()
 		lastState = state
 		local phase = state.phase
 
-		-- Layers and screen effects for the phase.
-		local cardPhase = phase == "waiting" or phase == "intro" or phase == "summary"
+		-- Layers and screen effects for the phase. Between shifts ("waiting") everyone is
+		-- out on the pier with only the lobby banner up.
+		local cardPhase = phase == "intro" or phase == "summary"
 		play.Visible = phase == "queue" or phase == "window" or phase == "failed"
+		lobby.Visible = phase == "waiting"
 		dim.BackgroundTransparency = if cardPhase then 0.45 elseif phase == "ending" then 0.8 else 1
 		EffectsController.setBlur(cardPhase)
 		EffectsController.setFlooded(phase == "failed")
 		overlay.render(state, progress)
-		if cardPhase or phase == "ending" then
+		if cardPhase or phase == "ending" or phase == "waiting" then
 			ledger.Visible = false
 		end
 
 		if phase ~= previousPhase then
 			if phase == "intro" then
-				CameraController.lookTo(0, 0)
+				-- Every night starts looking out of the window (after the flood, too).
+				CameraController.faceWindow()
 				calledFor = nil
 			elseif phase == "failed" then
 				CameraController.lookTo(FLOOD_VIEW.X, FLOOD_VIEW.Y)
@@ -707,15 +801,18 @@ function HudController.start()
 	end
 
 	-- Wiring -------------------------------------------------------------------------
-	local function call(kind: string)
+	-- Each returns whether it did anything, so a key that does nothing here passes on to
+	-- Roblox's own controls.
+	local function call(kind: string): boolean
 		local state = lastState
 		local passenger = if state and state.phase == "window" then state.passenger else nil
 		if passenger == nil or calledFor == passenger.id then
-			return
+			return false
 		end
 		calledFor = passenger.id
 		actionRemote:FireServer(kind, passenger.id)
 		refreshButtons()
+		return true
 	end
 	boardButton.Activated:Connect(function()
 		call("board")
@@ -723,36 +820,60 @@ function HudController.start()
 	denyButton.Activated:Connect(function()
 		call("deny")
 	end)
-	local function takePage()
+	local function takePage(): boolean
 		local state = lastState
 		local passenger = if state and state.phase == "window" then state.passenger else nil
 		if passenger and passenger.hasPage then
 			actionRemote:FireServer("page", passenger.id)
+			return true
 		end
+		return false
 	end
-	ticket.onTakePage(takePage)
-
-	UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
-		local state = lastState
-		if processed or state == nil then
-			return
-		end
-		local key = input.KeyCode
-		if state.phase == "window" then
-			if table.find(KEYS.board, key) then
-				call("board")
-			elseif table.find(KEYS.deny, key) then
-				call("deny")
-			elseif table.find(KEYS.page, key) then
-				takePage()
-			end
-		elseif table.find(KEYS.continue, key) then
-			overlay.pressContinue()
-		end
+	ticket.onTakePage(function()
+		takePage()
 	end)
+
+	-- Shortcuts sit above Roblox's controls (which bind at Medium priority) and sink a key
+	-- only when they use it: gamepad A boards at the window, continues on a card, and
+	-- jumps the rest of the time.
+	local function bindKey(name: string, keys: { Enum.KeyCode }, handler: () -> boolean)
+		ContextActionService:BindActionAtPriority(
+			name,
+			function(_action: string, inputState: Enum.UserInputState, _input: InputObject): Enum.ContextActionResult
+				if inputState == Enum.UserInputState.Begin and handler() then
+					return Enum.ContextActionResult.Sink
+				end
+				return Enum.ContextActionResult.Pass
+			end,
+			false,
+			Enum.ContextActionPriority.High.Value,
+			table.unpack(keys)
+		)
+	end
+	bindKey("LastFerryContinue", KEYS.continue, function(): boolean
+		return overlay.pressContinue()
+	end)
+	bindKey("LastFerryBoard", KEYS.board, function(): boolean
+		return call("board")
+	end)
+	bindKey("LastFerryDeny", KEYS.deny, function(): boolean
+		return call("deny")
+	end)
+	bindKey("LastFerryPage", KEYS.page, takePage)
 	overlay.onContinue(function()
 		actionRemote:FireServer("continue")
 	end)
+
+	-- Clocking in or out: a moment of black hides the jump between the pier and the booth,
+	-- and the cursor is freed for the HUD while on shift.
+	local function onShiftChanged()
+		local onShift = player:GetAttribute("OnShift") == true
+		cursor.Visible = onShift
+		blackout.BackgroundTransparency = 0
+		TweenService:Create(blackout, TweenInfo.new(0.9, Enum.EasingStyle.Sine), { BackgroundTransparency = 1 }):Play()
+	end
+	player:GetAttributeChangedSignal("OnShift"):Connect(onShiftChanged)
+	cursor.Visible = player:GetAttribute("OnShift") == true
 	rulesTab.Activated:Connect(function()
 		showingManifest = false
 		refreshSide()
@@ -812,6 +933,7 @@ function HudController.start()
 	fxRemote.OnClientEvent:Connect(onFx)
 	progressRemote.OnClientEvent:Connect(function(payload: View.Progress)
 		progress = payload
+		refreshLobby()
 		local state = lastState
 		if state then
 			overlay.render(state, progress)

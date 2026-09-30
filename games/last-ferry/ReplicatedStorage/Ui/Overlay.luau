@@ -1,7 +1,7 @@
 --!strict
 --[[
-	Overlay: the cards between the action.
-		waiting - before the first shift starts
+	Overlay: the cards between the action. (Between shifts, "waiting", there's no card:
+	everyone is out on the pier and the HUD shows only the lobby banner.)
 		intro   - "Night 3": tonight's rules (new ones marked) and Pike on the radio
 		summary - every call from the night, and why it was right or wrong
 		failed  - the tide came in (no button; the night restarts on a timer)
@@ -23,7 +23,7 @@ export type Overlay = {
 	render: (state: View.State, progress: View.Progress?) -> (),
 	tick: (state: View.State) -> (),
 	onContinue: (callback: () -> ()) -> (),
-	pressContinue: () -> (), -- the Continue key or gamepad button
+	pressContinue: () -> boolean, -- the Continue key or gamepad button; true if it pressed
 	resize: (designSize: Vector2) -> (),
 }
 
@@ -38,18 +38,18 @@ local Overlay = {}
 local CONTINUE_TEXT: { [string]: string } = {
 	intro = "OPEN THE WINDOW",
 	summary = "NEXT NIGHT",
-	ending = "START A NEW SHIFT",
+	ending = "CLOCK OUT",
 }
 
 local TIMER_TEXT: { [string]: string } = {
 	intro = "The window opens by itself in %ds",
 	summary = "The next night starts in %ds",
 	failed = "The night starts again in %ds",
-	ending = "A new shift starts in %ds",
+	ending = "Back to the pier in %ds",
 }
 
 local function isOverlayPhase(phase: string): boolean
-	return phase == "waiting" or phase == "intro" or phase == "summary" or phase == "failed" or phase == "ending"
+	return phase == "intro" or phase == "summary" or phase == "failed" or phase == "ending"
 end
 
 local function column(parent: Instance, name: string, width: UDim, x: UDim): Frame
@@ -188,7 +188,7 @@ function Overlay.new(parent: Instance): Overlay
 		else
 			card.AnchorPoint = Vector2.new(0.5, 0.5)
 			card.Position = UDim2.fromScale(0.5, 0.5)
-			card.Size = UDim2.fromOffset(width, math.min(if phase == "waiting" then 240 else 520, designSize.Y - 24))
+			card.Size = UDim2.fromOffset(width, math.min(520, designSize.Y - 24))
 		end
 	end
 
@@ -283,13 +283,6 @@ function Overlay.new(parent: Instance): Overlay
 					order = 3,
 				})
 			end
-		else
-			kicker.Text = "GULL HARBOR"
-			title.Text = "Last Ferry"
-			title.TextColor3 = C.lamp
-			subtitle.Text = ""
-			Ui.list(content, Enum.FillDirection.Vertical, 6)
-			paragraph(content, "Waiting for the night shift to begin...", { size = 18, color = C.muted })
 		end
 		body.CanvasPosition = Vector2.zero
 	end
@@ -328,7 +321,8 @@ function Overlay.new(parent: Instance): Overlay
 		status.Text = table.concat(parts, " · ")
 	end
 
-	local function press()
+	-- Returns whether Continue was pressed (it can only be while it's on screen and enabled).
+	local function press(): boolean
 		local state = lastState
 		if
 			state
@@ -341,9 +335,13 @@ function Overlay.new(parent: Instance): Overlay
 			pressedFor = state.phaseEnds
 			continueCallback()
 			updateFooter(state)
+			return true
 		end
+		return false
 	end
-	continue.Activated:Connect(press)
+	continue.Activated:Connect(function()
+		press()
+	end)
 
 	local overlay: Overlay = {
 		root = root,

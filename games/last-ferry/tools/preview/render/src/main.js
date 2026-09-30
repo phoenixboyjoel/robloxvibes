@@ -113,10 +113,118 @@ function normalize(node) {
   for (const child of node.children) normalize(child);
 }
 
+function indexNodes(node, into, parent = null) {
+  if (!node) return into;
+  node.parent = parent;
+  into.set(node.id, node);
+  for (const child of node.children) indexNodes(child, into, node);
+  return into;
+}
+
+// Roblox's default ProximityPrompt (CoreScripts/ProximityPrompt.lua), for prompts the
+// player's character is close enough to: a 72 px dark pill, the key in a grey circle,
+// the object text above the action text. Always on top, centred on its attachment.
+async function drawPrompts(ctx, data, partsById, nodesById, camera, W, H) {
+  const character = nodesById.get(data.localCharacter);
+  if (!character) return;
+  const rootNode = character.children.find((c) => c.name === 'HumanoidRootPart');
+  const root = rootNode && partsById.get(rootNode.id);
+  if (!root) return;
+  const rootPosition = new THREE.Vector3().setFromMatrixPosition(root.world);
+  const font = { family: 'rbxasset://fonts/families/BuilderSans.json', weight: 'Medium', style: 'Normal' };
+  await loadFontsFor({ props: { FontFace: font }, children: [] });
+  const { canvasFont } = await import('./fonts.js');
+  for (const node of nodesById.values()) {
+    if (node.class !== 'ProximityPrompt' || node.props.Enabled === false) continue;
+    const holder = node.parent;
+    let position = null;
+    if (holder?.class === 'Attachment' && partsById.get(holder.parent?.id)) {
+      const local = cframeMatrix(holder.props.CFrame ?? [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1]);
+      position = new THREE.Vector3().setFromMatrixPosition(
+        partsById.get(holder.parent.id).world.clone().multiply(local),
+      );
+    } else if (holder && partsById.get(holder.id)) {
+      position = new THREE.Vector3().setFromMatrixPosition(partsById.get(holder.id).world);
+    }
+    if (!position || position.distanceTo(rootPosition) > (node.props.MaxActivationDistance ?? 10)) continue;
+    const screen = position.clone().project(camera);
+    if (screen.z > 1) continue;
+    const cx = ((screen.x + 1) / 2) * W;
+    const cy = ((1 - screen.y) / 2) * H;
+    const action = node.props.ActionText ?? '';
+    const object = node.props.ObjectText ?? '';
+    ctx.save();
+    ctx.font = canvasFont(font, 19);
+    const actionWidth = ctx.measureText(action).width;
+    ctx.font = canvasFont(font, 14);
+    const objectWidth = ctx.measureText(object).width;
+    const width = 72 + Math.max(actionWidth, objectWidth) + (object ? 15 : 24);
+    const left = cx - width / 2;
+    const top = cy - 36;
+    ctx.fillStyle = 'rgba(18, 18, 18, 0.8)';
+    ctx.beginPath();
+    ctx.roundRect(left, top, width, 72, 8);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(163, 162, 165, 0.5)';
+    ctx.beginPath();
+    ctx.arc(left + 36, top + 36, 24, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(left + 36 - 12, top + 36 - 14, 24, 26, 5);
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = canvasFont(font, 16);
+    ctx.fillText(node.props.KeyboardKeyCode ?? 'E', left + 36, top + 35);
+    ctx.textAlign = 'left';
+    if (object) {
+      ctx.font = canvasFont(font, 14);
+      ctx.fillStyle = 'rgb(179, 179, 179)';
+      ctx.fillText(object, left + 72, top + 26);
+    }
+    ctx.font = canvasFont(font, 19);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(action, left + 72, top + (object ? 45 : 36));
+    ctx.restore();
+  }
+}
+
+// Where Roblox anchors a bubble: over a part, its top; over a model, the top of the
+// model's bounding box above its HumanoidRootPart (so it clears hats), as ExpChat's
+// BubbleChatBillboard:getVerticalOffset does. Then 1 stud up (its StudsOffset).
+function bubbleAnchor(id, partsById, nodesById) {
+  const part = partsById.get(id);
+  if (part) {
+    const size = part.node.props.Size ?? [1, 1, 1];
+    return new THREE.Vector3(0, size[1] / 2 + 1, 0).applyMatrix4(part.world);
+  }
+  const model = nodesById.get(id);
+  if (!model || model.class !== 'Model') return null;
+  const box = new THREE.Box3();
+  let root = null;
+  const walk = (node) => {
+    const entry = partsById.get(node.id);
+    if (entry) {
+      const [x, y, z] = entry.node.props.Size ?? [1, 1, 1];
+      const local = new THREE.Box3(new THREE.Vector3(-x / 2, -y / 2, -z / 2), new THREE.Vector3(x / 2, y / 2, z / 2));
+      box.union(local.applyMatrix4(entry.world));
+      if (node.name === 'HumanoidRootPart' || (!root && node.id === model.props.PrimaryPart)) root = entry;
+    }
+    for (const child of node.children) walk(child);
+  };
+  walk(model);
+  if (box.isEmpty()) return null;
+  const centre = root ? new THREE.Vector3().setFromMatrixPosition(root.world) : box.getCenter(new THREE.Vector3());
+  return new THREE.Vector3(centre.x, box.max.y + 1, centre.z);
+}
+
 // Roblox's chat bubbles (TextChatService:DisplayBubble) in their default style: a white
-// rounded bubble with dark text and a tail, above the part it belongs to, newest at the
+// rounded bubble with dark text and a tail, above what it belongs to, newest at the
 // bottom. They're screen-sized, not world-sized, like Roblox's.
-async function drawBubbles(ctx, bubbles, partsById, camera, W, H) {
+async function drawBubbles(ctx, bubbles, partsById, nodesById, camera, W, H) {
   if (bubbles.length === 0) return;
   const font = { family: 'rbxasset://fonts/families/BuilderSans.json', weight: 'Medium', style: 'Normal' };
   await loadFontsFor({ props: { FontFace: font }, children: [] });
@@ -127,10 +235,9 @@ async function drawBubbles(ctx, bubbles, partsById, camera, W, H) {
   }
   const { canvasFont } = await import('./fonts.js');
   for (const [id, list] of byPart) {
-    const part = partsById.get(id);
-    if (!part) continue;
-    const size = part.node.props.Size ?? [1, 1, 1];
-    const anchor = new THREE.Vector3(0, size[1] / 2 + 0.9, 0).applyMatrix4(part.world).project(camera);
+    const world = bubbleAnchor(id, partsById, nodesById);
+    if (!world) continue;
+    const anchor = world.project(camera);
     if (anchor.z > 1) continue;
     let bottom = ((1 - anchor.y) / 2) * H;
     const x = ((anchor.x + 1) / 2) * W;
@@ -251,7 +358,9 @@ async function main() {
   overlay.width = W;
   overlay.height = H;
   const ctx = overlay.getContext('2d');
-  await drawBubbles(ctx, data.bubbles ?? [], world.partsById, camera, W, H);
+  const nodesById = indexNodes(data.workspace, new Map());
+  await drawBubbles(ctx, data.bubbles ?? [], world.partsById, nodesById, camera, W, H);
+  await drawPrompts(ctx, data, world.partsById, nodesById, camera, W, H);
   if (data.playerGui) {
     await loadFontsFor(data.playerGui);
     drawScreenGuis(ctx, data.playerGui, { w: W, h: H }, safe, imageFor);

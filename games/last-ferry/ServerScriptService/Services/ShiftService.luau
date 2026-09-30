@@ -15,6 +15,7 @@ local Net = require("../../ReplicatedStorage/Shared/Net")
 local View = require("../../ReplicatedStorage/Shared/Types")
 local Director = require("../Shift/Director")
 local Types = require("../Shift/Types")
+local CrewService = require("./CrewService")
 local PassengerService = require("./PassengerService")
 local ProgressService = require("./ProgressService")
 local WorldService = require("./WorldService")
@@ -181,16 +182,22 @@ function ShiftService.start(markers: WorldService.Markers)
 		Director.action(director, player.UserId, kind, value)
 	end)
 
+	-- The lobby loop: wait on the pier for someone to clock in, work a whole run in the booth,
+	-- then everyone clocks out onto the pier again.
 	task.spawn(function()
 		while true do
-			Director.waitForPlayers(director)
+			Director.toLobby(director)
+			CrewService.waitForClockIn(function(player: Player): boolean
+				return synced[player] == true
+			end)
+			CrewService.startShift()
 			local ok, err = xpcall(Director.playRun, debug.traceback, director)
 			if not ok then
-				-- A bug shouldn't strand players in a frozen booth: start a fresh run.
-				warn(`[Last Ferry] The shift hit an error and is starting over:\n{err}`)
+				-- A bug shouldn't strand players in a frozen booth: back to the pier.
+				warn(`[Last Ferry] The shift hit an error and everyone is back on the pier:\n{err}`)
 				clearQueue()
-				task.wait(2)
 			end
+			CrewService.endShift()
 		end
 	end)
 end

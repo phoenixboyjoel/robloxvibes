@@ -18,14 +18,23 @@
     },
     "Lighting": {
       "$properties": {
-        "Technology": "Future",
         "LightingStyle": "Realistic",
         "PrioritizeLightingQuality": true
       }
     },
     "Players": {
       "$properties": {
-        "CharacterAutoLoads": false
+        "CharacterAutoLoads": true
+      }
+    },
+    "StarterPlayer": {
+      "$properties": {
+        "CameraMaxZoomDistance": 25
+      }
+    },
+    "TextChatService": {
+      "$properties": {
+        "ChatVersion": "TextChatService"
       }
     }
   }

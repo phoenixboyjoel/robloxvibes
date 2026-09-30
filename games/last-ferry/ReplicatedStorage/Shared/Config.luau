@@ -23,11 +23,6 @@ local Config = {
 
 	ActionsPerSecond = 4,
 	ActionBurst = 6,
-
-	-- Booth camera look limits, in degrees.
-	LookYaw = 38,
-	LookPitchDown = 32,
-	LookPitchUp = 12,
 }
 
 return Config

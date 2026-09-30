@@ -350,7 +350,9 @@ export async function buildWorld(data, { renderer, textureFor, imageFor }) {
       group.matrixAutoUpdate = false;
       group.matrix.copy(world);
       scene.add(group);
-      const transparency = p.Transparency ?? 0;
+      // Roblox's effective transparency: LocalTransparencyModifier is what the first-person
+      // camera uses to hide your own character from you.
+      const transparency = 1 - (1 - (p.Transparency ?? 0)) * (1 - (p.LocalTransparencyModifier ?? 0));
       const geometry = partGeometry(node);
       if (transparency < 0.999) {
         const mesh = new THREE.Mesh(
@@ -370,15 +372,17 @@ export async function buildWorld(data, { renderer, textureFor, imageFor }) {
       for (const child of node.children) {
         if (child.class === 'Decal' || child.class === 'Texture') {
           const texture = textureFor(child.props.Texture ?? child.props.ColorMap);
-          if (!texture) continue;
+          const decalTransparency =
+            1 - (1 - (child.props.Transparency ?? 0)) * (1 - (child.props.LocalTransparencyModifier ?? 0));
+          if (!texture || decalTransparency >= 0.999) continue;
           if (geometry.userData.head && (child.props.Face ?? 'Front') === 'Front') {
-            group.add(headDecal(geometry, texture, child.props.Color3, child.props.Transparency));
+            group.add(headDecal(geometry, texture, child.props.Color3, decalTransparency));
           } else {
             const material = new THREE.MeshStandardMaterial({
               map: texture,
               color: srgb(child.props.Color3 ?? [1, 1, 1]),
               transparent: true,
-              opacity: 1 - (child.props.Transparency ?? 0),
+              opacity: 1 - decalTransparency,
               alphaTest: 0.05,
               depthWrite: false,
             });

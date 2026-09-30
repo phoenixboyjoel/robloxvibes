@@ -8,15 +8,23 @@
 		lune run tools/preview/export.luau <scenario> <out.json> [--screen=W,H] [--safe=W,H] [--touch]
 
 	Scenarios:
-		first  - the first passenger of night 1 at the window (a regular: dry, breathing, casting a shadow)
+		lobby  - three players on the pier as their avatars, Alice at the time clock with
+		         its "Clock in" prompt up (Roblox's third-person camera behind her)
+		first  - the first passenger of night 1 at the window, seen in first person from
+		         Alice's stand (a regular: dry, breathing, casting a shadow)
 		wet    - the first dripping passenger of night 1 (one of the drowned)
-		intro  - the night 1 title card, before the window opens
+		intro  - the night 1 title card, just after clocking in
 		queue  - between passengers, with the queue walking up
+		crew   - three clerks at the counter in their caps, seen from the dock over the head
+		         of the passenger at the window (no HUD)
 		lineup - the whole wardrobe in daylight (no player, no HUD)
-		pier   - the pier behind the booth, where players arrive (no player, no HUD)
+		pier   - the empty pier behind the booth (no player, no HUD)
 
 	--screen and --safe set the screen and its safe area in pixels (default 1280x720,
 	safe 1280x684). --touch makes the game see a phone.
+
+	The simulator stands in for Roblox's default camera (sim.cameraFollows), so the
+	first-person and third-person views are where Roblox would put them.
 ]]
 
 local process = require("@lune/process")
@@ -46,6 +54,7 @@ local function pair(text: string?): Vector2?
 	return if x then roblox.Vector2.new(tonumber(x), tonumber(y)) else nil
 end
 
+local V = roblox.Vector3
 local screen = pair(flags.screen)
 local sim = Sim.new({
 	root = ".",
@@ -55,16 +64,29 @@ local sim = Sim.new({
 })
 sim:startServer()
 sim:run(1)
--- The lineup frames its own camera, so no player (whose camera script would move it).
-local player = if scenario == "lineup" or scenario == "pier" then nil else sim:addPlayer("Preview", 1)
+
+local noPlayer = scenario == "lineup" or scenario == "pier"
+local player = if noPlayer then nil else sim:addPlayer("Alice", 101)
+local friends = {}
+if scenario == "lobby" or scenario == "crew" then
+	table.insert(friends, sim:addPlayer("Bob", 202))
+	table.insert(friends, sim:addPlayer("Cara", 303))
+end
+if player then
+	sim.cameraFollows = player
+end
 
 local function hud()
 	return player.PlayerGui.LastFerryHud.Root
 end
 
+local function clockPrompt()
+	return sim.workspace.World.Booth.TimeClock.PromptPoint.ClockIn
+end
+
 local function atWindow()
 	for _, model in sim.workspace.World.Passengers:GetChildren() do
-		local rootPart = model:FindFirstChild("Root") or model:FindFirstChild("HumanoidRootPart")
+		local rootPart = model:FindFirstChild("HumanoidRootPart")
 		if rootPart then
 			local position = rootPart.Position
 			if math.abs(position.X) < 0.5 and math.abs(position.Z + 3.2) < 0.5 then
@@ -75,11 +97,19 @@ local function atWindow()
 	return nil
 end
 
--- Presses Continue on every card (once it's been up a moment) until `reached` says stop.
+-- Clocks in from the pier (once the prompt is up), then presses Continue on every card
+-- (once it's been up a moment) until `reached` says stop.
 local lastCard = ""
 local function playUntil(reached: () -> boolean, limit: number): boolean
 	return sim:runUntil(function()
 		local root = hud()
+		if root.Lobby.Visible then
+			if clockPrompt().Enabled and not player:GetAttribute("OnShift") then
+				sim:moveCharacter(player, V.new(2.7, 0, 11), V.new(2.7, 0, 8))
+				sim:triggerPrompt(player, clockPrompt())
+			end
+			return false
+		end
 		local overlay = root.Overlay
 		if overlay.Visible then
 			if reached() then
@@ -96,6 +126,42 @@ local function playUntil(reached: () -> boolean, limit: number): boolean
 		end
 		return reached()
 	end, limit, 1 / 20)
+end
+
+-- A passenger at the window with the desk ready, first or first dripping one.
+local function untilPassenger(wanted: string): boolean
+	return playUntil(function()
+		local root = hud()
+		if root.Overlay.Visible then
+			return false
+		end
+		local board = root.Play.Desk.Board
+		local model = atWindow()
+		if model == nil or not board.Interactable then
+			return false
+		end
+		local wet = model:FindFirstChild("Drips", true) ~= nil
+		if wanted == "first" or (wanted == "wet" and wet) then
+			return true
+		end
+		sim:click(board)
+		return false
+	end, 1200)
+end
+
+-- Waits for the puddle to spread and the booth lamp to be steady (not mid-flicker).
+local function settle()
+	sim:run(6.5)
+	sim:runUntil(function()
+		local bulb = sim.workspace.World.Booth:FindFirstChild("LampBulb")
+		return bulb ~= nil and bulb.Transparency == 0
+	end, 3, 1 / 20)
+end
+
+-- Points the camera from `at` toward `target`; Roblox's camera keeps the direction and
+-- puts itself on the character.
+local function aim(at: Vector3, target: Vector3)
+	sim.workspace.CurrentCamera.CFrame = sim.lookAt(at, target)
 end
 
 -- The whole wardrobe in daylight: one figure per outfit, with hats, hair, bags and
@@ -146,22 +212,28 @@ local function lineup()
 	return camera
 end
 
--- The pier behind the booth at night, where players arrive, from a player's-eye height.
-local function pier()
+local done
+local capturePlayer = player
+if scenario == "lineup" then
+	done = lineup() ~= nil
+elseif scenario == "pier" then
 	sim:execute([[
 		local camera = workspace.CurrentCamera
 		camera.CFrame = CFrame.lookAt(Vector3.new(6, 6.5, 38), Vector3.new(-1, 4, 6))
 		camera.FieldOfView = 70
 	]])
 	sim:run(1)
-	return true
-end
-
-local done
-if scenario == "lineup" then
-	done = lineup() ~= nil
-elseif scenario == "pier" then
-	done = pier()
+	done = true
+elseif scenario == "lobby" then
+	sim:run(2)
+	-- Alice at the time clock, her friends ambling up the pier behind her.
+	sim:moveCharacter(player, V.new(3.4, 0, 13.2), V.new(2.7, 0, 8))
+	sim:moveCharacter(friends[1], V.new(-1.6, 0, 17.5), V.new(0, 0, 8))
+	sim:moveCharacter(friends[2], V.new(-5.2, 0, 21), V.new(-7.5, 0, 12))
+	sim.cameraZoom = 11
+	aim(V.new(9, 9.5, 24), V.new(1.2, 3.4, 10))
+	sim:run(1)
+	done = clockPrompt().Enabled and hud().Lobby.Visible
 elseif scenario == "intro" then
 	done = playUntil(function()
 		local overlay = hud().Overlay
@@ -174,34 +246,30 @@ elseif scenario == "queue" then
 		return not root.Overlay.Visible and root.Play.Desk.Idle.Visible
 	end, 300)
 	sim:run(2)
+elseif scenario == "crew" then
+	done = untilPassenger("first")
+	settle()
+	-- From the dock, over the passenger's head, into the booth; no one's screen.
+	sim.cameraFollows = nil
+	capturePlayer = nil
+	local camera = sim.workspace.CurrentCamera
+	camera.CameraType = roblox.Enum.CameraType.Scriptable
+	for _, clerk in { player, friends[1], friends[2] } do
+		for _, part in clerk.Character:GetDescendants() do
+			if part:IsA("BasePart") or part:IsA("Decal") then
+				part.LocalTransparencyModifier = 0
+			end
+		end
+	end
+	camera.CFrame = sim.lookAt(V.new(1.4, 7.9, -9.8), V.new(0, 4.2, 3))
+	camera.FieldOfView = 48
 else
-	done = playUntil(function()
-		local root = hud()
-		if root.Overlay.Visible then
-			return false
-		end
-		local board = root.Play.Desk.Board
-		local model = atWindow()
-		if model == nil or not board.Interactable then
-			return false
-		end
-		local wet = model:FindFirstChild("Drips", true) ~= nil
-		if scenario == "first" or (scenario == "wet" and wet) then
-			return true
-		end
-		sim:click(board)
-		return false
-	end, 1200)
-	sim:run(6.5) -- let the puddle spread to full size
-	-- Don't catch the booth lamp mid-flicker.
-	sim:runUntil(function()
-		local bulb = sim.workspace.World.Booth:FindFirstChild("LampBulb")
-		return bulb ~= nil and bulb.Transparency == 0
-	end, 3, 1 / 20)
+	done = untilPassenger(scenario)
+	settle()
 end
 assert(done, `never reached the "{scenario}" scenario`)
 assert(#sim.errors == 0, table.concat(sim.errors, "\n"))
 
-local scene = Scene.capture(sim, { root = ".", player = player, notes = { scenario = scenario } })
+local scene = Scene.capture(sim, { root = ".", player = capturePlayer, notes = { scenario = scenario } })
 Scene.write(outPath, scene)
 print(`wrote {outPath} ({scenario}, at {math.floor(sim.now)} s)`)

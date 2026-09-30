@@ -40,6 +40,7 @@ type Bot = {
 	sawRetry: boolean,
 	sawLedger: boolean?,
 	calls: number,
+	clockIns: number,
 }
 
 local function hud(bot: Bot)
@@ -90,16 +91,50 @@ local function readDesk(root)
 	}
 end
 
--- The latest chat bubble this player saw over `model`'s head.
+-- The latest chat bubble this player saw over `model` (bubbles go on the whole model).
 local function heard(bot: Bot, model): string
-	local head = model:FindFirstChild("Head")
 	local latest = ""
 	for _, bubble in bot.sim.bubbles do
-		if bubble.player == bot.player and bubble.adornee == head then
+		if bubble.player == bot.player and bubble.adornee == model then
 			latest = bubble.message
 		end
 	end
 	return latest
+end
+
+local CLOCK_SPOT = roblox.Vector3.new(2.7, 0, 11) -- on the pier, in front of the time clock
+
+local function clockPrompt(sim)
+	return sim.workspace.World.Booth.TimeClock.PromptPoint.ClockIn
+end
+
+-- Walks up to the time clock and holds its prompt, if it's up.
+local function clockIn(bot: Bot): boolean
+	local sim = bot.sim
+	local prompt = clockPrompt(sim)
+	if not prompt.Enabled or bot.player.Character == nil or bot.player:GetAttribute("OnShift") then
+		return false
+	end
+	sim:moveCharacter(bot.player, CLOCK_SPOT, roblox.Vector3.new(2.7, 0, 8))
+	sim:triggerPrompt(bot.player, prompt)
+	bot.clockIns += 1
+	return true
+end
+
+-- Where a character's feet are.
+local function feet(player)
+	local root = player.Character.HumanoidRootPart
+	return root.Position - roblox.Vector3.new(0, 2.35, 0)
+end
+
+local function inBooth(player): boolean
+	local at = feet(player)
+	return math.abs(at.X) < 4.8 and at.Z > 1.75 and at.Z < 7.8 and math.abs(at.Y - 0.2) < 0.01
+end
+
+local function onPier(player): boolean
+	local at = feet(player)
+	return at.Z > 8.5 and at.Z < 46 and math.abs(at.X) < 14 and math.abs(at.Y) < 0.01
 end
 
 -- What you can see of the passenger standing at the window.
@@ -162,6 +197,7 @@ local function newBot(sim, player, policy): Bot
 		sawFailed = false,
 		sawRetry = false,
 		calls = 0,
+		clockIns = 0,
 	}
 end
 
@@ -169,6 +205,14 @@ local function tick(bot: Bot)
 	local sim = bot.sim
 	local root = hud(bot)
 	if root == nil then
+		return
+	end
+
+	-- On the pier between shifts: walk to the time clock and clock in.
+	if root.Lobby.Visible then
+		if bot.policy.clockIn ~= false then
+			clockIn(bot)
+		end
 		return
 	end
 
@@ -312,10 +356,32 @@ local function clean(sim, label: string)
 	T.equal(#sim.warnings, 0, `{label}: warnings`)
 end
 
+-- Puts a hat on a player's avatar, the way the platform loads one: an Accessory of type
+-- Hat on the head's HatAttachment.
+local HAT = [[
+	local player = game:GetService("Players"):GetPlayers()[1]
+	local accessory = Instance.new("Accessory")
+	accessory.Name = "TopHat"
+	accessory.AccessoryType = Enum.AccessoryType.Hat
+	local handle = Instance.new("Part")
+	handle.Name = "Handle"
+	handle.Size = Vector3.new(1, 1.2, 1)
+	handle.Transparency = 0.1
+	handle.Parent = accessory
+	local attachment = Instance.new("Attachment")
+	attachment.Name = "HatAttachment"
+	attachment.Position = Vector3.new(0, -0.6, 0)
+	attachment.Parent = handle
+	player.Character.Humanoid:AddAccessory(accessory)
+	return handle
+]]
+
 T.test("a clerk playing from the HUD finishes five nights clean", function()
 	local sim = boot()
 	local alice = sim:addPlayer("Alice", 101)
+	local hat = sim:execute(HAT)
 	local bot = newBot(sim, alice)
+	local hatHidden = false
 	local finished = sim:runUntil(
 		function()
 			return bot.ending ~= nil
@@ -324,8 +390,12 @@ T.test("a clerk playing from the HUD finishes five nights clean", function()
 		1 / 20,
 		function()
 			tick(bot)
+			if alice:GetAttribute("OnShift") and alice.Character:FindFirstChild("ClerkCap") then
+				hatHidden = hat.Transparency == 1
+			end
 		end
 	)
+	T.expect(hatHidden, "her own hat goes under the clerk's cap for the shift")
 	sim:run(3) -- the save finishes just after the ending card appears
 	clean(sim, "clean run")
 	T.expect(finished, `the run never ended (stuck at {math.floor(sim.now)}s on "{bot.lastCard}")`)
@@ -340,6 +410,117 @@ T.test("a clerk playing from the HUD finishes five nights clean", function()
 	print(
 		`    (a clean run took {math.floor(sim.now / 60)} min {math.floor(sim.now % 60)} s of game time, {bot.calls} calls)`
 	)
+
+	-- Then everyone clocks out onto the pier, ready for another shift.
+	local root = hud(bot)
+	local back = sim:runUntil(function()
+		return root.Lobby.Visible
+	end, 90)
+	sim:run(1)
+	clean(sim, "clock out")
+	T.expect(back, "back to the lobby after the ending")
+	T.expect(onPier(alice), `Alice is back on the pier (feet at {feet(alice)})`)
+	T.equal(alice:GetAttribute("OnShift"), false, "off shift")
+	T.expect(alice.Character:FindFirstChild("ClerkCap") == nil, "the cap comes off")
+	T.equal(alice.Character.Humanoid.WalkSpeed, 16, "walking at Roblox's usual pace again")
+	T.equal(hat.Transparency, 0.1, "her own hat comes back as it was")
+	T.expect(clockPrompt(sim).Enabled, "the time clock is ready for the next shift")
+	T.equal(sim.workspace.World.Booth.Door.CanCollide, false, "the door is open")
+	T.equal(root.Lobby.Found.Text, "Endings found: 1 of 4")
+	T.equal(alice.CameraMode, roblox.Enum.CameraMode.Classic, "Roblox's third-person camera on the pier")
+end)
+
+T.test("players arrive on the pier as their avatars and clock in together", function()
+	local sim = boot()
+	local alice = sim:addPlayer("Alice", 101)
+	local bob = sim:addPlayer("Bob", 202)
+	sim:run(2)
+	clean(sim, "arrival")
+	for _, player in { alice, bob } do
+		local root = player.PlayerGui.LastFerryHud.Root
+		T.expect(player.Character ~= nil, `{player.Name} has an avatar`)
+		T.expect(onPier(player), `{player.Name} spawned on the pier (feet at {feet(player)})`)
+		T.expect(sim:shown(root.Lobby), `{player.Name} sees the lobby banner`)
+		T.expect(not sim:shown(root.Overlay), `{player.Name} sees no card on the pier`)
+		T.expect(not sim:shown(root.Play), `{player.Name} sees no shift HUD on the pier`)
+		T.equal(player.CameraMode, roblox.Enum.CameraMode.Classic, `{player.Name}: third person on the pier`)
+		T.expect(not root.Parent.FreeCursor.Visible, "the mouse isn't freed on the pier")
+	end
+	T.expect(string.find(alice.PlayerGui.LastFerryHud.Root.Lobby.How.Text, "<b>E</b>", 1, true) ~= nil, "says hold E")
+	T.expect(clockPrompt(sim).Enabled, "the time clock is ready")
+	T.equal(clockPrompt(sim).ActionText, "Clock in")
+	T.equal(sim.workspace.World.Booth.Door.CanCollide, false, "the booth door is open")
+
+	-- Too far away, the prompt can't be reached.
+	T.expect(not pcall(sim.triggerPrompt, sim, alice, clockPrompt(sim)), "the prompt needs you at the clock")
+	local bot = newBot(sim, alice, { idle = true, pressContinue = false })
+	T.expect(clockIn(bot), "Alice clocks in")
+	sim:run(1.5)
+	clean(sim, "clock in")
+	local standsUsed = {}
+	for _, player in { alice, bob } do
+		local root = player.PlayerGui.LastFerryHud.Root
+		T.expect(inBooth(player), `{player.Name} is in the booth (feet at {feet(player)})`)
+		T.equal(player:GetAttribute("OnShift"), true, `{player.Name} is on shift`)
+		T.expect(player.Character:FindFirstChild("ClerkCap") ~= nil, `{player.Name} wears the clerk's cap`)
+		T.equal(player.Character.Humanoid.WalkSpeed, 10, "walking at booth pace")
+		T.equal(player.CameraMode, roblox.Enum.CameraMode.LockFirstPerson, `{player.Name}: first person on shift`)
+		T.expect(root.Parent.FreeCursor.Visible and root.Parent.FreeCursor.Modal, "the HUD frees the mouse")
+		T.equal(root.Overlay.Card.Header.Title.Text, "Night 1", `{player.Name} sees the night 1 card`)
+		local key = tostring(feet(player))
+		T.expect(not standsUsed[key], "each clerk has their own stand")
+		standsUsed[key] = true
+	end
+	T.equal(sim.workspace.World.Booth.Door.CanCollide, true, "the door shuts behind them")
+	T.expect(not clockPrompt(sim).Enabled, "no clocking in again mid-shift")
+	T.expect(sim.workspace.World.Booth.BoothSpawn.Enabled, "respawns land in the booth")
+	T.expect(not sim.workspace.World.Pier.PierSpawn.Enabled, "not on the pier")
+	-- The booth holds them: walls, glass, roof and the counter are solid.
+	for _, name in { "Wall", "Glass", "Roof", "Counter", "CounterFront", "Floor" } do
+		for _, part in sim.workspace.World.Booth:GetChildren() do
+			if part.Name == name then
+				T.expect(part.CanCollide, `{name} is solid`)
+			end
+		end
+	end
+end)
+
+T.test("gamepad A boards at the window and jumps the rest of the time", function()
+	local sim = boot()
+	local alice = sim:addPlayer("Alice", 101)
+	-- Roblox's own jump binding (ControlModule, Medium priority).
+	local jumps = { count = 0 }
+	sim:runAsClient(alice, function(env)
+		env.game:GetService("ContextActionService"):BindActionAtPriority("jumpAction", function(_, state)
+			if state == env.Enum.UserInputState.Begin then
+				jumps.count += 1
+			end
+			return env.Enum.ContextActionResult.Sink
+		end, false, env.Enum.ContextActionPriority.Medium.Value, env.Enum.KeyCode.ButtonA)
+	end)
+	sim:run(1)
+	sim:pressKey(roblox.Enum.KeyCode.ButtonA, alice)
+	T.equal(jumps.count, 1, "on the pier, A jumps")
+
+	local bot = newBot(sim, alice, { idle = true })
+	local atWindow = sim:runUntil(
+		function()
+			local root = hud(bot)
+			return root.Play.Desk.Board.Interactable and sim:shown(root.Play.Desk.TicketHolder)
+		end,
+		300,
+		1 / 20,
+		function()
+			tick(bot)
+		end
+	)
+	T.expect(atWindow, "a passenger reached the window")
+	local before = jumps.count
+	sim:pressKey(roblox.Enum.KeyCode.ButtonA, alice)
+	sim:run(0.5)
+	T.equal(jumps.count, before, "at the window, A boards instead of jumping")
+	T.expect(not hud(bot).Play.Desk.Board.Interactable, "the call was made")
+	clean(sim, "gamepad")
 end)
 
 T.test("passengers are classic Robloxians who move like Roblox characters", function()
@@ -581,6 +762,10 @@ T.test("on phones the HUD scales down but the main buttons stay at least 44 px",
 			T.expect(button.Size.Y.Offset * scale >= 38, `{button.Name} is {button.Size.Y.Offset * scale} px`)
 		end
 		T.expect(string.find(root.Play.Hint.Text, "Pinch", 1, true) ~= nil, "touch hint")
+		-- The rules panel stops short of Roblox's jump button (bottom right, about 90 px up).
+		local side = root.Play.Side
+		local gap = (-side.Size.Y.Offset - 70) * scale
+		T.expect(gap >= 112, `the rules panel ends {gap} px above the bottom, clear of the jump button`)
 	end
 end)
 
@@ -603,6 +788,10 @@ T.test("co-op: a friend who joins late sees the same shift, and the Continue wai
 	sim:run(2, 1 / 20, function()
 		tick(bot)
 	end)
+	T.expect(inBooth(bob), `Bob starts in the booth, not on the pier (feet at {feet(bob)})`)
+	T.equal(bob:GetAttribute("OnShift"), true, "Bob is on shift")
+	T.expect(bob.Character:FindFirstChild("ClerkCap") ~= nil, "Bob wears the cap")
+	T.expect(tostring(feet(bob)) ~= tostring(feet(alice)), "Bob gets his own stand")
 	local aliceNight = alice.PlayerGui.LastFerryHud.Root.Play.TopBar.Left.Night.Text
 	local bobNight = bob.PlayerGui.LastFerryHud.Root.Play.TopBar.Left.Night.Text
 	T.equal(bobNight, aliceNight, "Bob sees the same night")

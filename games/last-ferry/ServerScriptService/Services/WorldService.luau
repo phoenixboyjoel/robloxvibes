@@ -68,6 +68,9 @@ local MARIGOLD_HOME = CFrame.new(-12, -1, -92) * CFrame.Angles(0, math.rad(20), 
 local WorldService = {}
 
 local markers: Markers
+local clockPrompt: ProximityPrompt
+local pierSpawn: SpawnLocation
+local boothSpawn: SpawnLocation
 local ferry: Model
 local ferryMover: CFrameValue
 local ferryTween: Tween? = nil
@@ -548,6 +551,25 @@ local function buildDock(parent: Folder)
 	channelBuoy(dock, Vector3.new(44, -2.3, -70), BUOY_GREEN)
 end
 
+-- An invisible spawn pad whose top is at the given frame's top face: characters appear
+-- standing on it. No force field (Duration 0), and nobody bumps into it.
+local function spawnPad(name: string, size: Vector3, cframe: CFrame, parent: Instance): SpawnLocation
+	local pad = Instance.new("SpawnLocation")
+	pad.Name = name
+	pad.Size = size
+	pad.CFrame = cframe
+	pad.Anchored = true
+	pad.CanCollide = false
+	pad.CanTouch = false
+	pad.CanQuery = false
+	pad.Transparency = 1
+	pad.CastShadow = false
+	pad.Neutral = true
+	pad.Duration = 0
+	pad.Parent = parent
+	return pad
+end
+
 -- The pier behind the booth, where players arrive as their avatars before a shift
 -- (the "lobby"). Railings and invisible walls keep them off the passengers' dock and
 -- out of the water; the booth's back door is the way in.
@@ -619,21 +641,10 @@ local function buildPier(parent: Folder): Vector3
 	end
 	sign(board, Enum.NormalId.Front, "NIGHT FERRY · STAFF WANTED\nClock in at the ticket office door", TRIM)
 
-	-- Players appear here, facing the booth (-Z, as a SpawnLocation faces by default).
-	local spawn = Instance.new("SpawnLocation")
-	spawn.Name = "PierSpawn"
-	spawn.Size = Vector3.new(8, 0.2, 8)
-	spawn.CFrame = CFrame.new(0, 0.1, 30)
-	spawn.Anchored = true
-	spawn.CanCollide = false
-	spawn.CanTouch = false
-	spawn.CanQuery = false
-	spawn.Transparency = 1
-	spawn.CastShadow = false
-	spawn.Neutral = true
-	spawn.Duration = 0
-	spawn.Parent = pier
-	return spawn.Position
+	-- Players appear here between shifts, facing the booth (-Z, as a SpawnLocation faces
+	-- by default).
+	pierSpawn = spawnPad("PierSpawn", Vector3.new(8, 0.2, 8), CFrame.new(0, -0.1, 30), pier)
+	return Vector3.new(0, 0, 30)
 end
 
 local DOOR_HINGE = CFrame.new(-1.3, 3.45, 8)
@@ -693,6 +704,7 @@ local function buildBooth(parent: Folder): CFrame
 		cframe = CFrame.new(0, 8.5, 3.8),
 		color = ROOF,
 		material = Enum.Material.SmoothPlastic,
+		collide = true, -- a clerk jumping in the booth bumps their head
 		parent = booth,
 	})
 	part({
@@ -726,6 +738,61 @@ local function buildBooth(parent: Folder): CFrame
 	doorWeld.Part1 = doorSign
 	doorWeld.Parent = doorSign
 	doorSign.Anchored = false
+
+	-- The time clock on the pier side of the back wall, right of the door: where a shift
+	-- starts. Roblox's own "E" prompt, held for a moment so nobody clocks in by accident.
+	local timeClock = part({
+		name = "TimeClock",
+		size = Vector3.new(1.3, 1.7, 0.45),
+		cframe = CFrame.new(2.7, 3.9, 8.43),
+		color = Color3.fromRGB(46, 58, 76),
+		collide = true,
+		parent = booth,
+	})
+	part({
+		name = "ClockFace",
+		size = Vector3.new(0.1, 0.8, 0.8),
+		cframe = CFrame.new(2.7, 4.2, 8.67) * CFrame.Angles(0, math.rad(90), 0),
+		color = TRIM,
+		shape = Enum.PartType.Cylinder,
+		castShadow = false,
+		parent = booth,
+	})
+	part({
+		name = "CardSlot",
+		size = Vector3.new(0.7, 0.08, 0.1),
+		cframe = CFrame.new(2.7, 3.45, 8.67),
+		color = Color3.fromRGB(20, 22, 26),
+		castShadow = false,
+		parent = booth,
+	})
+	local clockSign = part({
+		name = "ClockSign",
+		size = Vector3.new(1.8, 0.5, 0.06),
+		cframe = CFrame.new(2.7, 5.1, 8.24),
+		color = SIGN_NEON,
+		material = Enum.Material.Neon,
+		castShadow = false,
+		parent = booth,
+	})
+	sign(clockSign, Enum.NormalId.Back, "CLOCK IN", Color3.fromRGB(28, 34, 44))
+	local promptPoint = Instance.new("Attachment")
+	promptPoint.Name = "PromptPoint"
+	promptPoint.Position = Vector3.new(0, 0, 0.4)
+	promptPoint.Parent = timeClock
+	clockPrompt = Instance.new("ProximityPrompt")
+	clockPrompt.Name = "ClockIn"
+	clockPrompt.ActionText = "Clock in"
+	clockPrompt.ObjectText = "Night shift"
+	clockPrompt.HoldDuration = 0.6
+	clockPrompt.MaxActivationDistance = 9
+	clockPrompt.RequiresLineOfSight = false
+	clockPrompt.Enabled = false
+	clockPrompt.Parent = promptPoint
+
+	-- Clerks who join (or respawn) mid-shift appear inside, facing the window.
+	boothSpawn = spawnPad("BoothSpawn", Vector3.new(4, 0.2, 2), CFrame.new(0, 0.1, 5.6), booth)
+	boothSpawn.Enabled = false
 
 	-- Inside, for anyone who turns round: a clock and the rules in poster form.
 	part({
@@ -804,6 +871,24 @@ local function buildBooth(parent: Folder): CFrame
 	interior.Range = 9
 	interior.Shadows = false
 	interior.Parent = counter
+	-- A warm ceiling lamp at the back, so clerks can see each other. Its light stops short
+	-- of the window: it never lights a passenger or the planks where the tells are.
+	local ceilingLamp = part({
+		name = "CeilingLamp",
+		size = Vector3.new(0.18, 1.1, 1.1),
+		cframe = CFrame.new(0, 8.1, 5) * CFrame.Angles(0, 0, math.rad(90)),
+		color = LAMP_WARM,
+		material = Enum.Material.Neon,
+		shape = Enum.PartType.Cylinder,
+		castShadow = false,
+		parent = booth,
+	})
+	local ceilingLight = Instance.new("PointLight")
+	ceilingLight.Color = LAMP_WARM
+	ceilingLight.Brightness = 0.9
+	ceilingLight.Range = 8
+	ceilingLight.Shadows = false
+	ceilingLight.Parent = ceilingLamp
 	-- Three lanterns on the counter: one goes out for each mistake.
 	table.clear(lanterns)
 	for i = 1, 3 do
@@ -1141,12 +1226,15 @@ function WorldService.build(): Markers
 	markers = {
 		camera = cameraCFrame,
 		pier = pier,
-		-- Behind the counter, facing the window: the front spot first.
+		-- Where each clerk's feet go on the booth floor, facing the window: the front spot
+		-- first. Four fit along the counter and behind it; more than six share.
 		stands = {
 			CFrame.lookAt(Vector3.new(0, 0.2, 2.7), Vector3.new(0, 0.2, -1)),
 			CFrame.lookAt(Vector3.new(-2.8, 0.2, 3), Vector3.new(-2.8, 0.2, -1)),
 			CFrame.lookAt(Vector3.new(2.8, 0.2, 3), Vector3.new(2.8, 0.2, -1)),
 			CFrame.lookAt(Vector3.new(0, 0.2, 5.4), Vector3.new(0, 0.2, -1)),
+			CFrame.lookAt(Vector3.new(-2.8, 0.2, 5.8), Vector3.new(-2.8, 0.2, -1)),
+			CFrame.lookAt(Vector3.new(2.8, 0.2, 5.8), Vector3.new(2.8, 0.2, -1)),
 		},
 		window = Vector3.new(0, 0, -3.2),
 		queue = { Vector3.new(-2, 0, -11), Vector3.new(0.5, 0, -17), Vector3.new(-1.5, 0, -23) },
@@ -1192,12 +1280,25 @@ function WorldService.passengerFolder(): Folder
 	return passengers
 end
 
+-- The prompt on the time clock by the booth's back door.
+function WorldService.clockPrompt(): ProximityPrompt
+	return clockPrompt
+end
+
 -- The staff door swings open onto the pier between shifts, and shuts for one.
 function WorldService.setDoor(open: boolean)
 	door.CanCollide = not open
 	TweenService:Create(door, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
 		CFrame = if open then DOOR_OPEN else DOOR_SHUT,
 	}):Play()
+end
+
+-- During a shift the door is shut and anyone who (re)spawns appears in the booth;
+-- between shifts the door is open and everyone appears on the pier.
+function WorldService.setShift(on: boolean)
+	WorldService.setDoor(not on)
+	boothSpawn.Enabled = on
+	pierSpawn.Enabled = not on
 end
 
 function WorldService.setLanterns(lit: number)

@@ -27,13 +27,17 @@ Codex reads it directly.
 
 - `ServerScriptService/` and `ReplicatedStorage/` sync into Studio with Rojo
   (`rojo serve`, `default.project.json`) or Script Sync. The project also sets
-  three properties scripts can't:
-  - `Workspace.StreamingEnabled = false`: the client needs the whole harbor for
-    the fixed camera;
-  - `Lighting.LightingStyle = Realistic` with `PrioritizeLightingQuality`
-    (plus the older `Technology = Future`): crisp local-light shadows, which the
-    shadow rule depends on. `setUpLighting` sets the new two again at runtime;
-  - `Players.CharacterAutoLoads = false`.
+  properties that belong in the place:
+  - `Workspace.StreamingEnabled = false`: the client needs the whole harbor in
+    view from the booth;
+  - `Lighting.LightingStyle = Realistic` with `PrioritizeLightingQuality`:
+    crisp local-light shadows, which the shadow rule depends on.
+    `setUpLighting` sets both again at runtime;
+  - `Players.CharacterAutoLoads = true`: players are their own avatars;
+  - `StarterPlayer.CameraMaxZoomDistance = 25`: a close third-person camera on
+    the pier;
+  - `TextChatService.ChatVersion = TextChatService`, which the passengers' chat
+    bubbles need (scripts can't set it).
 - One server Script, one client Script (in ReplicatedStorage, RunContext
   Client). Everything else is a ModuleScript. Never put a `.client.luau` file in
   a Starter container: it would run twice.
@@ -134,10 +138,15 @@ otherwise. Don't weaken or skip a test to get green.
 - Nothing may cover a passenger's face while they're at the window: breath is
   a rule from night 3. That's why the radio waits for an empty window and
   warnings show as a banner over the top bar.
-- Every tell must be visible from the fixed camera. The sill hides the planks
-  closer than z ≈ −4.1, and a passenger's body hides everything straight
-  behind them. Check new cues with `tools/preview` (export, then render) before
-  a Studio playtest.
+- Roblox's touch controls are on (players walk the pier and the booth): the
+  thumbstick takes the lower left and the jump button the lower right. The
+  rules panel stops short of the jump button on touch screens; `Game.spec`
+  checks it.
+- Every tell must be visible from the front stand's first-person view (the eye
+  is held at y = 5.1 for every avatar). The sill hides the planks closer than
+  z ≈ −4.1, and a passenger's body hides everything straight behind them.
+  Check new cues with `tools/preview` (export, then render) before a Studio
+  playtest.
 - Every cue is visual; the first build has no audio.
 
 ## Definition of done

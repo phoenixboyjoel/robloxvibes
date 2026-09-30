@@ -203,9 +203,12 @@ function Scene.capture(sim, options: Options): any
 	end
 
 	local camera = sim.workspace.CurrentCamera
+	local character = if options.player then options.player.Character else nil
 	return {
 		bubbles = bubbles,
-		version = 2,
+		version = 3,
+		-- The player's own character (its ProximityPrompts show when it's close enough).
+		localCharacter = if character then ids[character] else nil,
 		time = sim.now,
 		screen = { sim.screen.X, sim.screen.Y },
 		safeArea = { sim.safeArea.X, sim.safeArea.Y },

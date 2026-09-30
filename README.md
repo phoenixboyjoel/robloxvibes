@@ -10,6 +10,14 @@ agents: Claude Code with Claude Opus 5.5, or Codex with GPT-6 Astra.
   wires an agent to Roblox Studio (Script Sync or Rojo, plus Studio's built-in
   MCP server). It includes agent rules drawn from Roblox's own benchmark findings
   and a working, exploit-resistant NPC dialogue slice.
+- **[games/last-ferry/](games/last-ferry/README.md): the first game, built.** An
+  anomaly-shift horror game. You work the night ticket window for the last ferry
+  to Gull Island and keep the drowned off the boat.
+  - Five nights and four endings, for one to four players.
+  - Built entirely from code: the world, the HUD, and a test suite that runs the
+    real server and client headlessly while a bot plays.
+  - Next step: the first Studio playtest
+    ([PLAYTEST.md](games/last-ferry/PLAYTEST.md)).
 
 ## The answer in one paragraph
 

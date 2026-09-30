@@ -28,6 +28,19 @@ local serde = require("@lune/serde")
 
 local Enum = roblox.Enum
 
+-- Lune's CFrame.lookAt faces the opposite way to Roblox's (right and look vectors
+-- flipped), so the simulator gives game code a CFrame table with Roblox's lookAt.
+local function lookAt(at, target, up)
+	local look = (target - at).Unit
+	local right = look:Cross(up or roblox.Vector3.yAxis)
+	if right.Magnitude < 1e-6 then
+		right = look:Cross(roblox.Vector3.zAxis)
+	end
+	right = right.Unit
+	return roblox.CFrame.fromMatrix(at, right, right:Cross(look).Unit, -look)
+end
+local CFrameApi = setmetatable({ lookAt = lookAt }, { __index = roblox.CFrame })
+
 local Sim = {}
 Sim.__index = Sim
 
@@ -302,6 +315,7 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 	-- Instances
 
 	local state = setmetatable({}, { __mode = "k" })
+	local welds = setmetatable({}, { __mode = "k" }) -- part -> { [part] = true }, from WeldConstraints
 	local InstanceMT = { __type = "Instance" }
 	local computed = {} -- [className][property] = function(instance, st) -> value
 	local methods = {} -- [className][name] = function(instance, ...)
@@ -377,7 +391,32 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		end
 	end
 
+	-- Roblox's real default values, read from Lune's reflection database through a sample
+	-- instance of each class. Falls back to the table below when Lune can't make the class.
+	local samples = {}
+	local function realDefault(className: string, key: string): (boolean, any)
+		local sample = samples[className]
+		if sample == nil then
+			local ok, instance = pcall(roblox.Instance.new, className)
+			sample = if ok then instance else false
+			samples[className] = sample
+		end
+		if sample then
+			local ok, value = pcall(function()
+				return sample[key]
+			end)
+			if ok and value ~= nil then
+				return true, value
+			end
+		end
+		return false, nil
+	end
+
 	local function defaultFor(instance, st, key: string, info)
+		local found, real = realDefault(st.className, key)
+		if found and pcall(checkValue, st.className, key, info, real, 1) then
+			return real
+		end
 		local overrides = {
 			Visible = true,
 			Interactable = true,
@@ -401,7 +440,11 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 			end
 			return 0
 		elseif category == "Enum" then
-			return Enum[typeName]:GetEnumItems()[1]
+			local items = Enum[typeName]:GetEnumItems()
+			table.sort(items, function(x, y)
+				return x.Value < y.Value
+			end)
+			return items[1]
 		elseif category == "DataType" then
 			local constructors = {
 				Vector3 = function()
@@ -568,6 +611,32 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		st.props[key] = value
 		if old ~= value then
 			changed(instance, st, key, value)
+		end
+		if st.className == "WeldConstraint" and (key == "Part0" or key == "Part1") then
+			local part0, part1 = st.props.Part0, st.props.Part1
+			if part0 and part1 then
+				welds[part0] = welds[part0] or {}
+				welds[part1] = welds[part1] or {}
+				welds[part0][part1] = true
+				welds[part1][part0] = true
+			end
+		elseif key == "CFrame" and old ~= nil and old ~= value and welds[instance] then
+			-- Moving a part moves the whole welded assembly with it.
+			local delta = value * old:Inverse()
+			local visited = { [instance] = true }
+			local queue = { instance }
+			while #queue > 0 do
+				local part = table.remove(queue)
+				for other in welds[part] or {} do
+					if not visited[other] then
+						visited[other] = true
+						local otherState = state[other]
+						otherState.props.CFrame = delta * (otherState.props.CFrame or roblox.CFrame.new())
+						changed(other, otherState, "CFrame", otherState.props.CFrame)
+						table.insert(queue, other)
+					end
+				end
+			end
 		end
 	end
 
@@ -1249,7 +1318,7 @@ function Sim.new(options: { root: string?, screen: Vector2?, safeArea: Vector2?,
 		},
 		Vector3 = roblox.Vector3,
 		Vector2 = roblox.Vector2,
-		CFrame = roblox.CFrame,
+		CFrame = CFrameApi,
 		Color3 = roblox.Color3,
 		UDim = roblox.UDim,
 		UDim2 = roblox.UDim2,

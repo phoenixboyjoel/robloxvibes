@@ -46,6 +46,12 @@ small budget, and the starter in [`starter/`](../starter/README.md).
 This is an example to measure your own ideas against, not an instruction to drop
 them.
 
+**Update:** this one has been built as
+[Last Ferry](../games/last-ferry/README.md) (night ticket window, five nights,
+four endings, one to four players). It passes every automated check. It is
+waiting for its first Studio playtest
+([PLAYTEST.md](../games/last-ferry/PLAYTEST.md)).
+
 **Why this format.** *Scary Shawarma Kiosk*, made by one developer, reached about
 1.3B visits in roughly 13 months ([06](06-story-driven-games-on-roblox.md)).
 The format suits this studio and these tools:

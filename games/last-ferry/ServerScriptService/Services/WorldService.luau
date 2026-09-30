@@ -259,25 +259,40 @@ local function channelBuoy(parent: Instance, at: Vector3, color: Color3)
 	light:SetAttribute("Blink", true)
 end
 
+type GullPiece = { name: string, size: Vector3, at: CFrame, color: Color3 }
+
+local GULL_GREY = Color3.fromRGB(163, 162, 165)
+local GULL_LEGS = Color3.fromRGB(218, 133, 65)
+local GULL: { GullPiece } = {
+	{ name = "GullBody", size = Vector3.new(0.7, 0.6, 1.2), at = CFrame.new(0, 0.55, 0), color = TRIM },
+	{ name = "GullHead", size = Vector3.new(0.45, 0.45, 0.45), at = CFrame.new(0, 1.0, -0.5), color = TRIM },
+	{
+		name = "GullBeak",
+		size = Vector3.new(0.14, 0.14, 0.34),
+		at = CFrame.new(0, 0.95, -0.85),
+		color = Color3.fromRGB(245, 205, 48),
+	},
+	{ name = "GullWing", size = Vector3.new(0.12, 0.42, 0.95), at = CFrame.new(-0.4, 0.6, 0.05), color = GULL_GREY },
+	{ name = "GullWing", size = Vector3.new(0.12, 0.42, 0.95), at = CFrame.new(0.4, 0.6, 0.05), color = GULL_GREY },
+	{
+		name = "GullTail",
+		size = Vector3.new(0.5, 0.12, 0.45),
+		at = CFrame.new(0, 0.7, 0.75),
+		color = Color3.fromRGB(27, 42, 53),
+	},
+	{ name = "GullLeg", size = Vector3.new(0.08, 0.3, 0.08), at = CFrame.new(-0.15, 0.15, 0), color = GULL_LEGS },
+	{ name = "GullLeg", size = Vector3.new(0.08, 0.3, 0.08), at = CFrame.new(0.15, 0.15, 0), color = GULL_LEGS },
+}
+
 -- A blocky gull perched at `at`, looking along `facing`. Pure decoration: no shadow.
 local function seagull(parent: Instance, at: Vector3, facing: Vector3)
 	local frame = CFrame.lookAt(at, at + facing)
-	local pieces = {
-		{ "GullBody", Vector3.new(0.7, 0.6, 1.2), CFrame.new(0, 0.55, 0), TRIM },
-		{ "GullHead", Vector3.new(0.45, 0.45, 0.45), CFrame.new(0, 1.0, -0.5), TRIM },
-		{ "GullBeak", Vector3.new(0.14, 0.14, 0.34), CFrame.new(0, 0.95, -0.85), Color3.fromRGB(245, 205, 48) },
-		{ "GullWing", Vector3.new(0.12, 0.42, 0.95), CFrame.new(-0.4, 0.6, 0.05), Color3.fromRGB(163, 162, 165) },
-		{ "GullWing", Vector3.new(0.12, 0.42, 0.95), CFrame.new(0.4, 0.6, 0.05), Color3.fromRGB(163, 162, 165) },
-		{ "GullTail", Vector3.new(0.5, 0.12, 0.45), CFrame.new(0, 0.7, 0.75), Color3.fromRGB(27, 42, 53) },
-		{ "GullLeg", Vector3.new(0.08, 0.3, 0.08), CFrame.new(-0.15, 0.15, 0), Color3.fromRGB(218, 133, 65) },
-		{ "GullLeg", Vector3.new(0.08, 0.3, 0.08), CFrame.new(0.15, 0.15, 0), Color3.fromRGB(218, 133, 65) },
-	}
-	for _, piece in pieces do
+	for _, piece in GULL do
 		part({
-			name = piece[1],
-			size = piece[2],
-			cframe = frame * piece[3],
-			color = piece[4],
+			name = piece.name,
+			size = piece.size,
+			cframe = frame * piece.at,
+			color = piece.color,
 			castShadow = false,
 			parent = parent,
 		})
@@ -583,31 +598,32 @@ local function buildPier(parent: Folder): Vector3
 	lifebuoy(pier, Vector3.new(-13.6, 1.8, 36), Vector3.new(1, 0, 0))
 	seagull(pier, Vector3.new(14.5, 1, 38), Vector3.new(-1, 0, 0.2))
 
-	-- A notice board facing the booth, so the first thing a new player reads is what
-	-- to do.
+	-- A notice board beside the path to the booth, facing the spawn, so the first thing
+	-- a new player reads is what to do. (A part's Front face is its -Z side; turned
+	-- round, it faces down the pier.)
 	local board = part({
 		name = "NoticeBoard",
-		size = Vector3.new(9, 4.4, 0.4),
-		cframe = CFrame.new(0, 3.6, 44.6) * CFrame.Angles(0, math.rad(180), 0),
+		size = Vector3.new(6, 3.4, 0.3),
+		cframe = CFrame.new(-7.5, 3.9, 12) * CFrame.Angles(0, math.rad(180), 0),
 		color = Color3.fromRGB(33, 52, 96),
 		parent = pier,
 	})
-	for _, x in { -4, 4 } do
+	for _, x in { -10.3, -4.7 } do
 		part({
 			name = "BoardPost",
-			size = Vector3.new(0.4, 6, 0.4),
-			cframe = CFrame.new(x, 3, 44.9),
+			size = Vector3.new(0.4, 5.6, 0.4),
+			cframe = CFrame.new(x, 2.8, 11.7),
 			color = TRIM,
 			parent = pier,
 		})
 	end
 	sign(board, Enum.NormalId.Front, "NIGHT FERRY · STAFF WANTED\nClock in at the ticket office door", TRIM)
 
-	-- Players appear here, facing the booth.
+	-- Players appear here, facing the booth (-Z, as a SpawnLocation faces by default).
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "PierSpawn"
 	spawn.Size = Vector3.new(8, 0.2, 8)
-	spawn.CFrame = CFrame.new(0, 0.1, 30) * CFrame.Angles(0, math.rad(180), 0)
+	spawn.CFrame = CFrame.new(0, 0.1, 30)
 	spawn.Anchored = true
 	spawn.CanCollide = false
 	spawn.CanTouch = false

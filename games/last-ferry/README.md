@@ -23,6 +23,29 @@ Everything is built from parts and code: no asset IDs, no licences to check.
 The story design is in [GAME_DESIGN.md](GAME_DESIGN.md) and the code map is in
 [ARCHITECTURE.md](ARCHITECTURE.md).
 
+## What the booth sees
+
+These are blockout renders of the real game's geometry: the server's world code
+running in the test simulator, ray-traced by
+[tools/preview](tools/preview/render.py). They're for layout, not looks. Roblox
+will render the fog, light, materials and particles very differently.
+
+| A living regular at the window | One of the drowned (1999 ticket) |
+| --- | --- |
+| ![Booth view with a living passenger](docs/preview-living.png) | ![Booth view with a drowned passenger](docs/preview-drowned.png) |
+
+What they show:
+- **Left:** the regular's breath fogs in front of their face. The lighthouse is
+  far off to the left, and the *Petrel*'s lit cabin is on the right.
+- **Right:** a drowned passenger is pale, with a darkened coat and seaweed, and
+  no breath. The previous passenger heads through the gate to the gangway.
+
+![The lamp's shadow tinted red, with the HUD regions outlined](docs/preview-shadow-and-hud.png)
+
+The booth lamp hangs front-left, so a passenger's shadow (tinted red here) falls
+back and to the right across the planks, in view. The HUD leaves the bottom
+centre clear for it.
+
 ## Status
 
 | Area | State |

@@ -5,6 +5,12 @@
 > faceless passengers, no player avatars, a premium-dark HUD and no audio.
 > What was built from it is in `games/last-ferry` (see its README and
 > ARCHITECTURE.md); the ranked recommendations were followed in that order.
+> One thing was built differently after an independent review: passengers'
+> lines use a bubble of the game's own drawn like Roblox's (`Ui/Speech`), not
+> `TextChatService:DisplayBubble` (section 3), because Roblox's chat never shows
+> on consoles, its bubbles fade before the 45 s window ends, and what they say
+> is a rule. Moving NPCs on the client (2.7) was built as `Shared/Glide`, and
+> used for everything that moves.
 
 Compiled 2026-09-30 for Phoenix Feather Studios. Scope: making Last Ferry (fixed-camera booth horror, Rojo, strict Luau, headless Lune simulator) look and feel like Roblox: passengers as Roblox-avatar NPCs, optional visible player avatars, NPC speech through bubble chat, and a HUD that follows Roblox UI conventions.
 

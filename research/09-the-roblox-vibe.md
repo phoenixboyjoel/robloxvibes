@@ -5,6 +5,10 @@
 > faceless passengers, no player avatars, a premium-dark HUD and no audio.
 > What was built from it is in `games/last-ferry` (see its README and
 > ARCHITECTURE.md); the ranked recommendations were followed in that order.
+> One thing was built differently after an independent review: passengers'
+> lines use a bubble of the game's own drawn like Roblox's chat bubble, not
+> Roblox's own `DisplayBubble`, so they stay readable for the whole window on
+> every device, consoles included.
 
 **Prepared for:** Phoenix Feather Studios (studio head's note: *"the game doesn't look like Roblox right now. it doesn't look or give the roblox vibe."*)
 **Date:** 2026-09-30

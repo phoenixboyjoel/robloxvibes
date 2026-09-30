@@ -370,12 +370,15 @@ function TopBar.new(parent: Instance, fallback: GuiObject): TopBar
 		end,
 		fit = function()
 			place()
-			-- The row's scale on screen: Roblox's (up on a TV), or the HUD's in the fallback.
-			local s = row.AbsoluteSize.Y / ROW
+			-- How big the row is on screen, and so its scale: Roblox's (up on a TV), or the
+			-- HUD's in the fallback. Up in Roblox's row it's as big as the ScreenGui, which
+			-- is always laid out (the row itself isn't while it's hidden).
+			local size = if inRow then gui.AbsoluteSize else row.AbsoluteSize
+			local s = size.Y / ROW
 			if s <= 0 then
 				return
 			end
-			local room = row.AbsoluteSize.X / s - EDGE_LEFT - EDGE_RIGHT
+			local room = size.X / s - EDGE_LEFT - EDGE_RIGHT
 			local show: { [GuiObject]: boolean } = {}
 			for _, extra in extras do
 				show[extra] = true
@@ -412,6 +415,7 @@ function TopBar.new(parent: Instance, fallback: GuiObject): TopBar
 
 	place()
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(topBar.fit)
+	row:GetPropertyChangedSignal("AbsoluteSize"):Connect(topBar.fit)
 	return topBar
 end
 

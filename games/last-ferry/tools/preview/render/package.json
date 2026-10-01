@@ -1,0 +1,42 @@
+{
+  "name": "last-ferry-preview",
+  "private": true,
+  "description": "Renders scenes exported by tools/preview/export.luau with a three.js approximation of Roblox's renderer.",
+  "type": "module",
+  "scripts": {
+    "shot": "node shot.mjs"
+  },
+  "dependencies": {
+    "@fontsource/amatic-sc": "5.3.0",
+    "@fontsource/arimo": "5.3.0",
+    "@fontsource/bangers": "5.3.0",
+    "@fontsource/creepster": "5.3.0",
+    "@fontsource/denk-one": "5.3.0",
+    "@fontsource/fredoka-one": "5.3.0",
+    "@fontsource/indie-flower": "5.3.0",
+    "@fontsource/inter": "5.3.0",
+    "@fontsource/josefin-sans": "5.3.0",
+    "@fontsource/kalam": "5.3.0",
+    "@fontsource/luckiest-guy": "5.3.0",
+    "@fontsource/merriweather": "5.3.0",
+    "@fontsource/michroma": "5.3.0",
+    "@fontsource/montserrat": "5.3.0",
+    "@fontsource/nunito": "5.3.0",
+    "@fontsource/oswald": "5.3.0",
+    "@fontsource/patrick-hand": "5.3.0",
+    "@fontsource/permanent-marker": "5.3.0",
+    "@fontsource/press-start-2p": "5.3.0",
+    "@fontsource/roboto": "5.3.0",
+    "@fontsource/roboto-condensed": "5.3.0",
+    "@fontsource/roboto-mono": "5.3.0",
+    "@fontsource/sarpanch": "5.3.0",
+    "@fontsource/source-sans-3": "5.3.0",
+    "@fontsource/special-elite": "5.3.0",
+    "@fontsource/titillium-web": "5.3.0",
+    "@fontsource/ubuntu": "5.3.0",
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1"
+  }
+}

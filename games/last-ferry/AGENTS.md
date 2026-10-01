@@ -1,0 +1,231 @@
+# Agent rules: Last Ferry
+
+You are working on a finished first build of a Roblox game with the developer.
+Read this file, then `GAME_DESIGN.md` (what the game is), `ARCHITECTURE.md`
+(what exists and how it flows) and `PLAYTEST.md` (what hasn't been seen yet)
+before you change anything. Claude Code loads this file through `CLAUDE.md`;
+Codex reads it directly.
+
+## How this project differs from the starter template
+
+- **Git holds everything, including the world.** The harbor, the booth and the
+  ferry are built by `WorldService` when the server starts. Don't build world
+  geometry by hand in Studio or with MCP `execute_luau`; change `WorldService`
+  and rebuild. The `.rbxl` is a build output (`rojo build -o LastFerry.rbxl`)
+  and is ignored by git.
+- **There is a headless test suite, and it's the first line of verification.**
+  `lune run tests/run.luau` runs:
+  - the logic tests;
+  - a simulated shift;
+  - the real server and client scripts together, with a bot playing through the
+    HUD.
+
+  It must pass before you tell anyone a change works. Then verify in Studio
+  (below) for anything visual or about feel.
+
+## How the project is wired
+
+- `ServerScriptService/` and `ReplicatedStorage/` sync into Studio with Rojo
+  (`rojo serve`, `default.project.json`) or Script Sync. The project also sets
+  properties that belong in the place:
+  - `Workspace.StreamingEnabled = false`: the client needs the whole harbor in
+    view from the booth;
+  - `Workspace.SignalBehavior = Deferred`: handlers run after what fired them
+    has finished (Default still means Immediate), which is what the simulator
+    runs;
+  - `Workspace.PlayerScriptsUseInputActionSystem = Disabled`: Roblox's controls
+    stay on ContextActionService, which the HUD's key bindings sit above;
+  - `Lighting.LightingStyle = Realistic` with `PrioritizeLightingQuality`:
+    crisp local-light shadows, which the shadow rule depends on.
+    `setUpLighting` sets both again at runtime;
+  - `Players.CharacterAutoLoads = true`: players are their own avatars;
+  - `StarterPlayer.CameraMaxZoomDistance = 25`: a close third-person camera on
+    the pier;
+  - `TextChatService.ChatVersion = TextChatService`, for the chat log and
+    friends' bubbles (scripts can't set it).
+
+  The Rojo plugin can't sync `SignalBehavior` or
+  `PlayerScriptsUseInputActionSystem`; with `rojo serve`, set them once in
+  Studio. The simulator refuses to run a project without them.
+- One server Script, one client Script (in ReplicatedStorage, RunContext
+  Client). Everything else is a ModuleScript. Never put a `.client.luau` file in
+  a Starter container: it would run twice.
+- Requires use Roblox's require-by-string: `./` from the script's parent, `../`
+  from its grandparent. The disk layout mirrors the DataModel, so the same paths
+  work in Studio, in luau-lsp and in the Lune tests.
+
+## Rules that keep the game fair (tests enforce them)
+
+- The living never show a supernatural tell: they are always dry, breathing and
+  casting a shadow, and never say your name. Their mistakes are paperwork only.
+- Every drowned passenger, and Mara, breaks at least one rule that is active
+  that night and visible to the player.
+- `Rules.broken` looks only at what the player can see. Visible tells are built
+  from the passenger's facts (`wet`, `breath`, `shadow`, `saysName`), never from
+  their `kind`.
+- The screen state (`Director.state`) never carries a passenger's kind, role or
+  tells. Only what a clerk can read or see.
+- If you add a rule or a new kind of passenger, extend the generator's guarantee
+  tests in `tests/Generator.spec.luau` first.
+
+## The work loop
+
+1. Plan in small phases from `GAME_DESIGN.md` and `PLAYTEST.md` notes. Say
+   what each phase changes and how it will be verified.
+2. Read the modules involved. Reuse `Content`, `Rules`, `Director`, `Ui`
+   builders and `Widgets` instead of adding parallel versions.
+3. Make the smallest change that completes the phase. Story text goes in
+   `Content.luau`; tunables in `Content.Nights` or `Shared/Config.luau`.
+4. Run the checks (below) until they're clean.
+5. For anything visual or about feel (lighting, fog, shadows, particles, UI
+   layout, pacing), verify in Studio through the MCP server:
+   - start a playtest;
+   - read the server and client output;
+   - screenshot the booth view at the window;
+   - use the device emulator for phone sizes.
+
+   Never claim something looks right without a screenshot.
+6. Update `ARCHITECTURE.md` in the same change.
+7. If two fixes in a row fail, stop. Re-read everything involved, explain
+   step by step what should happen and where it diverges, then edit.
+
+The developer judges feel, difficulty, pacing and scares. Ask them to play
+anything you can't measure.
+
+## Checks
+
+From this folder (every tool, Lune included, is pinned in `rokit.toml`):
+
+```sh
+stylua ServerScriptService ReplicatedStorage tests tools
+selene .
+rojo sourcemap default.project.json -o sourcemap.json
+luau-lsp analyze --platform roblox --sourcemap sourcemap.json \
+  --definitions @roblox=<path to globalTypes.None.d.luau> ReplicatedStorage ServerScriptService
+lune run tests/run.luau
+rojo build -o LastFerry.rbxl
+```
+
+All clean, every time. If a test fails, the code is wrong until proven
+otherwise. Don't weaken or skip a test to get green. While working on
+something, `lune run tests/run.luau some words` runs only the tests whose names
+contain all of those words; run the whole suite before you're done.
+
+## Luau rules
+
+- `--!strict` on every game file, with parameters and returns annotated.
+- UI properties are set through typed assignments (see `Ui.luau`) so luau-lsp
+  checks every property name and value type. Don't build instances from
+  untyped property tables.
+- `task.*` only: never `wait`, `spawn`, `delay`, or `Instance.new(class,
+  parent)`. Set Parent last.
+- No deprecated APIs. The simulator records any deprecated member used, and the
+  tests fail on it.
+- Never move things by tweening their CFrame on the server: it stutters on
+  players' screens and replicates every frame. Glide them
+  (`ReplicatedStorage/Shared/Glide`), and once something has glided move it only
+  with Glide. Tweening other properties on the server (a fade, a colour) is
+  fine.
+- Identify players with `player.User`; key saved data by `player.User.Id`.
+- To put GUI over a point in the world, take the layer's `AbsolutePosition` off
+  `Camera:WorldToScreenPoint` (GUI coordinates, as `AbsolutePosition` is).
+  `WorldToViewportPoint` starts at the notch's edge on phones.
+- Never measure something hidden by its `AbsoluteSize`: Roblox doesn't keep
+  what's hidden laid out. Measure text with a label in a disabled ScreenGui
+  (`TextBounds`), as Roblox's own chat does and `Ui/TopBar` and `Ui/Speech` do,
+  and measure it again once its font has loaded (`ContentProvider:PreloadAsync`,
+  which isn't always enough: measure again if it doesn't fit after all) and
+  when `GuiService.PreferredTextSize` changes: text measured before its font
+  loads comes out a stand-in font's size. A measuring label must draw its text
+  as big as what it measures, so don't hold it at a size (`hold = false`).
+- New Roblox API in game code? The simulator will say "isn't simulated". Add
+  the class to `tests/sim/gen_reflection.py` and the behaviour to
+  `tests/sim/Roblox.luau`, rather than working around the test.
+
+## Security
+
+- Every `ShiftAction` goes through three checks:
+  1. the rate limiter;
+  2. the kind whitelist in `ShiftService`;
+  3. the phase and passenger-id checks in `Director.action`.
+
+  Keep all three for any new action.
+- Story content, later nights, the ledger and the endings stay in
+  `ServerScriptService`. Players can read anything in ReplicatedStorage.
+- No player-written text is shown to others. If that changes, filter it with
+  TextService.
+
+## Phones first
+
+- The HUD is laid out on a 960 × 420 design canvas and scaled with `UIScale`
+  (`Theme`). At the smallest phone scale (about 0.7), main buttons must stay at
+  least 44 px: keep them 64 design px or more. `Game.spec` checks this.
+- Keep the bottom centre of the screen clear: the passenger's shadow falls
+  there, and it's a rule from night 4.
+- Every piece of text must fit its box on every screen: Roblox doesn't draw the
+  lines of wrapped text that don't fit, and text that doesn't wrap spills out.
+  The simulator measures text with Roblox's real font widths, and `Game.spec`
+  checks every label on screen on phones, a monitor and a TV, and every card
+  the bot sees (ARCHITECTURE's test list says which screens see which). Text
+  that doesn't wrap keeps 4% of its width to spare, for kerning. Only text
+  meant to be cut short uses `TextTruncate`. Add any new font the game uses to
+  `tests/sim/gen_fonts.py`.
+- Text must fit at every Text Size, too. Players can have Roblox draw all
+  text bigger (`GuiService.PreferredTextSize`): 4, 10 or 14 px, as measured
+  in Studio, except `TextScaled` text and text a `UITextSizeConstraint` holds
+  back. Text meant for reading wraps or grows its box (AutomaticSize), so it
+  gets bigger. Text in a box that can't grow the way it needs (down for
+  wrapped text, across for the rest) is held at its size: `Ui.label` does this
+  by default, `Ui.holdTextSize` for anything else, and only while the player
+  has asked for bigger text. Whether Roblox applies the constraint on screen,
+  after UIScale (a DevForum bug report says so), or in the label's own pixels
+  isn't documented, so the game asks Roblox when it starts
+  (`Ui.findWhereTextIsHeld`) and holds text at its size times the layout
+  scales above it, or at its size. Make a UIScale that lays the HUD out at a
+  size with `Ui.layoutScale`, and call `Ui.refreshHeldText` after changing
+  it; a UIScale that only animates something (a bounce, a pop) is a plain
+  one. `Game.spec` plays at every Text Size, with text held either way: every
+  word still fits, the text meant for reading is as big as the setting asks,
+  and held text keeps its size. Don't hold rich text that sets sizes
+  (`<font size>`): a UITextSizeConstraint overrides them.
+- Nothing may cover a passenger's face while they're at the window: breath is
+  a rule from night 3. That's why the radio waits for an empty window,
+  warnings show as a banner across the status in Roblox's top bar row, and
+  the speech bubble never goes lower than the top of their head.
+- In co-op, the other clerks are in the booth too: anyone standing between you
+  and the window turns see-through on your screen (`CameraController`), and an
+  invisible guard over the counter stops anyone standing on it. Keep the space
+  between the stands and the window clear of anything else.
+- Roblox's touch controls are on (players walk the pier and the booth): the
+  thumbstick takes the lower left and the jump button the lower right (90 px
+  up on phones, 210 px on tablets). The rules panel stops short of the jump
+  button on touch screens; `Game.spec` checks both.
+- A passenger's line is in a bubble over their head for the whole window
+  (`Ui/Speech`), not Roblox's own bubble: it's a rule on night 5, and must be
+  readable on every device, consoles included. It's drawn over the HUD but kept
+  to the room the HUD leaves it (`updateSpeechRoom` in `HudController`); add
+  any new HUD piece there. The shift's status lives in Roblox's own top bar row
+  (`Ui/TopBar`, `TopbarSafeInsets`) so that, on a phone, the longest line fits
+  between the top of the screen and a passenger's head. `Game.spec` checks the
+  longest line from every stand on a monitor, a notched phone and an iPhone SE.
+- Every tell must be visible from the front stand's first-person view (the eye
+  is held at y = 5.1 for every avatar). The sill hides the planks closer than
+  z ≈ −4.1, and a passenger's body hides everything straight behind them.
+  Check new cues with `tools/preview` (export, then render) before a Studio
+  playtest.
+- Every tell is visual. Sound is feedback only (footsteps, the stamp, clicks, a
+  lantern's gust, splashes), and only the built-in sounds Roblox's own
+  characters make (`rbxasset://sounds/...` used by RbxCharacterSounds, see
+  `Shared/Sounds.luau`), because only those are on every device. There's
+  nothing to upload. Every passenger sounds the same whatever they are;
+  `Game.spec` checks that every sound played is one of those.
+
+## Definition of done
+
+- [ ] `lune run tests/run.luau` passes, and new behaviour has a test
+- [ ] stylua, selene and luau-lsp clean; `rojo build` succeeds
+- [ ] Visual or feel changes checked in a Studio playtest with screenshots,
+      including a phone emulator
+- [ ] `ARCHITECTURE.md` updated
+- [ ] A short summary for the developer: what changed, how it was verified,
+      and what still needs a human to judge

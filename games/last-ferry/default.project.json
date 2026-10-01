@@ -1,0 +1,43 @@
+{
+  "name": "last-ferry",
+  "emitLegacyScripts": false,
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$path": "ReplicatedStorage",
+      "$ignoreUnknownInstances": true
+    },
+    "ServerScriptService": {
+      "$path": "ServerScriptService",
+      "$ignoreUnknownInstances": true
+    },
+    "Workspace": {
+      "$properties": {
+        "StreamingEnabled": false,
+        "SignalBehavior": "Deferred",
+        "PlayerScriptsUseInputActionSystem": "Disabled"
+      }
+    },
+    "Lighting": {
+      "$properties": {
+        "LightingStyle": "Realistic",
+        "PrioritizeLightingQuality": true
+      }
+    },
+    "Players": {
+      "$properties": {
+        "CharacterAutoLoads": true
+      }
+    },
+    "StarterPlayer": {
+      "$properties": {
+        "CameraMaxZoomDistance": 25
+      }
+    },
+    "TextChatService": {
+      "$properties": {
+        "ChatVersion": "TextChatService"
+      }
+    }
+  }
+}

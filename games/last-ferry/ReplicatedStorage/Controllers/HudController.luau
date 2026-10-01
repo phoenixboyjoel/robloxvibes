@@ -37,6 +37,7 @@
 ]]
 
 local ContextActionService = game:GetService("ContextActionService")
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
@@ -581,8 +582,22 @@ function HudController.start()
 				bottom = rest.Y + extent.Y + gap,
 			})
 		end
-		speechRoom = { area = { left = left, top = top, right = right, bottom = bottom }, obstacles = obstacles }
+		-- Roblox's own buttons in the top bar row (left of TopbarInset, and right of it if
+		-- anything is), which Roblox draws over every game's GUI. The row is above GUI y 0.
+		local inset = GuiService.TopbarInset
+		local drawnOver: { Speech.Area } = {
+			{ left = -10000, top = -10000, right = inset.Min.X, bottom = 0 },
+		}
+		if inset.Max.X < at.X + size.X - 0.5 then
+			table.insert(drawnOver, { left = inset.Max.X, top = -10000, right = 10000, bottom = 0 })
+		end
+		speechRoom = {
+			area = { left = left, top = top, right = right, bottom = bottom },
+			obstacles = obstacles,
+			drawnOver = drawnOver,
+		}
 	end
+	GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(updateSpeechRoom)
 
 	-- The desk down the left side, and the rules panel and the ledger down the right, from
 	-- just under the status to the bottom, where the rules panel stops short of Roblox's
@@ -625,6 +640,7 @@ function HudController.start()
 		root.Size = UDim2.fromScale(1 / scale, 1 / scale)
 		overlay.resize(size / scale)
 		layoutSide()
+		Ui.refreshHeldText() -- held in screen pixels, which this scale changes
 	end
 
 	local function refreshHint()

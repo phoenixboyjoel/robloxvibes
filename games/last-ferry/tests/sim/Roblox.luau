@@ -124,6 +124,8 @@ function Sim.new(
 		-- Below Roblox's 58 px top bar, where ScreenGuis with CoreUISafeInsets go.
 		safeArea = opts.safeArea or opts.screen or roblox.Vector2.new(1280, 662),
 		topbarInset = opts.topbarInset,
+		-- Whether the test chose the top bar row's free part (else it follows the screen).
+		topbarInsetChosen = opts.topbarInset ~= nil,
 		preferredInput = opts.preferredInput or Enum.PreferredInput.KeyboardAndMouse,
 		-- A console on a TV: GuiService:IsTenFootInterface(), a Large ViewportDisplaySize, and
 		-- Roblox's chat never shows.
@@ -140,6 +142,10 @@ function Sim.new(
 		displaySize = opts.displaySize,
 		-- The player's Text Size setting (GuiService.PreferredTextSize).
 		preferredTextSize = opts.preferredTextSize or Enum.PreferredTextSize.Medium,
+		-- Whether that setting's offset is added to text in its object's own pixels
+		-- ("label", before any UIScale, as Roblox's docs suggest) or on screen ("screen",
+		-- after): Roblox doesn't say, so the tests try both.
+		textSizeOffsetIn = opts.textSizeOffsetIn or "label",
 		stores = {},
 		badges = {},
 		coreCalls = {},
@@ -1409,26 +1415,55 @@ function Sim.new(
 
 	local ENTITIES = { lt = "<", gt = ">", amp = "&", quot = '"', apos = "'" }
 	-- How much bigger the player's Text Size setting draws text, in pixels. Roblox adds a
-	-- fixed amount (TextService:GetTextSizeOffsetAsync) but doesn't publish it: these are
-	-- this simulator's guesses, generous at the top end.
-	local TEXT_SIZE_OFFSETS = { Medium = 0, Large = 2, Larger = 4, Largest = 8 }
+	-- fixed amount (TextService:GetTextSizeOffsetAsync) but doesn't publish it. These were
+	-- measured in Studio by the Facet UI library ("exactly { Medium = 0, Large = 4, Larger
+	-- = 10, Largest = 14 } — uniform across font, weight and size", its
+	-- tests/lib/large_text.luau); a script that undoes the setting subtracts 4, 9 and 14.
+	local TEXT_SIZE_OFFSETS = { Medium = 0, Large = 4, Larger = 10, Largest = 14 }
 	local WEIGHTS = {}
 	for _, item in Enum.FontWeight:GetEnumItems() do
 		WEIGHTS[item.Value] = item
 	end
 
-	-- The size text of `size` in an object is drawn at: plus the player's Text Size setting
-	-- unless it's TextScaled, within any UITextSizeConstraint on it.
-	local function drawnSize(st, size: number): number
-		if not st.props.TextScaled then
-			size += TEXT_SIZE_OFFSETS[sim.preferredTextSize.Name] or 0
+	-- How much the UIScales on an object and above it scale it.
+	local function scaleAbove(instance): number
+		local scale = 1
+		local cursor = instance
+		while cursor do
+			local st = state[cursor]
+			if isA(st.className, "LayerCollector") then
+				break
+			end
+			for _, child in st.children do
+				if state[child].className == "UIScale" then
+					scale *= child.Scale
+				end
+			end
+			cursor = st.parent
 		end
-		for _, child in st.children do
-			if state[child].className == "UITextSizeConstraint" then
-				size = math.clamp(size, child.MinTextSize, child.MaxTextSize)
+		return scale
+	end
+
+	-- The size text of `size` in an object is drawn at, in the object's own pixels: plus the
+	-- player's Text Size setting unless it's TextScaled (in its own pixels or on screen, see
+	-- textSizeOffsetIn), then within any UITextSizeConstraint on it, which Roblox applies on
+	-- screen, after any UIScale (DevForum: "UIScale/UITextSizeConstraint Precedence").
+	-- `unconstrained` leaves the constraints out.
+	local function drawnSize(instance, st, size: number, unconstrained: boolean?): number
+		local scale = scaleAbove(instance)
+		if scale <= 0 then
+			return size
+		end
+		local offset = if st.props.TextScaled then 0 else TEXT_SIZE_OFFSETS[sim.preferredTextSize.Name] or 0
+		local onScreen = if sim.textSizeOffsetIn == "screen" then size * scale + offset else (size + offset) * scale
+		if not unconstrained then
+			for _, child in st.children do
+				if state[child].className == "UITextSizeConstraint" then
+					onScreen = math.clamp(onScreen, child.MinTextSize, child.MaxTextSize)
+				end
 			end
 		end
-		return size
+		return onScreen / scale
 	end
 
 	-- An object's text as runs in one font and size each: rich text's <b>, <font face,
@@ -1493,14 +1528,14 @@ function Sim.new(
 	-- `maxWidth` if given, lines broken at spaces and a word wider than a line broken across
 	-- lines. While the fonts are loading, and for a font it doesn't know, every character is
 	-- about half the text size wide (a fifth less while loading, as a stand-in font's).
-	local function measureText(st, maxWidth: number?): (any, { number })
+	local function measureText(instance, st, maxWidth: number?): (any, { number })
 		local declared = st.props.TextSize or 14
-		local size = drawnSize(st, declared)
+		local size = drawnSize(instance, st, declared)
 		local rough = if sim.fontsLoaded then 0.52 else 0.42
 		-- Every character, with how wide it's drawn.
 		local characters = {}
 		for _, run in textRuns(st, declared) do
-			local runSize = drawnSize(st, run.size)
+			local runSize = drawnSize(instance, st, run.size)
 			local widths = if sim.fontsLoaded then faceWidths(run.font) else nil
 			for _, code in utf8.codes(run.text) do
 				local character = utf8.char(code)
@@ -1656,7 +1691,7 @@ function Sim.new(
 		local inner = if width then math.max(0, width - left - right) else nil
 		local extentX, extentY = 0, 0
 		if isText(st.className) then
-			local text = measureText(st, if inner and instance.TextWrapped then inner else nil)
+			local text = measureText(instance, st, if inner and instance.TextWrapped then inner else nil)
 			extentX, extentY = text.X, text.Y
 		end
 		local list = childOfClass(st, "UIListLayout")
@@ -1845,7 +1880,7 @@ function Sim.new(
 		local left, top, right, bottom = paddingOf(st)
 		local width = box.size.X / box.scale - left - right
 		local height = box.size.Y / box.scale - top - bottom
-		local bounds, lines = measureText(st, if st.props.TextWrapped then width else nil)
+		local bounds, lines = measureText(instance, st, if st.props.TextWrapped then width else nil)
 		return bounds, lines, width, height
 	end
 	-- Wrapped text never measures taller than its object: as in Roblox, lines that don't fit
@@ -3384,10 +3419,45 @@ function Sim.new(
 		return bounds, width, height
 	end
 
-	-- The size an object's text is drawn at: its TextSize, bigger at the player's Text Size
-	-- setting (unless it's TextScaled), within any UITextSizeConstraint on it.
-	function sim:drawnTextSize(object): number
-		return drawnSize(state[object], object.TextSize)
+	-- The size an object's text is drawn at, in its own pixels: its TextSize, bigger at the
+	-- player's Text Size setting (unless it's TextScaled), within any UITextSizeConstraint on
+	-- it unless `unconstrained`.
+	function sim:drawnTextSize(object, unconstrained: boolean?): number
+		return drawnSize(object, state[object], object.TextSize, unconstrained)
+	end
+
+	-- Where an object's text is drawn, in GUI pixels: as wide and tall as it's laid out,
+	-- placed in its box (inside its padding) by its TextXAlignment and TextYAlignment.
+	function sim:textRect(object)
+		local st = state[object]
+		local box = layoutOf(object)
+		local left, top = paddingOf(st)
+		local bounds, _, width, height = textLayout(object, st)
+		local x, y = left, top
+		local xAlign, yAlign = object.TextXAlignment, object.TextYAlignment
+		if xAlign == Enum.TextXAlignment.Center then
+			x += (width - bounds.X) / 2
+		elseif xAlign == Enum.TextXAlignment.Right then
+			x += width - bounds.X
+		end
+		if yAlign == Enum.TextYAlignment.Center then
+			y += (height - bounds.Y) / 2
+		elseif yAlign == Enum.TextYAlignment.Bottom then
+			y += height - bounds.Y
+		end
+		local at = box.position + roblox.Vector2.new(x, y) * box.scale
+		local size = bounds * box.scale
+		return { left = at.X, top = at.Y, right = at.X + size.X, bottom = at.Y + size.Y }
+	end
+
+	-- How much the UIScales on an object and above it scale it.
+	function sim:scaleOf(object): number
+		return scaleAbove(object)
+	end
+
+	-- How many pixels bigger the player's Text Size setting draws text now.
+	function sim:textSizeOffset(): number
+		return TEXT_SIZE_OFFSETS[sim.preferredTextSize.Name] or 0
 	end
 
 	-- A GuiService setting the player (or their device) changed, and what follows it.
@@ -3417,6 +3487,12 @@ function Sim.new(
 	-- say): the free part of the top bar row changes, and ScreenGuis in it resize.
 	function sim:setTopbarInset(rect)
 		sim.topbarInset = rect
+		sim.topbarInsetChosen = true
+		local guiService = game:GetService("GuiService")
+		local changed = state[guiService].propertySignals.TopbarInset
+		if changed then
+			fire(changed, nil)
+		end
 		for instance, st in state do
 			if st.className == "ScreenGui" and instance.ScreenInsets == Enum.ScreenInsets.TopbarSafeInsets then
 				touchGui(instance)
@@ -3425,6 +3501,31 @@ function Sim.new(
 					fire(signal, nil)
 				end
 			end
+		end
+		drain()
+	end
+
+	-- The window changes size (a computer's window dragged, a phone turned): the screen and
+	-- its safe area, with every ScreenGui laid out again and its AbsoluteSize changed.
+	function sim:setScreen(screen, safeArea)
+		sim.screen = screen
+		sim.safeArea = safeArea or screen
+		if not sim.topbarInsetChosen then
+			sim.topbarInset = nil -- worked out again for the new size
+		end
+		for instance, st in state do
+			if st.className == "ScreenGui" then
+				touchGui(instance)
+				local signal = st.propertySignals.AbsoluteSize
+				if signal then
+					fire(signal, nil)
+				end
+			end
+		end
+		local camera = sim.workspace.CurrentCamera
+		local viewport = camera and state[camera].propertySignals.ViewportSize
+		if viewport then
+			fire(viewport, nil)
 		end
 		drain()
 	end

@@ -223,13 +223,25 @@ Disabled**.
           phones the longest lines may sit over the top bar row, or be drawn
           a little smaller so they stay on screen. The pills drop the date
           first.
-        - The ticket, the buttons, the tabs, the card headings and the
-          countdown stay their usual size, by design (their boxes can't
-          grow). Say whether they're readable enough at that setting.
-        - Roblox doesn't publish how much bigger each setting draws text; the
-          tests guess 8 px at the largest. If it's more, look hardest at the
-          bubble on an iPhone SE and at "The next passenger is coming up the
-          dock..." on the desk.
+        - The buttons, the tabs, the card headings, the countdown and most of
+          the ticket stay their usual size, by design (their boxes can't
+          grow); the passenger's name on the ticket grows a little. Say
+          whether they're readable enough at that setting.
+        - Those held labels are their usual size: not smaller on the PC (where
+          the HUD is scaled up) and not bigger on the phone (scaled down). If
+          they are, Roblox applies UITextSizeConstraint before UIScale after
+          all: `Ui.holdTextSize` should then hold text at its size alone.
+        - In the command bar, on the client, during the playtest,
+          `print(game:GetService("TextService"):GetTextSizeOffsetAsync(16, Font.fromEnum(Enum.Font.BuilderSans)))`
+          gives 14 at the largest (4 and 10 at the steps between), the sizes
+          the tests use. If not, update `TEXT_SIZE_OFFSETS` in
+          `tests/sim/Roblox.luau` and run the tests.
+        - Captions, the summary's lines, the manifest's names and the desk's
+          "The next passenger is coming up the dock..." line grow with their
+          text inside the scaled HUD (a 2026 DevForum report has Roblox
+          mis-sizing text like this under a UIScale).
+      - Back at the usual Text Size, everything looks exactly as before
+        (nothing is held back at that size).
       - Mara (the smallest passenger) has a normal-looking classic head.
 - [ ] **Test → Clients and Servers**, 2 players:
       - both see the same passenger;
@@ -255,8 +267,8 @@ Disabled**.
 | How far out the pier camera can zoom | `StarterPlayer.CameraMaxZoomDistance` (project file) | 25 studs |
 | The passenger's speech bubble (text size, width, height above the head) | `ReplicatedStorage/Ui/Speech.luau` | 16 px (24 on a TV), text up to 300 px wide (or the room between the ticket and the rules), 0.4 studs up |
 | The gap between the bubble and the HUD | `SPEECH_GAP` in `HudController` | 8 design px |
-| How much smaller the bubble's line may be drawn, at a big Text Size, to stay on screen | `limits` in `Speech.luau` (`applyDisplay`) | 2 px at a time, down to 16 px (24 on a TV) |
-| Which text grows with the player's Text Size | `hold` in `Ui.label` (`Ui.luau`) | all but text whose box can't grow, button labels and tags |
+| How much smaller the bubble's line may be drawn, at a big Text Size, to stay on screen | `limits` in `Speech.luau` (`applyDisplay`); `STEP_UP` | 2 px at a time from 12 px over its size, down to 16 px (24 on a TV); bigger again only with 4 px to spare |
+| Which text grows with the player's Text Size | `hold` and `holdAt` in `Ui.label` (`Ui.luau`) | all but text whose box can't grow the way it needs, button labels and tags; the ticket's name grows up to 26 px |
 | The status pills in Roblox's top bar row | `ReplicatedStorage/Ui/TopBar.luau` | 44 px pills, 12 px down, near-black at 8% see-through (Roblox's own numbers) |
 | Sound volumes and pitches | `ReplicatedStorage/Shared/Sounds.luau` | |
 | Queue sizes and difficulty per night | `Content.Nights` | 6 to 9 passengers |

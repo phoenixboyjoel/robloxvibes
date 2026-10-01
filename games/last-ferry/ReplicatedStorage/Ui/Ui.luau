@@ -7,6 +7,7 @@
 	wrong value type before the game ever runs.
 ]]
 
+local GuiService = game:GetService("GuiService")
 local TweenService = game:GetService("TweenService")
 
 local Net = require("../Shared/Net")
@@ -14,6 +15,8 @@ local Sfx = require("./Sfx")
 local Theme = require("./Theme")
 
 local C = Theme.Colors
+-- The name of the UIScale a button bounces with (Ui.button).
+local BOUNCE = "Bounce"
 
 export type TextProps = {
 	text: string?,
@@ -30,10 +33,12 @@ export type TextProps = {
 	autoSize: Enum.AutomaticSize?,
 	order: number?,
 	lineHeight: number?,
-	-- Kept at `size` whatever the player's Text Size setting (see Ui.holdTextSize)? By
-	-- default, only if its box can't make room for bigger text: it doesn't wrap, and
-	-- doesn't grow to fit its text.
+	-- Kept from growing past `size` at the player's Text Size setting (see Ui.holdTextSize)?
+	-- By default, only if its box can't make room for bigger text: it doesn't grow the way
+	-- its text needs, down for text that wraps and across for text that doesn't.
 	hold: boolean?,
+	-- Held at this size rather than `size`: a little bigger, where its box has room.
+	holdAt: number?,
 }
 
 local Ui = {}
@@ -140,15 +145,63 @@ function Ui.panel(parent: Instance, name: string, size: UDim2, position: UDim2?,
 end
 
 -- Players can have Roblox draw all text bigger (GuiService.PreferredTextSize, the Text Size
--- setting): a few pixels bigger at each step, and wrapped or automatically sized text makes
--- room for it. Text in a box that can't grow would spill out of it instead, so it's held
--- at its size here, with a UITextSizeConstraint, which Roblox's docs say that setting never
--- draws text past. (The text meant for reading wraps, or grows its box, and so gets bigger.)
-function Ui.holdTextSize(object: TextLabel | TextButton, size: number)
-	local constraint = Instance.new("UITextSizeConstraint")
-	constraint.MaxTextSize = size
-	constraint.Parent = object
+-- setting): 4, 10 or 14 pixels bigger, as measured. The text meant for reading wraps, or
+-- grows its box, to make room. Text in a box that can't grow would spill out of it, so it's
+-- held at its size by a UITextSizeConstraint, which that setting never draws text past
+-- (Roblox's accessibility docs).
+--
+-- Roblox applies the constraint in screen pixels, after any UIScale (DevForum bug report
+-- "UIScale/UITextSizeConstraint Precedence"), so its MaxTextSize is the size times the
+-- UIScales above the label: worked out again when the label moves, and whenever one of
+-- them changes (Ui.refreshHeldText). And as in Roblox's own Foundation icons, it's there
+-- only while the player has asked for bigger text: at the usual size nothing is held.
+--
+-- The size is fixed here: change the label's TextSize later and it's still held at this.
+type Held = { constraint: UITextSizeConstraint, size: number }
+local held: { [Instance]: Held } = setmetatable({}, { __mode = "k" }) :: any
+
+-- How much the UIScales above an object scale it, leaving out a button's bounce.
+local function scaleOf(object: Instance): number
+	local scale = 1
+	local cursor: Instance? = object
+	while cursor and not cursor:IsA("LayerCollector") do
+		local uiScale = cursor:FindFirstChildOfClass("UIScale")
+		if uiScale and uiScale.Name ~= BOUNCE then
+			scale *= uiScale.Scale
+		end
+		cursor = cursor.Parent
+	end
+	return scale
 end
+
+local function applyHold(object: Instance, entry: Held)
+	if not object:IsDescendantOf(game) then
+		return -- not shown yet (it's held once it is), or destroyed
+	elseif GuiService.PreferredTextSize == Enum.PreferredTextSize.Medium then
+		entry.constraint.Parent = nil
+	else
+		-- A whole number of pixels, rounded down: never bigger than the box was made for.
+		entry.constraint.MaxTextSize = math.max(1, math.floor(entry.size * scaleOf(object) + 0.001))
+		entry.constraint.Parent = object
+	end
+end
+
+function Ui.holdTextSize(object: TextLabel | TextButton, size: number)
+	local entry: Held = { constraint = Instance.new("UITextSizeConstraint"), size = size }
+	held[object] = entry
+	applyHold(object, entry)
+	object.AncestryChanged:Connect(function()
+		applyHold(object, entry)
+	end)
+end
+
+-- Holds every held label again, for the UIScales above it: call it after changing one.
+function Ui.refreshHeldText()
+	for object, entry in held do
+		applyHold(object, entry)
+	end
+end
+GuiService:GetPropertyChangedSignal("PreferredTextSize"):Connect(Ui.refreshHeldText)
 
 -- Typed as TextLabel so every property below is checked. TextButton has the same text
 -- properties, so the tab buttons go through here too.
@@ -173,10 +226,12 @@ local function applyText(label: TextLabel, props: TextProps)
 	label.LineHeight = props.lineHeight or 1
 	local hold = props.hold
 	if hold == nil then
-		hold = props.wrap ~= true and autoSize == Enum.AutomaticSize.None
+		local across = autoSize == Enum.AutomaticSize.X or autoSize == Enum.AutomaticSize.XY
+		local down = autoSize == Enum.AutomaticSize.Y or autoSize == Enum.AutomaticSize.XY
+		hold = if props.wrap == true then not down else not across
 	end
 	if hold then
-		Ui.holdTextSize(label, size)
+		Ui.holdTextSize(label, props.holdAt or size)
 	end
 end
 
@@ -289,6 +344,7 @@ function Ui.button(parent: Instance, name: string, text: string, size: UDim2, st
 	Ui.gloss(face)
 	Ui.shadow(face, 5, style.deep or style.fill:Lerp(Color3.new(0, 0, 0), 0.45))
 	local scale = Instance.new("UIScale")
+	scale.Name = BOUNCE
 	scale.Parent = face
 
 	local content = Ui.frame(face, "Content", UDim2.fromScale(1, 1))

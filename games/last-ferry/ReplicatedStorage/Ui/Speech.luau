@@ -36,7 +36,9 @@ export type Area = { left: number, top: number, right: number, bottom: number }
 -- Where the bubble may go, in GUI coordinates (GuiObject.AbsolutePosition's): `area`, which
 -- the HUD leaves clear from top to bottom, less any of the `obstacles` it would otherwise
 -- run into (a piece of the HUD lower down, beside it, like the ticket's page tab).
-export type Room = { area: Area, obstacles: { Area } }
+-- `drawnOver` is anything Roblox draws over every game's GUI (its own top bar buttons): a
+-- bubble pushed up there is drawn smaller instead, if it can be.
+export type Room = { area: Area, obstacles: { Area }, drawnOver: { Area }? }
 
 export type Speech = {
 	-- Shows `text` over `model` until release() or clear(), or for `seconds` if given.
@@ -63,6 +65,9 @@ local NARROWEST = MIN_TEXT + 2 * PAD_X -- so the narrowest a bubble gets
 local SLACK = 2
 local REMEASURE_EVERY = 0.25 -- seconds, at most, while the line doesn't fit its bubble
 local NO_LIMIT = 1000 -- a UITextSizeConstraint's MaxTextSize that holds nothing back
+-- Pixels to spare at the top of the screen before the line is drawn a step bigger again,
+-- so its size doesn't flicker as the view moves.
+local STEP_UP = 4
 
 local Speech = {}
 
@@ -207,6 +212,7 @@ function Speech.new(parent: Instance, room: () -> Room?): Speech
 		size = textSize,
 		color = INK,
 		wrap = true,
+		hold = false, -- held by `limits` below, only as far as it must be
 		xAlign = Enum.TextXAlignment.Center,
 		frameSize = UDim2.new(1, -2 * PAD_X, 1, -2 * PAD_Y),
 		position = UDim2.fromOffset(PAD_X, PAD_Y),
@@ -232,14 +238,18 @@ function Speech.new(parent: Instance, room: () -> Room?): Speech
 		font = FONT,
 		size = textSize,
 		wrap = true,
+		hold = false,
 		frameSize = UDim2.fromOffset(maxWidth, 10000),
 	})
 
-	-- The line is drawn as big as the player's Text Size setting draws it, unless the bubble
-	-- would then run off the top of the screen: then a step smaller at a time (`limits`, the
-	-- first no limit at all), but never smaller than designed. A UITextSizeConstraint on each
-	-- label holds it there, as Roblox's docs say that setting never draws text past one.
+	-- The line is drawn as big as the player's Text Size setting draws it (up to 14 px
+	-- bigger), unless the bubble would then run off the top of the screen: then 2 px smaller
+	-- at a time (`limits`, the first no limit at all), but never smaller than designed. A
+	-- UITextSizeConstraint on each label holds it there, as Roblox's docs say that setting
+	-- never draws text past one. (Nothing scales this layer, so its pixels are the screen's.)
 	local limits: { number } = {}
+	local limitIndex = 1 -- the one the line is drawn at
+	local trying = NO_LIMIT -- the one the bubble is being sized for
 	local lineLimit = Instance.new("UITextSizeConstraint")
 	lineLimit.MaxTextSize = NO_LIMIT
 	lineLimit.Parent = line
@@ -267,7 +277,11 @@ function Speech.new(parent: Instance, room: () -> Room?): Speech
 		caretSize = if tv then Vector2.new(14, 9) else Vector2.new(9, 6)
 		-- The tail overlaps the bubble by a pixel, so it reaches that much less below it.
 		tail = caretSize.Y - 1
-		limits = { NO_LIMIT, textSize + 6, textSize + 4, textSize + 2, textSize }
+		limits = { NO_LIMIT }
+		for extra = 12, 0, -2 do
+			table.insert(limits, textSize + extra)
+		end
+		limitIndex = 1
 		line.TextSize = textSize
 		measure.TextSize = textSize
 		caret.Size = UDim2.fromOffset(caretSize.X, caretSize.Y)
@@ -289,21 +303,21 @@ function Speech.new(parent: Instance, room: () -> Room?): Speech
 	end)
 
 	-- How big the bubble is with its line wrapped for `area`: as wide as Roblox's bubbles
-	-- go, or as the area is (but never too narrow to read). Its text is no bigger than the
-	-- limit on the measuring label.
+	-- go, or as the area is (but never too narrow to read), with its text no bigger than the
+	-- limit being tried.
 	local function sizeFor(area: Area): Vector2
 		local fits = math.floor(math.min(maxWidth + 2 * PAD_X, area.right - area.left)) - 2 * PAD_X
 		local width = math.max(fits, MIN_TEXT)
-		local limit = measureLimit.MaxTextSize
-		local byWidth = measured[limit]
+		local byWidth = measured[trying]
 		if byWidth == nil then
 			byWidth = {}
-			measured[limit] = byWidth
+			measured[trying] = byWidth
 		end
 		local known: Vector2? = byWidth[width]
 		if known then
 			return known
 		end
+		measureLimit.MaxTextSize = trying
 		measure.Size = UDim2.fromOffset(width - SLACK, 10000)
 		measure.Text = "" -- laid out afresh, even if the text is the same as last time
 		measure.Text = line.Text
@@ -368,19 +382,43 @@ function Speech.new(parent: Instance, room: () -> Room?): Speech
 			table.insert(obstacles, onLayer(obstacle))
 		end
 		local layerRoom = { area = onLayer(free.area), obstacles = obstacles }
-		-- The biggest text that keeps the bubble on screen (the top of this layer is the top
-		-- of the screen), or the smallest there is.
-		measureLimit.MaxTextSize = limits[1]
-		local size, at, along = Speech.placeInRoom(tip, head, tail, layerRoom, sizeFor)
-		for i = 2, #limits do
-			if at.Y >= -0.5 then
-				break
+		local hidden: { Area } = {}
+		local drawnOver: { Area } = free.drawnOver or {}
+		for _, area in drawnOver do
+			table.insert(hidden, onLayer(area))
+		end
+		-- Whether a bubble placed there is on screen (the top of this layer is the top of the
+		-- screen) and clear of what Roblox draws over it, with `spare` pixels at the top.
+		local function shows(placedSize: Vector2, placedAt: Vector2, spare: number): boolean
+			if placedAt.Y < spare - 0.5 then
+				return false
 			end
-			measureLimit.MaxTextSize = limits[i]
+			local placed = {
+				left = placedAt.X,
+				top = placedAt.Y,
+				right = placedAt.X + placedSize.X,
+				bottom = placedAt.Y + placedSize.Y + tail,
+			}
+			for _, area in hidden do
+				if overlap(placed, area) then
+					return false
+				end
+			end
+			return true
+		end
+		-- The biggest text that shows the whole bubble, or the smallest there is. Bigger than
+		-- it's drawn now only with a few pixels to spare.
+		local index = 1
+		trying = limits[index]
+		local size, at, along = Speech.placeInRoom(tip, head, tail, layerRoom, sizeFor)
+		while index < #limits and not shows(size, at, if index < limitIndex then STEP_UP else 0) do
+			index += 1
+			trying = limits[index]
 			size, at, along = Speech.placeInRoom(tip, head, tail, layerRoom, sizeFor)
 		end
-		if lineLimit.MaxTextSize ~= measureLimit.MaxTextSize then
-			lineLimit.MaxTextSize = measureLimit.MaxTextSize
+		limitIndex = index
+		if lineLimit.MaxTextSize ~= limits[index] then
+			lineLimit.MaxTextSize = limits[index]
 		end
 		if size ~= bubbleSize then
 			bubbleSize = size
@@ -413,6 +451,7 @@ function Speech.new(parent: Instance, room: () -> Room?): Speech
 			height = heightAbove(speaker, part)
 			line.Text = text
 			table.clear(measured) -- measured on the next frame, for the room there is then
+			limitIndex = 1
 			stack:SetAttribute("Speaker", speaker.Name)
 			timed = seconds ~= nil
 			if seconds then

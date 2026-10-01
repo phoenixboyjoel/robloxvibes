@@ -238,7 +238,6 @@ function TopBar.new(parent: Instance, fallback: GuiObject): TopBar
 		yAlign = Enum.TextYAlignment.Top,
 		frameSize = UDim2.new(1, 0, 0, 29),
 		position = UDim2.fromOffset(0, 15),
-		hold = true, -- its two lines, whole, in a banner the height of Roblox's row
 	})
 	paragraph.TextTruncate = Enum.TextTruncate.AtEnd
 
@@ -339,6 +338,7 @@ function TopBar.new(parent: Instance, fallback: GuiObject): TopBar
 			row.Position = UDim2.fromOffset(16, 0)
 			row.Parent = fallback
 		end
+		Ui.refreshHeldText() -- held in screen pixels, which the row's scale changes
 		if placed and inRow ~= wasInRow then
 			placed()
 		end

@@ -104,7 +104,16 @@ local function drawEmpty(stamp: Frame)
 		0.45
 end
 
-local function field(parent: Instance, name: string, caption: string, y: number, valueSize: number): TextLabel
+-- A caption and the value under it. The value grows at the player's Text Size up to
+-- `holdAt`, if given: as far as its box has room for.
+local function field(
+	parent: Instance,
+	name: string,
+	caption: string,
+	y: number,
+	valueSize: number,
+	holdAt: number?
+): TextLabel
 	Ui.label(parent, name .. "Caption", {
 		text = caption,
 		font = Theme.Fonts.print,
@@ -119,6 +128,7 @@ local function field(parent: Instance, name: string, caption: string, y: number,
 		color = C.paperInk,
 		frameSize = UDim2.new(1, -80, 0, valueSize + 4),
 		position = UDim2.fromOffset(0, y + 14),
+		holdAt = holdAt,
 	})
 end
 
@@ -183,7 +193,9 @@ function Ticket.new(parent: Instance, home: UDim2): Ticket
 	rule.BackgroundTransparency = 0
 	rule.BackgroundColor3 = C.paperShade
 
-	local nameValue = field(body, "Passenger", "PASSENGER", 28, 22)
+	-- The name, the first thing read, grows into the room its box has (the longest is 202 px
+	-- wide at 26). The destination's box has none to spare ("HARBOUR TOWN").
+	local nameValue = field(body, "Passenger", "PASSENGER", 28, 22, 26)
 	nameValue.Size = UDim2.new(1, 0, 0, 26)
 	nameValue.TextTruncate = Enum.TextTruncate.AtEnd
 	local destination = field(body, "Destination", "TO", 72, 18)

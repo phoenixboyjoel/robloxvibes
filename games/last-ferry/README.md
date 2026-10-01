@@ -128,7 +128,7 @@ GitHub Actions runs all of these on every pull request
 same pinned versions. It keeps the built place file as a download on each run.
 
 At the time of this build every check comes back clean:
-- 104 tests pass.
+- 106 tests pass.
 - There are 0 selene findings.
 - There are 0 strict type errors.
 
@@ -249,6 +249,29 @@ The fifth review, of those fixes, found, and this build fixes:
   the previews break long words as Roblox does and download Roblox's files from
   pinned commits with checksums; and the docs no longer overstate how close the
   text measurements are (a few percent, not 1%).
+
+The sixth review, of the Text Size work, found, and this build fixes:
+- **Holding text back could have shrunk it for everyone:** Roblox applies a
+  `UITextSizeConstraint` on screen, after UIScale (a DevForum bug report says so,
+  and says it still happens), so holding a label at its designed size would
+  have drawn the HUD's held text a quarter smaller on every monitor, even at
+  the usual Text Size. Text is now held only while the player has asked for
+  bigger text (as Roblox's own Foundation icons do), at its size times the
+  HUD's scale, rounded down.
+- **Bigger than guessed:** the setting adds 4, 10 or 14 px (measured in Studio
+  by the Facet UI library), not up to 8. The tests now use those sizes, added
+  either in the HUD's own pixels or on screen (Roblox doesn't say which), on
+  whichever screen each is harder for.
+- **The bubble at a big Text Size:** it steps down 2 px at a time from 12 px
+  over, goes back up only with room to spare (it used to flicker between two
+  sizes as the view moved), and steps down rather than sit under Roblox's own
+  top bar buttons, which Roblox draws over every game's GUI.
+- **Text that wraps in a box that can't grow** (the cards' footer) is held too,
+  and the passenger's name on the ticket grows into its box's spare room.
+- **Tighter text checks:** labels side by side mustn't run into each other,
+  text cut short with "…" must still fit its box's height, the room to spare
+  is checked on the side a label grows towards, and new tests change the Text
+  Size mid-line and check held text keeps its size.
 
 Smooth movement came out of the same research: nothing is tweened on the
 server any more. The server sends each move once and every client plays it

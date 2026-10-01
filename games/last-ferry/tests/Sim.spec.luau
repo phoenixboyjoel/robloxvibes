@@ -605,30 +605,53 @@ end)
 
 T.test("the player's Text Size setting draws text bigger, except where it's held down", function()
 	local sim = Sim.new({ root = ".", preferredTextSize = roblox.Enum.PreferredTextSize.Largest })
+	T.equal(sim:textSizeOffset(), 14, "14 px bigger at Largest, as measured in Studio")
 	local largest = textBounds(sim, BUILDER_BOLD, 18, "NIGHT 1 / 5")
 	local plain = Sim.new({ root = "." })
-	T.equal(largest, textBounds(plain, BUILDER_BOLD, 26, "NIGHT 1 / 5"), "18 px text is drawn 8 px bigger at Largest")
-	local held, scaled = sim:execute([[
+	T.equal(largest, textBounds(plain, BUILDER_BOLD, 32, "NIGHT 1 / 5"), "18 px text is drawn 14 px bigger")
+	-- A UITextSizeConstraint holds text in screen pixels, after any UIScale: under a UIScale
+	-- of 2, a MaxTextSize of 20 holds 18 px text to 10 of its own pixels.
+	local source = [[
 		local gui = Instance.new("ScreenGui")
-		local function label()
+		local frame = Instance.new("Frame")
+		frame.Size = UDim2.fromOffset(400, 400)
+		frame.Parent = gui
+		local function label(parent)
 			local made = Instance.new("TextLabel")
 			made.FontFace = Font.fromEnum(Enum.Font.BuilderSansBold)
 			made.TextSize = 18
 			made.Text = "NIGHT 1 / 5"
-			made.Parent = gui
+			made.Parent = parent
 			return made
 		end
-		local held = label()
-		local cap = Instance.new("UITextSizeConstraint")
-		cap.MaxTextSize = 20
-		cap.Parent = held
-		local scaled = label()
+		local function cap(object, size)
+			local constraint = Instance.new("UITextSizeConstraint")
+			constraint.MaxTextSize = size
+			constraint.Parent = object
+		end
+		local held = label(gui)
+		cap(held, 20)
+		local scaled = label(gui)
 		scaled.TextScaled = true
+		local doubled = Instance.new("UIScale")
+		doubled.Scale = 2
+		doubled.Parent = frame
+		local underScale = label(frame)
+		cap(underScale, 20)
 		gui.Parent = game:GetService("StarterGui")
-		return held.TextBounds, scaled.TextBounds
-	]])
-	T.equal(held, textBounds(plain, BUILDER_BOLD, 20, "NIGHT 1 / 5"), "no bigger than a UITextSizeConstraint allows")
-	T.equal(scaled, textBounds(plain, BUILDER_BOLD, 18, "NIGHT 1 / 5"), "and TextScaled text isn't changed")
+		return held, scaled, underScale
+	]]
+	local held, scaled, underScale = sim:execute(source)
+	T.equal(
+		held.TextBounds,
+		textBounds(plain, BUILDER_BOLD, 20, "NIGHT 1 / 5"),
+		"no bigger than a UITextSizeConstraint allows"
+	)
+	T.equal(scaled.TextBounds, textBounds(plain, BUILDER_BOLD, 18, "NIGHT 1 / 5"), "and TextScaled text isn't changed")
+	T.equal(sim:drawnTextSize(underScale), 10, "a constraint under a UIScale holds text on screen")
+	local _, _, plainUnderScale = plain:execute(source)
+	T.equal(plain:drawnTextSize(plainUnderScale), 10, "even at the usual Text Size")
+	T.equal(sim:drawnTextSize(underScale, true), 32, "without its constraint, 14 px bigger in its own pixels")
 	sim:setPreferredTextSize(roblox.Enum.PreferredTextSize.Medium)
 	T.equal(
 		sim.game:GetService("GuiService").PreferredTextSize,
@@ -636,6 +659,18 @@ T.test("the player's Text Size setting draws text bigger, except where it's held
 		"the setting can change mid-game"
 	)
 	T.equal(#sim.errors, 0, table.concat(sim.errors, "\n"))
+	T.equal(#plain.errors, 0, table.concat(plain.errors, "\n"))
+
+	-- If the offset is added on screen instead, it's smaller in the pixels of text that's
+	-- scaled up: 7 of them under a UIScale of 2.
+	local onScreen = Sim.new({
+		root = ".",
+		preferredTextSize = roblox.Enum.PreferredTextSize.Largest,
+		textSizeOffsetIn = "screen",
+	})
+	local _, _, scaledUp = onScreen:execute(source)
+	T.equal(onScreen:drawnTextSize(scaledUp, true), 25, "18 + 14 / 2")
+	T.equal(#onScreen.errors, 0, table.concat(onScreen.errors, "\n"))
 end)
 
 T.test("fonts load late: text measures as a stand-in font's until then, and PreloadAsync waits", function()

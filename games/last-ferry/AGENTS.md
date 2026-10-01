@@ -109,7 +109,7 @@ rojo build -o LastFerry.rbxl
 All clean, every time. If a test fails, the code is wrong until proven
 otherwise. Don't weaken or skip a test to get green. While working on
 something, `lune run tests/run.luau some words` runs only the tests whose names
-contain those words; run the whole suite before you're done.
+contain all of those words; run the whole suite before you're done.
 
 ## Luau rules
 
@@ -171,14 +171,18 @@ contain those words; run the whole suite before you're done.
   meant to be cut short uses `TextTruncate`. Add any new font the game uses to
   `tests/sim/gen_fonts.py`.
 - Text must fit at every Text Size, too. Players can have Roblox draw all
-  text a few pixels bigger (`GuiService.PreferredTextSize`), except
-  `TextScaled` text and text a `UITextSizeConstraint` holds back. Text meant
-  for reading wraps or grows its box (AutomaticSize), so it can get bigger;
-  text in a box that can't grow is held at its size (`Ui.label` does this by
-  default, `Ui.holdTextSize` for anything else). `Game.spec` plays at the
-  largest size too: every word still fits, and the text meant for reading is
-  drawn bigger. Don't hold rich text that sets sizes (`<font size>`): a
-  UITextSizeConstraint overrides them.
+  text bigger (`GuiService.PreferredTextSize`): 4, 10 or 14 px, as measured
+  in Studio, except `TextScaled` text and text a `UITextSizeConstraint` holds
+  back. Text meant for reading wraps or grows its box (AutomaticSize), so it
+  gets bigger. Text in a box that can't grow the way it needs (down for
+  wrapped text, across for the rest) is held at its size: `Ui.label` does this
+  by default, `Ui.holdTextSize` for anything else. Roblox applies the
+  constraint on screen, after UIScale, so `Ui` holds text at its size times the
+  UIScales above it, and only while the player has asked for bigger text:
+  after changing a UIScale, call `Ui.refreshHeldText`. `Game.spec` plays at the
+  largest size too: every word still fits, the text meant for reading is as
+  big as the setting asks, and held text keeps its size. Don't hold rich text
+  that sets sizes (`<font size>`): a UITextSizeConstraint overrides them.
 - Nothing may cover a passenger's face while they're at the window: breath is
   a rule from night 3. That's why the radio waits for an empty window,
   warnings show as a banner across the status in Roblox's top bar row, and

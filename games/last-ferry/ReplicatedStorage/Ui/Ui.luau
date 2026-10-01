@@ -15,8 +15,6 @@ local Sfx = require("./Sfx")
 local Theme = require("./Theme")
 
 local C = Theme.Colors
--- The name of the UIScale a button bounces with (Ui.button).
-local BOUNCE = "Bounce"
 
 export type TextProps = {
 	text: string?,
@@ -148,25 +146,32 @@ end
 -- setting): 4, 10 or 14 pixels bigger, as measured. The text meant for reading wraps, or
 -- grows its box, to make room. Text in a box that can't grow would spill out of it, so it's
 -- held at its size by a UITextSizeConstraint, which that setting never draws text past
--- (Roblox's accessibility docs).
+-- (Roblox's accessibility docs). As in Roblox's own Foundation icons, the constraint is
+-- there only while the player has asked for bigger text: at the usual size nothing is held.
 --
--- Roblox applies the constraint in screen pixels, after any UIScale (DevForum bug report
--- "UIScale/UITextSizeConstraint Precedence"), so its MaxTextSize is the size times the
--- UIScales above the label: worked out again when the label moves, and whenever one of
--- them changes (Ui.refreshHeldText). And as in Roblox's own Foundation icons, it's there
--- only while the player has asked for bigger text: at the usual size nothing is held.
+-- Roblox's docs don't say whether a constraint holds text on screen, after any UIScale (as
+-- a DevForum bug report has it: "UIScale/UITextSizeConstraint Precedence"), or in the
+-- label's own pixels. So the game asks Roblox when it starts (Ui.findWhereTextIsHeld), and
+-- until then goes by the report. On screen, a label is held at its size times the layout
+-- scales above it (Ui.layoutScale), worked out again when the label moves and whenever one
+-- of those scales changes (Ui.refreshHeldText); in its own pixels, at its size.
 --
 -- The size is fixed here: change the label's TextSize later and it's still held at this.
 type Held = { constraint: UITextSizeConstraint, size: number }
 local held: { [Instance]: Held } = setmetatable({}, { __mode = "k" }) :: any
+-- The UIScales that lay the HUD out at a size for the screen, as against the ones that
+-- animate something (a button's bounce, the stamp's pop): held text follows only these.
+local layoutScales: { [Instance]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+-- Whether Roblox holds text on screen, after any UIScale (or in the label's own pixels).
+local heldOnScreen = true
 
--- How much the UIScales above an object scale it, leaving out a button's bounce.
+-- How much the layout scales above an object scale it.
 local function scaleOf(object: Instance): number
 	local scale = 1
 	local cursor: Instance? = object
 	while cursor and not cursor:IsA("LayerCollector") do
 		local uiScale = cursor:FindFirstChildOfClass("UIScale")
-		if uiScale and uiScale.Name ~= BOUNCE then
+		if uiScale and layoutScales[uiScale] then
 			scale *= uiScale.Scale
 		end
 		cursor = cursor.Parent
@@ -181,7 +186,8 @@ local function applyHold(object: Instance, entry: Held)
 		entry.constraint.Parent = nil
 	else
 		-- A whole number of pixels, rounded down: never bigger than the box was made for.
-		entry.constraint.MaxTextSize = math.max(1, math.floor(entry.size * scaleOf(object) + 0.001))
+		local scale = if heldOnScreen then scaleOf(object) else 1
+		entry.constraint.MaxTextSize = math.max(1, math.floor(entry.size * scale + 0.001))
 		entry.constraint.Parent = object
 	end
 end
@@ -195,13 +201,110 @@ function Ui.holdTextSize(object: TextLabel | TextButton, size: number)
 	end)
 end
 
--- Holds every held label again, for the UIScales above it: call it after changing one.
+-- Holds every held label again, for the layout scales above it: call it after changing one.
 function Ui.refreshHeldText()
 	for object, entry in held do
 		applyHold(object, entry)
 	end
 end
 GuiService:GetPropertyChangedSignal("PreferredTextSize"):Connect(Ui.refreshHeldText)
+
+-- A UIScale that lays `parent` and everything in it out at a size for the screen (the HUD's,
+-- the top bar row's): held text follows it. After changing its Scale, call
+-- Ui.refreshHeldText.
+function Ui.layoutScale(parent: Instance): UIScale
+	local scale = Instance.new("UIScale")
+	layoutScales[scale] = true
+	scale.Parent = parent
+	return scale
+end
+
+-- Where Roblox holds text: on screen, after any UIScale, or in the label's own pixels.
+function Ui.setTextHeldOnScreen(onScreen: boolean)
+	if onScreen ~= heldOnScreen then
+		heldOnScreen = onScreen
+		Ui.refreshHeldText()
+	end
+end
+
+-- The probe's text size and the UIScale it's under: far enough apart that the two answers
+-- can't be taken for each other at any Text Size (see below).
+local PROBE_SIZE = 30
+local PROBE_SCALE = 3
+
+export type HeldWhere = "screen" | "label"
+
+-- Asks Roblox where it holds text: "screen" if a UITextSizeConstraint holds text on screen,
+-- after any UIScale; "label" if in the label's own pixels; nil if it can't tell. Also returns
+-- what it measured. It waits a frame or more for Roblox to lay things out.
+--
+-- It measures labels no one sees, in pairs, one held and one not, by their TextBounds (each
+-- pair in the same pixels, whichever pixels Roblox gives TextBounds in):
+-- - held at half their size: drawn half as wide or less (with a bigger Text Size, less).
+--   If not, TextBounds don't show what a constraint does, and it can't tell;
+-- - under a UIScale of 3, held at their own size: drawn a third as wide or less if Roblox
+--   holds text on screen (30 px on screen is 10 of theirs); if in their own pixels, as wide,
+--   or at the biggest Text Size still over two thirds as wide (30 against 30 + 14).
+function Ui.findWhereTextIsHeld(parent: Instance): (HeldWhere?, number?)
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "LastFerryTextCheck"
+	gui.ResetOnSpawn = false
+	local function probe(where: Instance, name: string, max: number?): TextLabel
+		local label = Instance.new("TextLabel")
+		label.Name = name
+		label.Size = UDim2.fromOffset(10, 10)
+		label.BackgroundTransparency = 1
+		label.TextTransparency = 1
+		label.FontFace = Theme.Fonts.body
+		label.TextSize = PROBE_SIZE
+		label.Text = "MMMM"
+		if max then
+			local constraint = Instance.new("UITextSizeConstraint")
+			constraint.MaxTextSize = max
+			constraint.Parent = label
+		end
+		label.Parent = where
+		return label
+	end
+	local free = probe(gui, "Free")
+	local halved = probe(gui, "Halved", PROBE_SIZE / 2)
+	local scaled = Ui.frame(gui, "Scaled", UDim2.fromOffset(10, 10))
+	local uiScale = Instance.new("UIScale")
+	uiScale.Scale = PROBE_SCALE
+	uiScale.Parent = scaled
+	local scaledFree = probe(scaled, "Free")
+	local scaledHeld = probe(scaled, "Held", PROBE_SIZE)
+	gui.Parent = parent
+
+	-- How wide a held label is drawn, as a share of how wide one that isn't is, once both
+	-- have been measured.
+	local function share(heldLabel: TextLabel, freeLabel: TextLabel): number?
+		local heldWidth, freeWidth = heldLabel.TextBounds.X, freeLabel.TextBounds.X
+		return if heldWidth > 0 and freeWidth > 0 then heldWidth / freeWidth else nil
+	end
+	local answer: HeldWhere? = nil
+	local measured: number? = nil
+	local last: HeldWhere? = nil
+	for _ = 1, 30 do
+		task.wait()
+		-- Once the UIScale is laid out: the same answer two frames running.
+		if scaled.AbsoluteSize.X >= 10 * PROBE_SCALE - 0.5 then
+			local seen, underScale = share(halved, free), share(scaledHeld, scaledFree)
+			local now: HeldWhere? = nil
+			if seen and underScale and seen < 0.75 then
+				now = if underScale < 0.5 then "screen" else "label"
+			end
+			measured = underScale
+			if now ~= nil and now == last then
+				answer = now
+				break
+			end
+			last = now
+		end
+	end
+	gui:Destroy()
+	return answer, measured
+end
 
 -- Typed as TextLabel so every property below is checked. TextButton has the same text
 -- properties, so the tab buttons go through here too.
@@ -344,7 +447,7 @@ function Ui.button(parent: Instance, name: string, text: string, size: UDim2, st
 	Ui.gloss(face)
 	Ui.shadow(face, 5, style.deep or style.fill:Lerp(Color3.new(0, 0, 0), 0.45))
 	local scale = Instance.new("UIScale")
-	scale.Name = BOUNCE
+	scale.Name = "Bounce"
 	scale.Parent = face
 
 	local content = Ui.frame(face, "Content", UDim2.fromScale(1, 1))

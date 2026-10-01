@@ -19,6 +19,7 @@
 
 local ContentProvider = game:GetService("ContentProvider")
 local GuiService = game:GetService("GuiService")
+local TextService = game:GetService("TextService")
 
 local Theme = require("./Theme")
 local Ui = require("./Ui")
@@ -78,6 +79,9 @@ local INK_MUTED = Color3.fromRGB(188, 190, 200)
 -- Roblox's highlight over a button under the mouse, and while it's pressed.
 local HOVER = Color3.fromRGB(208, 217, 251)
 local HOVER_SEE_THROUGH, PRESSED_SEE_THROUGH = 0.92, 0.88
+-- How many pixels bigger the player's Text Size setting draws text, as measured in Studio
+-- (the Facet UI library's tests/lib/large_text.luau): until Roblox's TextService says.
+local MEASURED_OFFSETS: { [string]: number } = { Medium = 0, Large = 4, Larger = 10, Largest = 14 }
 
 local TopBar = {}
 
@@ -121,8 +125,7 @@ function TopBar.new(parent: Instance, fallback: GuiObject): TopBar
 
 	local row = Ui.frame(gui, "Row", UDim2.fromScale(1, 1))
 	row.Visible = false
-	local scale = Instance.new("UIScale")
-	scale.Parent = row
+	local scale = Ui.layoutScale(row)
 
 	-- The status pills, level with Roblox's buttons.
 	local bar =
@@ -256,16 +259,34 @@ function TopBar.new(parent: Instance, fallback: GuiObject): TopBar
 	-- Text Size setting draws it.
 	local measure = Ui.label(sizer, "Measure", { frameSize = UDim2.fromOffset(10000, PILL), hold = false })
 	local measured: { [TextLabel]: number } = {} -- this fitting's
+	-- How many pixels bigger the Text Size setting draws text, by setting, as Roblox says.
+	local offsets: { [string]: number } = {}
+	local function textSizeOffset(): number
+		local setting = GuiService.PreferredTextSize.Name
+		return offsets[setting] or MEASURED_OFFSETS[setting] or 0
+	end
+	-- How much the row is scaled where it's being fitted.
+	local measuredAt = 1
 	local function textWidth(label: TextLabel): number
 		local width = measured[label]
 		if width == nil then
 			measure.FontFace = label.FontFace
-			measure.TextSize = label.TextSize
+			-- Roblox may add the Text Size setting's pixels on screen, after the row's scale
+			-- (it doesn't say): scaled down, that's more of the row's own pixels than the
+			-- measuring label gets, so it measures that much bigger.
+			measure.TextSize = label.TextSize + math.max(0, textSizeOffset() * (1 / measuredAt - 1))
 			measure.Text = label.Text
 			width = math.ceil(measure.TextBounds.X)
 			measured[label] = width
 		end
 		return width
+	end
+	-- Measures for the row drawn at `s` times its size, from now on.
+	local function measureAt(s: number)
+		if s ~= measuredAt then
+			measuredAt = s
+			table.clear(measured)
+		end
 	end
 
 	-- How much room the pills take, at Roblox's size for the row, with `show` saying which of
@@ -320,7 +341,11 @@ function TopBar.new(parent: Instance, fallback: GuiObject): TopBar
 		local size = gui.AbsoluteSize
 		local s = size.Y / ROW
 		local wasInRow = inRow
-		inRow = size.Y >= MIN_ROW and size.X / s - EDGE_LEFT - EDGE_RIGHT >= need(none)
+		inRow = false
+		if size.Y >= MIN_ROW then
+			measureAt(s)
+			inRow = size.X / s - EDGE_LEFT - EDGE_RIGHT >= need(none)
+		end
 		local at = if inRow then s else 0
 		if at == placedAt then
 			return
@@ -381,6 +406,7 @@ function TopBar.new(parent: Instance, fallback: GuiObject): TopBar
 			if s <= 0 then
 				return
 			end
+			measureAt(s)
 			local room = size.X / s - EDGE_LEFT - EDGE_RIGHT
 			local show: { [GuiObject]: boolean } = {}
 			for _, extra in extras do
@@ -416,11 +442,33 @@ function TopBar.new(parent: Instance, fallback: GuiObject): TopBar
 	seeThrough()
 	GuiService:GetPropertyChangedSignal("PreferredTransparency"):Connect(seeThrough)
 
+	-- What Roblox says the Text Size setting adds, once it's answered: it asks over the
+	-- network, and can fail, and then the offsets measured in Studio stand.
+	local function askOffset()
+		local setting = GuiService.PreferredTextSize.Name
+		if setting == "Medium" or offsets[setting] ~= nil then
+			return
+		end
+		local ok, offset = pcall(function(): number
+			return TextService:GetTextSizeOffsetAsync(16, F.bodyBold)
+		end)
+		if ok and GuiService.PreferredTextSize.Name == setting then
+			offsets[setting] = offset
+			if offset ~= MEASURED_OFFSETS[setting] then
+				topBar.fit()
+			end
+		end
+	end
+
 	place()
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(topBar.fit)
 	row:GetPropertyChangedSignal("AbsoluteSize"):Connect(topBar.fit)
 	-- And at once when the player changes their text size, or the pills' fonts have loaded.
-	GuiService:GetPropertyChangedSignal("PreferredTextSize"):Connect(topBar.fit)
+	GuiService:GetPropertyChangedSignal("PreferredTextSize"):Connect(function()
+		topBar.fit()
+		askOffset()
+	end)
+	task.spawn(askOffset)
 	task.spawn(function()
 		ContentProvider:PreloadAsync({ night, clock, date, queue, ledgerWord, ledgerCount })
 		topBar.fit()

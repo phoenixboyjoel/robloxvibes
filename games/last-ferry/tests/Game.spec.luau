@@ -211,9 +211,25 @@ end
 -- Roblox's kerned text: text in a box that can't grow keeps that much room to spare.
 local KERNING = 1.04
 
--- Which way a label that grows to fit its text grows, within `around` (the nearest box
--- that doesn't grow): by how a list there lines up what's in it, or else by the anchor
--- of whatever in it holds the label. "right", "left" or "both".
+-- The nearest box around an object that doesn't grow along `axis` ("X" across, "Y" down)
+-- to fit what's in it: the one whose size bounds it that way.
+local function boundsAlong(object, axis: string)
+	local A = roblox.Enum.AutomaticSize
+	local outer = object.Parent
+	while outer:IsA("GuiObject") do
+		local automatic = outer.AutomaticSize
+		if not (automatic == A.XY or automatic == (if axis == "X" then A.X else A.Y)) then
+			break
+		end
+		outer = outer.Parent
+	end
+	return outer
+end
+
+-- Which way a label that grows across to fit its text grows, within `around` (the nearest
+-- box that doesn't grow across): by how a list there lines up what's in it, or else by the
+-- anchor of whatever in it holds the label (the label itself, if nothing between grows).
+-- "right", "left" or "both".
 local function growthSide(object, around): string
 	local placed = object
 	while placed.Parent ~= around do
@@ -255,33 +271,44 @@ local function checkLabelFits(sim, object, label: string)
 	if not (growsX or growsY) then
 		return
 	end
-	local outer = object.Parent
-	while outer:IsA("GuiObject") and outer.AutomaticSize ~= roblox.Enum.AutomaticSize.None do
-		outer = outer.Parent
+	-- Inside the nearest box that doesn't grow, across and down: a list that scrolls makes
+	-- room the way it scrolls, so not that way.
+	local inner = box(object)
+	local function scrolls(frame, axis: string): boolean
+		if not frame:IsA("ScrollingFrame") then
+			return false
+		end
+		local direction = frame.ScrollingDirection
+		return direction == roblox.Enum.ScrollingDirection.XY
+			or direction
+				== (if axis == "X" then roblox.Enum.ScrollingDirection.X else roblox.Enum.ScrollingDirection.Y)
 	end
-	if not outer:IsA("GuiObject") then
-		return
-	end
-	-- A list that scrolls makes room the way it scrolls, and only that way.
-	local checkX, checkY = true, true
-	if outer:IsA("ScrollingFrame") then
-		checkX = outer.ScrollingDirection == roblox.Enum.ScrollingDirection.Y
-		checkY = outer.ScrollingDirection == roblox.Enum.ScrollingDirection.X
-	end
-	local inner, around = box(object), box(outer)
-	T.expect(
-		(not checkX or (inner.left >= around.left - 0.5 and inner.right <= around.right + 0.5))
-			and (not checkY or (inner.top >= around.top - 0.5 and inner.bottom <= around.bottom + 0.5)),
-		`{where} {describe(inner)} runs out of {outer:GetFullName()} {describe(around)}`
-	)
-	if checkX and not object.TextWrapped then
-		local towards = growthSide(object, outer)
-		local left, right = inner.left - around.left, around.right - inner.right
-		local spare = if towards == "right" then right elseif towards == "left" then left else 2 * math.min(left, right)
-		local wanted = (inner.right - inner.left) * (KERNING - 1)
+	local acrossIn, downIn = boundsAlong(object, "X"), boundsAlong(object, "Y")
+	if acrossIn:IsA("GuiObject") and not scrolls(acrossIn, "X") then
+		local around = box(acrossIn)
 		T.expect(
-			spare >= wanted - 0.5,
-			`{where} has {spare} px to spare towards the {towards} in {outer:GetFullName()}, less than {wanted}`
+			inner.left >= around.left - 0.5 and inner.right <= around.right + 0.5,
+			`{where} {describe(inner)} runs out of {acrossIn:GetFullName()} {describe(around)} sideways`
+		)
+		if growsX and not object.TextWrapped then
+			local towards = growthSide(object, acrossIn)
+			local left, right = inner.left - around.left, around.right - inner.right
+			local spare = if towards == "right"
+				then right
+				elseif towards == "left" then left
+				else 2 * math.min(left, right)
+			local wanted = (inner.right - inner.left) * (KERNING - 1)
+			T.expect(
+				spare >= wanted - 0.5,
+				`{where} has {spare} px to spare towards the {towards} in {acrossIn:GetFullName()}, less than {wanted}`
+			)
+		end
+	end
+	if downIn:IsA("GuiObject") and not scrolls(downIn, "Y") then
+		local around = box(downIn)
+		T.expect(
+			inner.top >= around.top - 0.5 and inner.bottom <= around.bottom + 0.5,
+			`{where} {describe(inner)} runs out of {downIn:GetFullName()} {describe(around)} downwards`
 		)
 	end
 end
@@ -299,7 +326,7 @@ end
 -- grow (sideways, for a list that scrolls up and down), with that room to spare on the side
 -- it grows towards. Text meant to be cut short with "…" (TextTruncate) is checked for its
 -- height, and for every line if it wraps. And no two labels side by side run into each
--- other (inkOf).
+-- other (inkOf). Text drawn wholly see-through shows nothing to fit.
 local function checkTextFits(sim, player, label: string)
 	for _, gui in player.PlayerGui:GetChildren() do
 		if gui:IsA("ScreenGui") and gui.Enabled then
@@ -308,6 +335,7 @@ local function checkTextFits(sim, player, label: string)
 				if
 					(object:IsA("TextLabel") or object:IsA("TextButton"))
 					and object.Text ~= ""
+					and object.TextTransparency < 1
 					and sim:shown(object)
 				then
 					checkLabelFits(sim, object, label)
@@ -1685,12 +1713,56 @@ T.test("on the smallest phone, every card's words fit, from the first night to t
 	checkEndingCard(sim, alice, "the ending card, on a phone")
 end)
 
+-- The labels held at a size in the player's HUD and status (Ui.holdTextSize; the bubble
+-- holds its own).
+local function heldLabels(player): { any }
+	local found = {}
+	for _, name in { "LastFerryHud", "LastFerryTopBar" } do
+		for _, object in player.PlayerGui[name]:GetDescendants() do
+			if object:IsA("UITextSizeConstraint") then
+				table.insert(found, object.Parent)
+			end
+		end
+	end
+	return found
+end
+
+-- Held labels held at more than their TextSize, by name: the ticket's name grows into the
+-- room its box has (Ticket.luau).
+local HELD_AT = { Passenger = 26 }
+
+-- Every label in a box that can't grow is held at its size, or at the size the player's
+-- Text Size draws it if that's smaller: not bigger, and not smaller either (but for
+-- rounding down to a whole screen pixel, if Roblox holds text on screen).
+local function checkHeld(sim, player, how: string)
+	local held = heldLabels(player)
+	T.expect(#held > 20, `{how}: labels in boxes that can't grow are held ({#held})`)
+	for _, object in held do
+		local wanted = math.min(sim:drawnTextSize(object, true), HELD_AT[object.Name] or object.TextSize)
+		local drawn, onePixel = sim:drawnTextSize(object), 1 / sim:scaleOf(object)
+		T.expect(
+			drawn >= wanted - onePixel - 0.01 and drawn <= wanted + 0.01,
+			`{how}: {object:GetFullName()} is drawn at {drawn}, for {wanted}`
+		)
+	end
+end
+
+-- What the game found out about where Roblox holds text (Ui.findWhereTextIsHeld), once it
+-- has asked.
+local function textHeld(sim, player): string
+	local gui = player.PlayerGui.LastFerryHud
+	sim:runUntil(function()
+		return gui:GetAttribute("TextHeld") ~= nil
+	end, 5)
+	return gui:GetAttribute("TextHeld")
+end
+
 -- Roblox draws all text bigger at the player's Text Size setting (GuiService's
 -- PreferredTextSize), except where a UITextSizeConstraint holds it down (Ui.holdTextSize).
 -- Roblox doesn't say whether it adds that in a label's own pixels or on screen: on a
 -- monitor, where the HUD is scaled up, its own pixels are the more demanding; on a phone,
 -- scaled down, the screen's (Sim.new's textSizeOffsetIn).
-T.test("at the largest Text Size a player can choose, the longest line and every word still fit", function()
+T.test("at every Text Size a player can choose, the longest line and every word still fit", function()
 	for _, screen in
 		{
 			{
@@ -1707,93 +1779,149 @@ T.test("at the largest Text Size a player can choose, the longest line and every
 				-- Roblox's buttons as wide as they get with voice chat on: past the desk, with
 				-- the status still up in their row.
 				wideButtons = 240,
+				-- And buttons of Roblox's on the right of the row too, past the rules panel
+				-- (Roblox puts none there now, but its layout allows them).
+				rightButtons = 250,
 			},
 			{
 				label = "an iPhone SE",
 				screen = roblox.Vector2.new(667, 375),
 				safeArea = roblox.Vector2.new(667, 317),
 				input = roblox.Enum.PreferredInput.Touch,
+				-- With a microphone button beside Roblox's own (voice chat on).
+				micButtons = 208,
 			},
 		}
 	do
-		local label = `{screen.label}, at the largest Text Size`
-		local sim = boot({
-			root = ROOT,
-			screen = screen.screen,
-			safeArea = screen.safeArea,
-			preferredInput = screen.input,
-			preferredTextSize = roblox.Enum.PreferredTextSize.Largest,
-			textSizeOffsetIn = if screen.roomy then "label" else "screen",
-		})
-		everyoneSays(sim, sim:execute(LONGEST_LINE))
-		local alice = sim:addPlayer("Alice", 101)
-		sim.cameraFollows = alice
-		sim:run(3)
-		checkTextFits(sim, alice, `{label}, on the pier`)
-		-- The bot checks everything on screen as it plays (the night's card included), up to a
-		-- passenger with a page to take.
-		local bot = newBot(sim, alice, { stopAtPage = true, checkText = label, grown = true })
-		local model = untilAPage(sim, bot)
-		local root = alice.PlayerGui.LastFerryHud.Root
-		local reading = readingText(root.Play.Side.Scroller.Rules)
-		table.insert(reading, root.Play.Hint)
-		for _, pill in { "NightPill", "ClockPill", "DatePill" } do
-			table.insert(reading, topRow(alice).TopBar.Left[pill]:FindFirstChildOfClass("TextLabel"))
-		end
-		checkGrown(sim, reading, `{label}, a page to take`)
-		-- On a phone the longest line at this size may only fit over the top bar row.
-		local crowded = not screen.roomy
-		checkSpeechPlacement(sim, alice, model, `{label}, a page to take`, false, crowded)
-		-- The line is as big as the player asked for wherever there's room for it, and never
-		-- smaller than designed (Ui/Speech draws it smaller only to keep it on screen).
-		local line = speechBubble(alice).Bubble.Line
-		local full = sim:drawnTextSize(line, true)
-		local guiInset = sim.game:GetService("GuiService"):GetGuiInset()
-		for _, name in STAND_ORDER do
-			standAt(sim, alice, STANDS[name])
-			local drawn = sim:drawnTextSize(line)
-			T.expect(
-				if screen.roomy then drawn == full else drawn >= 16,
-				`{label}, {name} stand: the line is drawn at {drawn} px`
-			)
-			if drawn < full then
-				-- Only as much smaller as it had to be: 2 px bigger, it wouldn't have fitted
-				-- under the top of the screen (allowing for each line 2 px taller, one line
-				-- more, and the 4 px to spare it needs to be drawn bigger again).
-				local top = box(speechBubble(alice)).top + guiInset.Y
-				local lines = math.round(line.TextBounds.Y / drawn)
-				T.expect(
-					top <= 4 + 2 * lines + (drawn + 2) + 1,
-					`{label}, {name} stand: drawn at {drawn} px, with {top} px over it`
-				)
+		for _, textSize in { "Large", "Larger", "Largest" } do
+			local largest = textSize == "Largest"
+			local label = `{screen.label}, at Text Size {textSize}`
+			local sim = boot({
+				root = ROOT,
+				screen = screen.screen,
+				safeArea = screen.safeArea,
+				preferredInput = screen.input,
+				preferredTextSize = (roblox.Enum.PreferredTextSize :: any)[textSize],
+				textSizeOffsetIn = if screen.roomy then "label" else "screen",
+			})
+			everyoneSays(sim, sim:execute(LONGEST_LINE))
+			local alice = sim:addPlayer("Alice", 101)
+			sim.cameraFollows = alice
+			sim:run(3)
+			checkTextFits(sim, alice, `{label}, on the pier`)
+			checkHeld(sim, alice, `{label}, on the pier`)
+			-- The bot checks everything on screen as it plays (the night's card included), up to
+			-- a passenger with a page to take.
+			local bot = newBot(sim, alice, { stopAtPage = true, checkText = label, grown = true })
+			local model = untilAPage(sim, bot)
+			local root = alice.PlayerGui.LastFerryHud.Root
+			local reading = readingText(root.Play.Side.Scroller.Rules)
+			table.insert(reading, root.Play.Hint)
+			for _, pill in { "NightPill", "ClockPill", "DatePill" } do
+				table.insert(reading, topRow(alice).TopBar.Left[pill]:FindFirstChildOfClass("TextLabel"))
 			end
+			checkGrown(sim, reading, `{label}, a page to take`)
+			checkHeld(sim, alice, `{label}, a page to take`)
+			-- On a phone the longest line at a big size may only fit over the top bar row.
+			local crowded = not screen.roomy
+			checkSpeechPlacement(sim, alice, model, `{label}, a page to take`, false, crowded)
+			-- The line is as big as the player asked for wherever there's room for it, and never
+			-- smaller than designed (Ui/Speech draws it smaller only to keep it on screen).
+			local line = speechBubble(alice).Bubble.Line
+			local full = sim:drawnTextSize(line, true)
+			local guiInset = sim.game:GetService("GuiService"):GetGuiInset()
+			local drawnAt = {}
+			for _, name in STAND_ORDER do
+				standAt(sim, alice, STANDS[name])
+				local drawn = sim:drawnTextSize(line)
+				drawnAt[name] = drawn
+				T.expect(
+					if screen.roomy then drawn == full else drawn >= 16,
+					`{label}, {name} stand: the line is drawn at {drawn} px`
+				)
+				if drawn < full then
+					-- Only as much smaller as it had to be: 2 px bigger, it wouldn't have fitted
+					-- under the top of the screen (allowing for each line 2 px taller, one line
+					-- more, and the 4 px to spare it needs to be drawn bigger again).
+					local top = box(speechBubble(alice)).top + guiInset.Y
+					local lines = math.round(line.TextBounds.Y / drawn)
+					T.expect(
+						top <= 4 + 2 * lines + (drawn + 2) + 1,
+						`{label}, {name} stand: drawn at {drawn} px, with {top} px over it`
+					)
+				end
+			end
+			if largest and screen.micButtons then
+				-- Roblox's buttons a microphone wider: the line keeps out from under them, beside
+				-- them rather than drawn smaller to fit under them (a step smaller at most, for
+				-- the room it loses beside them).
+				local before = sim.game:GetService("GuiService").TopbarInset
+				sim:setTopbarInset(roblox.Rect.new(screen.micButtons, 0, screen.safeArea.X, 58))
+				sim:run(0.5)
+				for _, name in STAND_ORDER do
+					standAt(sim, alice, STANDS[name])
+					local drawn = sim:drawnTextSize(line)
+					T.expect(
+						drawn >= drawnAt[name] - 2,
+						`{label}, Roblox's buttons to x {screen.micButtons}, {name} stand: the line is drawn at {drawn} px, from {drawnAt[name]}`
+					)
+				end
+				checkSpeechPlacement(
+					sim,
+					alice,
+					model,
+					`{label}, Roblox's buttons to x {screen.micButtons}`,
+					false,
+					true
+				)
+				sim:setTopbarInset(before)
+				sim:run(0.5)
+			end
+			checkTextFits(sim, alice, `{label}, a page to take`)
+			checkHint(sim, alice, `{label}, a page to take`)
+			sim:click(root.Play.Desk.TicketHolder.PageTab)
+			sim:run(1)
+			T.expect(sim:shown(root.Play.Ledger), `{label}: taking the page opened the ledger`)
+			checkSpeechPlacement(sim, alice, model, `{label}, ledger open`, false, crowded)
+			checkTextFits(sim, alice, `{label}, ledger open`)
+			checkHint(sim, alice, `{label}, ledger open`)
+			sim:click(root.Play.Ledger.Close)
+			sim:click(root.Play.Side.Tabs.HIDE)
+			checkSpeechPlacement(sim, alice, model, `{label}, rules hidden`, false, crowded)
+			checkTextFits(sim, alice, `{label}, rules hidden`)
+			if largest and screen.wideButtons then
+				-- Voice chat and the like widen Roblox's own buttons (they're drawn over every
+				-- game's GUI): a line crowded up into the row still isn't under them.
+				sim:setTopbarInset(roblox.Rect.new(screen.wideButtons, 0, screen.safeArea.X, 58))
+				sim:run(0.5)
+				T.equal(
+					topRow(alice).Parent,
+					alice.PlayerGui.LastFerryTopBar,
+					`{label}: the status is still up in Roblox's row`
+				)
+				checkSpeechPlacement(sim, alice, model, `{label}, Roblox's buttons wider`, false, true)
+				checkTextFits(sim, alice, `{label}, Roblox's buttons wider`)
+			end
+			if largest and screen.rightButtons then
+				-- Roblox's buttons on the right of the row too: nor under those, nor drawn smaller
+				-- to fit under them (a step smaller at most, for the room it loses beside them).
+				local right = screen.safeArea.X - screen.rightButtons
+				sim:setTopbarInset(roblox.Rect.new(164, 0, right, 58))
+				sim:run(0.5)
+				for _, name in STAND_ORDER do
+					standAt(sim, alice, STANDS[name])
+					local drawn = sim:drawnTextSize(line)
+					T.expect(
+						drawn >= drawnAt[name] - 2,
+						`{label}, Roblox's buttons from x {right}, {name} stand: the line is drawn at {drawn} px, from {drawnAt[name]}`
+					)
+				end
+				checkSpeechPlacement(sim, alice, model, `{label}, Roblox's buttons on the right`, false, true)
+				checkTextFits(sim, alice, `{label}, Roblox's buttons on the right`)
+				checkPills(alice, `{label}, Roblox's buttons on the right`)
+			end
+			clean(sim, label)
 		end
-		checkTextFits(sim, alice, `{label}, a page to take`)
-		checkHint(sim, alice, `{label}, a page to take`)
-		sim:click(root.Play.Desk.TicketHolder.PageTab)
-		sim:run(1)
-		T.expect(sim:shown(root.Play.Ledger), `{label}: taking the page opened the ledger`)
-		checkSpeechPlacement(sim, alice, model, `{label}, ledger open`, false, crowded)
-		checkTextFits(sim, alice, `{label}, ledger open`)
-		checkHint(sim, alice, `{label}, ledger open`)
-		sim:click(root.Play.Ledger.Close)
-		sim:click(root.Play.Side.Tabs.HIDE)
-		checkSpeechPlacement(sim, alice, model, `{label}, rules hidden`, false, crowded)
-		checkTextFits(sim, alice, `{label}, rules hidden`)
-		if screen.wideButtons then
-			-- Voice chat and the like widen Roblox's own buttons (they're drawn over every
-			-- game's GUI): a line crowded up into the row still isn't under them.
-			sim:setTopbarInset(roblox.Rect.new(screen.wideButtons, 0, screen.safeArea.X, 58))
-			sim:run(0.5)
-			T.equal(
-				topRow(alice).Parent,
-				alice.PlayerGui.LastFerryTopBar,
-				`{label}: the status is still up in Roblox's row`
-			)
-			checkSpeechPlacement(sim, alice, model, `{label}, Roblox's buttons wider`, false, true)
-			checkTextFits(sim, alice, `{label}, Roblox's buttons wider`)
-		end
-		clean(sim, label)
 	end
 end)
 
@@ -2069,7 +2197,20 @@ T.test("a window moved to a TV mid-line: the bubble's type grows with it, and st
 	clean(sim, "moved to a TV")
 end)
 
-T.test("at a big Text Size the line steps down only as far as it must, and doesn't flicker", function()
+-- Has the server send the passenger at the window a line to say, as it does when they answer
+-- a call.
+local function sayAgain(sim, line: string)
+	sim:execute(string.format(
+		[[
+		local Config = require("../ReplicatedStorage/Shared/Config")
+		local Net = require("../ReplicatedStorage/Shared/Net")
+		Net.event(Config.Remotes.Fx):FireAllClients({ kind = "say", text = %q })
+	]],
+		line
+	))
+end
+
+T.test("at a big Text Size the line steps down a step at a time, as far as it must, without flicker", function()
 	-- The longest line on a notched phone at the largest size, from the left stand, where
 	-- it's drawn smaller only to stay on screen: tilting the view moves the passenger's head
 	-- up or down the screen, and with it the room over their head.
@@ -2080,7 +2221,8 @@ T.test("at a big Text Size the line steps down only as far as it must, and doesn
 		preferredInput = roblox.Enum.PreferredInput.Touch,
 		preferredTextSize = roblox.Enum.PreferredTextSize.Largest,
 	})
-	everyoneSays(sim, sim:execute(LONGEST_LINE))
+	local longest = sim:execute(LONGEST_LINE)
+	everyoneSays(sim, longest)
 	local alice = sim:addPlayer("Alice", 101)
 	sim.cameraFollows = alice
 	local bot = newBot(sim, alice, { idle = true })
@@ -2096,158 +2238,264 @@ T.test("at a big Text Size the line steps down only as far as it must, and doesn
 		sim:step(1 / 30)
 		return limit.MaxTextSize
 	end
-	-- The tilt where it first has to be drawn smaller, from looking up (where it fits) to
-	-- looking down, found to within a hair's breadth.
-	local fits, tooBig = nil, nil
-	for degrees = 12, -12, -0.5 do
-		if tilt(12) and tilt(degrees) ~= 1000 then
-			fits, tooBig = degrees + 0.5, degrees
-			break
+	-- From looking up (their head low on the screen, where it fits as big as the setting
+	-- draws it) to looking down: drawn smaller a step at a time, down to its designed size.
+	-- (Not only ever smaller: lower down, the bubble can have room to be wider, and fewer
+	-- lines.)
+	local full = 16 + sim:textSizeOffset()
+	local guiInset = sim.game:GetService("GuiService"):GetGuiInset()
+	local sizes, edges = { tilt(25) }, {}
+	for degrees = 25, -30, -0.1 do
+		local size = tilt(degrees)
+		if size ~= sizes[#sizes] then
+			table.insert(sizes, size)
+			table.insert(edges, { bigger = degrees + 0.1, smaller = degrees })
 		end
 	end
-	assert(fits and tooBig, "the line was never drawn smaller")
-	for _ = 1, 20 do
-		local middle = (fits + tooBig) / 2
-		tilt(12)
-		if tilt(middle) == 1000 then
-			fits = middle
-		else
-			tooBig = middle
+	local seen = table.concat(sizes, " ")
+	T.equal(sizes[1], 1000, `looking up, as big as the setting draws it ({seen})`)
+	T.equal(sizes[#sizes], 16, `looking down, at its designed size ({seen})`)
+	for i = 2, #sizes do
+		local a, b = sizes[i - 1], sizes[i]
+		local change = math.abs((if a == 1000 then full else a) - (if b == 1000 then full else b))
+		T.equal(change, 2, `a step at a time: {seen}`)
+	end
+	for i, edge in edges do
+		local size, step = sizes[i], sizes[i + 1]
+		if step > size then
+			continue -- drawn bigger, lower down
 		end
+		local where = `from {size} to {step}`
+		-- Where it has to be drawn smaller, found to within a hair's breadth (coming from
+		-- looking up each time).
+		local bigger, smaller = edge.bigger, edge.smaller
+		for _ = 1, 24 do
+			local middle = (bigger + smaller) / 2
+			tilt(25)
+			if tilt(middle) == size then
+				bigger = middle
+			else
+				smaller = middle
+			end
+		end
+		-- Just short of it, it stays the size it is, however long the view is held still,
+		-- and all of it is on screen, to the pixel.
+		tilt(25)
+		tilt(bigger)
+		for _ = 1, 5 do
+			T.equal(tilt(bigger), size, `{where}: held still just short of the edge`)
+		end
+		local top = box(speechBubble(alice)).top
+		T.expect(top >= -guiInset.Y, `{where}: just short of the edge, the bubble's top {top} is on screen`)
+		-- Just past it, a step smaller (2 px) is enough.
+		T.equal(tilt(smaller), step, `{where}: just past the edge, drawn a step smaller`)
+		-- Rocking across it: once drawn smaller, it's drawn bigger again only with room to
+		-- spare.
+		local writes = sim:countWrites(limit, "MaxTextSize")
+		for _ = 1, 10 do
+			tilt(bigger)
+			tilt(smaller)
+		end
+		local total = 0
+		for _, count in writes do
+			total += count
+		end
+		T.equal(total, 0, `{where}: the line's size changed while the view rocked`)
+		edge.bigger, edge.smaller = bigger, smaller
 	end
-	-- Just past it, a step smaller (2 px) is enough.
-	tilt(12)
-	T.equal(tilt(tooBig), 16 + sim:textSizeOffset() - 2, "just too big for the screen: drawn one step smaller")
-	-- Rocking across it: once drawn smaller, it's drawn bigger again only with room to spare.
-	local writes = sim:countWrites(limit, "MaxTextSize")
-	for _ = 1, 10 do
-		tilt(fits)
-		tilt(tooBig)
-	end
-	local total = 0
-	for _, count in writes do
-		total += count
-	end
-	T.equal(total, 0, "the line's size changed while the view rocked")
+	-- Drawn smaller just short of the first edge, with no room to spare to be drawn bigger
+	-- again, the next line starts afresh: as big as the setting draws it, where that fits.
+	local first = edges[1]
+	tilt(25)
+	tilt(first.smaller)
+	T.equal(tilt(first.bigger), sizes[2], "drawn smaller just short of the first edge")
+	sayAgain(sim, longest)
+	T.equal(tilt(first.bigger), sizes[1], "the next line is drawn as big as it fits")
 	clean(sim, "rocking at a big Text Size")
 end)
 
--- The labels held at a size in the player's HUD and status (Ui.holdTextSize; the bubble
--- holds its own).
-local function heldLabels(player): { any }
-	local found = {}
-	for _, name in { "LastFerryHud", "LastFerryTopBar" } do
-		for _, object in player.PlayerGui[name]:GetDescendants() do
-			if object:IsA("UITextSizeConstraint") then
-				table.insert(found, object.Parent)
-			end
-		end
+T.test("where Roblox holds text back is asked, not assumed, and text is held right either way", function()
+	-- Roblox's docs don't say whether a UITextSizeConstraint holds text on screen, after any
+	-- UIScale (a DevForum bug report says so), or in the label's own pixels, so the game asks
+	-- Roblox once it starts. In a world where TextBounds don't show what a constraint does,
+	-- it can't tell, and goes by the report.
+	local monitor = { label = "a monitor", screen = roblox.Vector2.new(1280, 720), offsetIn = "label" }
+	local phone = {
+		label = "an iPhone SE",
+		screen = roblox.Vector2.new(667, 375),
+		safeArea = roblox.Vector2.new(667, 317),
+		offsetIn = "screen",
+	}
+	for _, case in
+		{
+			{ on = monitor, constraintIn = "screen", answer = "screen" },
+			{ on = phone, constraintIn = "screen", answer = "screen" },
+			{ on = monitor, constraintIn = "label", answer = "label" },
+			{ on = phone, constraintIn = "label", answer = "label" },
+			{ on = phone, constraintIn = "screen", answer = "unknown", textBoundsIgnoreConstraints = true },
+		}
+	do
+		local how = `{case.on.label}, text held {case.constraintIn == "screen" and "on screen" or "in its own pixels"}`
+			.. (if case.textBoundsIgnoreConstraints then " (TextBounds don't show it)" else "")
+		local sim = boot({
+			root = ROOT,
+			screen = case.on.screen,
+			safeArea = case.on.safeArea,
+			preferredTextSize = roblox.Enum.PreferredTextSize.Largest,
+			textSizeOffsetIn = case.on.offsetIn,
+			constraintIn = case.constraintIn,
+			textBoundsIgnoreConstraints = case.textBoundsIgnoreConstraints,
+		})
+		local alice = sim:addPlayer("Alice", 101)
+		T.equal(textHeld(sim, alice), case.answer, `{how}: what the game found`)
+		sim:run(2)
+		T.expect(
+			alice.PlayerGui:FindFirstChild("LastFerryTextCheck") == nil,
+			`{how}: the labels it asked with are gone`
+		)
+		checkHeld(sim, alice, `{how}, on the pier`)
+		clean(sim, how)
 	end
-	return found
-end
+end)
 
 T.test("the player changes their Text Size mid-line: the bubble is the right size by the next frame", function()
-	local sim = boot()
-	everyoneSays(sim, "Evening, clerk. One for the island, please.")
-	local alice = sim:addPlayer("Alice", 101)
-	sim.cameraFollows = alice
-	local bot = newBot(sim, alice, { idle = true })
-	T.expect(untilTalking(sim, bot, 120) ~= nil, "a passenger is talking")
-	sim:run(0.5)
-	local bubble = speechBubble(alice).Bubble
-	local before = bubble.AbsoluteSize
-	-- Nothing is held back at the usual size: so however Roblox orders UIScale and
-	-- UITextSizeConstraint, the HUD looks as designed.
-	T.equal(#heldLabels(alice), 0, "at the usual Text Size, no label is held")
-	-- Measured again when the setting changes: not left until the line turns out not to fit
-	-- (or, going back down, never, as it would still fit a bubble too big for it).
-	sim:setPreferredTextSize(roblox.Enum.PreferredTextSize.Largest)
-	sim:step(1 / 60)
-	T.expect(bubble.AbsoluteSize.Y > before.Y, `bigger at once ({bubble.AbsoluteSize}, from {before})`)
-	T.expect(bubble.Line.TextFits, "with the line fitting it")
-	-- Labels in boxes that can't grow are held at their own size, on screen, under the
-	-- HUD's UIScale (4/3 on this monitor): not bigger, and not smaller either.
-	local function checkHeld(how: string)
-		local held = heldLabels(alice)
-		T.expect(#held > 20, `{how}: labels in boxes that can't grow are held ({#held})`)
-		for _, object in held do
-			-- Held to a whole number of screen pixels, rounded down.
-			local drawn, onePixel = sim:drawnTextSize(object), 1 / sim:scaleOf(object)
-			T.expect(
-				drawn >= object.TextSize - onePixel - 0.01 and drawn <= object.TextSize + 4,
-				`{how}: {object:GetFullName()} is drawn at {drawn}, for {object.TextSize}`
-			)
+	-- With Roblox holding text on screen and in each label's own pixels.
+	for _, constraintIn in { "screen", "label" } do
+		local sim = boot({ root = ROOT, constraintIn = constraintIn })
+		everyoneSays(sim, "Evening, clerk. One for the island, please.")
+		local alice = sim:addPlayer("Alice", 101)
+		sim.cameraFollows = alice
+		local bot = newBot(sim, alice, { idle = true })
+		T.expect(untilTalking(sim, bot, 120) ~= nil, "a passenger is talking")
+		sim:run(0.5)
+		T.equal(textHeld(sim, alice), constraintIn, "where the game found Roblox holds text")
+		local bubble = speechBubble(alice).Bubble
+		local before = bubble.AbsoluteSize
+		-- Nothing is held back at the usual size, so the HUD looks as designed whatever
+		-- Roblox does with a constraint.
+		T.equal(#heldLabels(alice), 0, "at the usual Text Size, no label is held")
+		-- Measured again when the setting changes: not left until the line turns out not to
+		-- fit (or, going back down, never, as it would still fit a bubble too big for it).
+		sim:setPreferredTextSize(roblox.Enum.PreferredTextSize.Largest)
+		sim:step(1 / 60)
+		T.expect(bubble.AbsoluteSize.Y > before.Y, `bigger at once ({bubble.AbsoluteSize}, from {before})`)
+		T.expect(bubble.Line.TextFits, "with the line fitting it")
+		-- Labels in boxes that can't grow are held at their own size under the HUD's UIScale
+		-- (4/3 on this monitor), however it changes.
+		local how = `text held {if constraintIn == "screen" then "on screen" else "in its own pixels"}`
+		checkHeld(sim, alice, `{how}, at the largest Text Size`)
+		-- Held again while the call stamp pops (its own UIScale, from 1.5 down to 1): only the
+		-- scales the HUD is laid out at count, so it's still held at its size once it lands.
+		local stamp = alice.PlayerGui.LastFerryHud.Root.Play.Desk.TicketHolder.Ticket.CallStamp
+		local pop = stamp:FindFirstChildOfClass("UIScale")
+		pop.Scale = 1.4
+		sim:executeClient(alice, [[require("./Ui/Ui").refreshHeldText()]])
+		pop.Scale = 1
+		checkHeld(sim, alice, `{how}, held again while the stamp popped`)
+		-- Roblox's top bar row grows half as big again (as on a TV), and the status with it.
+		sim:setTopbarInset(roblox.Rect.new(164, 0, 1280, 87))
+		sim:step(1 / 60)
+		checkHeld(sim, alice, `{how}, in a taller top bar row`)
+		sim:setTopbarInset(roblox.Rect.new(164, 0, 1280, 58))
+		sim:step(1 / 60)
+		-- The window shrinks to a phone's size, and the HUD's scale with it.
+		sim:setScreen(roblox.Vector2.new(844, 390), roblox.Vector2.new(750, 332))
+		sim:step(1 / 60)
+		checkHeld(sim, alice, `{how}, in a smaller window`)
+		sim:setScreen(roblox.Vector2.new(1280, 720), roblox.Vector2.new(1280, 662))
+		sim:step(1 / 60)
+		-- Each size between too.
+		for _, size in { "Large", "Larger" } do
+			sim:setPreferredTextSize((roblox.Enum.PreferredTextSize :: any)[size])
+			sim:step(1 / 60)
+			checkHeld(sim, alice, `{how}, at Text Size {size}`)
 		end
+		sim:setPreferredTextSize(roblox.Enum.PreferredTextSize.Medium)
+		sim:step(1 / 60)
+		T.equal(bubble.AbsoluteSize, before, "and back as it was at once")
+		T.equal(#heldLabels(alice), 0, "and nothing held once it's back to the usual size")
+		clean(sim, `Text Size changed mid-line, {how}`)
 	end
-	checkHeld("at the largest Text Size")
-	-- Roblox's top bar row grows half as big again (as on a TV), and the status with it.
-	sim:setTopbarInset(roblox.Rect.new(164, 0, 1280, 87))
-	sim:step(1 / 60)
-	checkHeld("in a taller top bar row")
-	sim:setTopbarInset(roblox.Rect.new(164, 0, 1280, 58))
-	sim:step(1 / 60)
-	-- The window shrinks to a phone's size, and the HUD's scale with it.
-	sim:setScreen(roblox.Vector2.new(844, 390), roblox.Vector2.new(750, 332))
-	sim:step(1 / 60)
-	checkHeld("in a smaller window")
-	sim:setScreen(roblox.Vector2.new(1280, 720), roblox.Vector2.new(1280, 662))
-	sim:step(1 / 60)
-	sim:setPreferredTextSize(roblox.Enum.PreferredTextSize.Medium)
-	sim:step(1 / 60)
-	T.equal(bubble.AbsoluteSize, before, "and back as it was at once")
-	T.equal(#heldLabels(alice), 0, "and nothing held once it's back to the usual size")
-	clean(sim, "Text Size changed mid-line")
 end)
 
 T.test("with no top bar row to put it in, the status sits at the top of the HUD instead", function()
-	-- An old 36 px top bar: too short for the status's pills.
-	local sim = boot({
-		root = ROOT,
-		screen = roblox.Vector2.new(1280, 720),
-		safeArea = roblox.Vector2.new(1280, 684),
-	})
-	local alice = sim:addPlayer("Alice", 101)
-	local bot = newBot(sim, alice, { idle = true })
-	local play = alice.PlayerGui.LastFerryHud.Root.Play
-	local onShift = sim:runUntil(
-		function()
-			return sim:shown(play)
-		end,
-		120,
-		1 / 20,
-		function()
-			tick(bot)
-		end
-	)
-	T.expect(onShift, "the first night started")
-	local row = play:FindFirstChild("Row")
-	T.expect(row ~= nil, "the status row is in the HUD")
-	T.expect(sim:shown(row.TopBar.Left.NightPill), "and showing")
-	local rowBottom = row.AbsolutePosition.Y + row.AbsoluteSize.Y
-	T.expect(play.Desk.AbsolutePosition.Y >= rowBottom, "the desk starts under it")
-	T.expect(play.Side.AbsolutePosition.Y >= rowBottom, "and so does the rules panel")
-	T.expect(row.TopBar.Right.Lanterns.AbsoluteSize.Y >= 38, "its pills are big enough to see and tap")
-	-- The passenger's line stays clear of it, from every stand.
-	sim.cameraFollows = alice
-	local model
-	T.expect(
-		sim:runUntil(
+	-- An old 36 px top bar: too short for the status's pills. On a monitor, and on phones at
+	-- the largest Text Size with the setting added on screen, where the pills, scaled down
+	-- with the HUD, have their text that much bigger in their own pixels; and once with
+	-- Roblox not saying how much bigger the setting draws text (TextService fails).
+	local touch = roblox.Enum.PreferredInput.Touch
+	local largest = roblox.Enum.PreferredTextSize.Largest
+	for _, case in
+		{
+			{ label = "a monitor", screen = roblox.Vector2.new(1280, 720), safeArea = roblox.Vector2.new(1280, 684) },
+			{
+				label = "an iPhone SE, at the largest Text Size",
+				screen = roblox.Vector2.new(667, 375),
+				safeArea = roblox.Vector2.new(667, 339),
+				input = touch,
+				textSize = largest,
+			},
+			{
+				label = "a notched phone, at the largest Text Size",
+				screen = roblox.Vector2.new(844, 390),
+				safeArea = roblox.Vector2.new(750, 354),
+				input = touch,
+				textSize = largest,
+			},
+			{
+				label = "an iPhone SE, at the largest Text Size, TextService failing",
+				screen = roblox.Vector2.new(667, 375),
+				safeArea = roblox.Vector2.new(667, 339),
+				input = touch,
+				textSize = largest,
+				offsetFails = true,
+			},
+		}
+	do
+		local label = `no top bar row, {case.label}`
+		local sim = boot({
+			root = ROOT,
+			screen = case.screen,
+			safeArea = case.safeArea,
+			preferredInput = case.input,
+			preferredTextSize = case.textSize,
+			textSizeOffsetIn = "screen",
+			textSizeOffsetFails = case.offsetFails,
+		})
+		local alice = sim:addPlayer("Alice", 101)
+		local bot = newBot(sim, alice, { stopAtPage = true })
+		local play = alice.PlayerGui.LastFerryHud.Root.Play
+		local onShift = sim:runUntil(
 			function()
-				local tells = lookAtPassenger(sim)
-				model = tells and tells.model
-				return model ~= nil and heard(bot, model) ~= ""
+				return sim:shown(play)
 			end,
 			120,
 			1 / 20,
 			function()
 				tick(bot)
 			end
-		),
-		"a passenger is at the window, talking"
-	)
-	checkSpeechPlacement(sim, alice, model, "no top bar row", true)
-	checkTextFits(sim, alice, "no top bar row")
-	clean(sim, "no top bar row")
+		)
+		T.expect(onShift, `{label}: the first night started`)
+		local row = play:FindFirstChild("Row")
+		T.expect(row ~= nil, `{label}: the status row is in the HUD`)
+		T.expect(sim:shown(row.TopBar.Left.NightPill), `{label}: and showing`)
+		local rowBottom = row.AbsolutePosition.Y + row.AbsoluteSize.Y
+		T.expect(play.Desk.AbsolutePosition.Y >= rowBottom, `{label}: the desk starts under it`)
+		T.expect(play.Side.AbsolutePosition.Y >= rowBottom, `{label}: and so does the rules panel`)
+		if case.input == nil then
+			T.expect(row.TopBar.Right.Lanterns.AbsoluteSize.Y >= 38, `{label}: its pills are big enough to see and tap`)
+		end
+		-- A page in the ledger, so every pill that can show is up, and the passenger's line
+		-- stays clear of it, from every stand.
+		sim.cameraFollows = alice
+		local model = untilAPage(sim, bot)
+		checkPills(alice, label)
+		-- On a phone at that size the line may only fit over the status, sitting on their head.
+		local phone = case.input ~= nil
+		checkSpeechPlacement(sim, alice, model, label, not phone, phone)
+		checkTextFits(sim, alice, label)
+		clean(sim, label)
+	end
 end)
 
 T.test("on tablets the rules panel clears Roblox's bigger jump button", function()

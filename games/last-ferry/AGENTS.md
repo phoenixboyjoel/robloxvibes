@@ -176,13 +176,18 @@ contain all of those words; run the whole suite before you're done.
   back. Text meant for reading wraps or grows its box (AutomaticSize), so it
   gets bigger. Text in a box that can't grow the way it needs (down for
   wrapped text, across for the rest) is held at its size: `Ui.label` does this
-  by default, `Ui.holdTextSize` for anything else. Roblox applies the
-  constraint on screen, after UIScale, so `Ui` holds text at its size times the
-  UIScales above it, and only while the player has asked for bigger text:
-  after changing a UIScale, call `Ui.refreshHeldText`. `Game.spec` plays at the
-  largest size too: every word still fits, the text meant for reading is as
-  big as the setting asks, and held text keeps its size. Don't hold rich text
-  that sets sizes (`<font size>`): a UITextSizeConstraint overrides them.
+  by default, `Ui.holdTextSize` for anything else, and only while the player
+  has asked for bigger text. Whether Roblox applies the constraint on screen,
+  after UIScale (a DevForum bug report says so), or in the label's own pixels
+  isn't documented, so the game asks Roblox when it starts
+  (`Ui.findWhereTextIsHeld`) and holds text at its size times the layout
+  scales above it, or at its size. Make a UIScale that lays the HUD out at a
+  size with `Ui.layoutScale`, and call `Ui.refreshHeldText` after changing
+  it; a UIScale that only animates something (a bounce, a pop) is a plain
+  one. `Game.spec` plays at every Text Size, with text held either way: every
+  word still fits, the text meant for reading is as big as the setting asks,
+  and held text keeps its size. Don't hold rich text that sets sizes
+  (`<font size>`): a UITextSizeConstraint overrides them.
 - Nothing may cover a passenger's face while they're at the window: breath is
   a rule from night 3. That's why the radio waits for an empty window,
   warnings show as a banner across the status in Roblox's top bar row, and

@@ -227,19 +227,40 @@ Disabled**.
           the ticket stay their usual size, by design (their boxes can't
           grow); the passenger's name on the ticket grows a little. Say
           whether they're readable enough at that setting.
-        - Those held labels are their usual size: not smaller on the PC (where
-          the HUD is scaled up) and not bigger on the phone (scaled down). If
-          they are, Roblox applies UITextSizeConstraint before UIScale after
-          all: `Ui.holdTextSize` should then hold text at its size alone.
+        - Where Roblox holds text: in the Explorer, select Players → (you) →
+          PlayerGui → LastFerryHud and read its attributes. `TextHeld` is
+          `screen` or `label` (the game asked Roblox when it started, and
+          holds text to match), not `unknown`; `TextHeldShare` is about 0.33
+          for `screen`, or between 0.68 and 1 for `label`. Note which.
+        - Those held labels are their usual size. Select the BOARD button's
+          label (LastFerryHud → Root → Play → Desk → Board → Face → Content →
+          Label) and note its `TextBounds` at the usual Text Size and again at
+          the largest, in a 1280 × 720 window and in the iPhone SE emulator:
+          each pair matches within 1 px. If the largest is clearly bigger or
+          smaller (a third bigger or a quarter smaller on the PC; a third
+          smaller or half as big again on the phone), the game has read
+          Roblox wrong: note `TextHeld`, `TextHeldShare` and the widths (the
+          fix is for `Ui.findWhereTextIsHeld` to give the other answer).
+        - The bubble's step down works in Roblox as in the tests: in the
+          command bar, on the client,
+          `local m = game.Players.LocalPlayer.PlayerGui.SpeechSizer.Measure; local c = m:FindFirstChildOfClass("UITextSizeConstraint"); c.MaxTextSize = 16; m.Text = "Evening, clerk"; local small = m.TextBounds.X; c.MaxTextSize = 1000; m.Text = ""; m.Text = "Evening, clerk"; print(small, m.TextBounds.X)`
+          prints two different widths (the second about 30/16 of the first).
+          If they're the same, TextBounds don't show what a constraint does,
+          and the bubble can't step down: say so.
         - In the command bar, on the client, during the playtest,
           `print(game:GetService("TextService"):GetTextSizeOffsetAsync(16, Font.fromEnum(Enum.Font.BuilderSans)))`
           gives 14 at the largest (4 and 10 at the steps between), the sizes
           the tests use. If not, update `TEXT_SIZE_OFFSETS` in
-          `tests/sim/Roblox.luau` and run the tests.
-        - Captions, the summary's lines, the manifest's names and the desk's
-          "The next passenger is coming up the dock..." line grow with their
-          text inside the scaled HUD (a 2026 DevForum report has Roblox
-          mis-sizing text like this under a UIScale).
+          `tests/sim/Roblox.luau` and `MEASURED_OFFSETS` in `Ui/TopBar.luau`,
+          and run the tests.
+        - Captions, the summary's lines, the manifest's names, the rules and
+          the desk's "The next passenger is coming up the dock..." line grow
+          with their text inside the scaled HUD, with every line showing,
+          the last included, in the 1280 × 720 window and in the iPhone SE
+          emulator, at the usual Text Size too. Roblox has open bug reports
+          (2024 to 2026) of text that grows its box under a UIScale losing its
+          last line at some scales; if you see it, note the screen size and
+          the label.
       - Back at the usual Text Size, everything looks exactly as before
         (nothing is held back at that size).
       - Mara (the smallest passenger) has a normal-looking classic head.

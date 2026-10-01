@@ -203,8 +203,18 @@ function HudController.start()
 	-- laid out at design size and scaled to fit.
 	local hud = screenGui(playerGui, "LastFerryHud", 6, Enum.ScreenInsets.CoreUISafeInsets)
 	local root = Ui.frame(hud, "Root", UDim2.fromScale(1, 1))
-	local uiScale = Instance.new("UIScale")
-	uiScale.Parent = root
+	local uiScale = Ui.layoutScale(root)
+
+	-- Where Roblox holds text back at a bigger Text Size: asked once, and noted on the HUD
+	-- (TextHeld: "screen", "label" or "unknown", and what was measured) for a playtest.
+	task.spawn(function()
+		local where, measured = Ui.findWhereTextIsHeld(playerGui)
+		if where then
+			Ui.setTextHeldOnScreen(where == "screen")
+		end
+		hud:SetAttribute("TextHeldShare", measured)
+		hud:SetAttribute("TextHeld", where or "unknown")
+	end)
 
 	-- In first person Roblox locks the mouse to the middle of the screen. A visible Modal
 	-- button frees it, so the HUD can be clicked; holding the right button still looks around.
@@ -584,12 +594,17 @@ function HudController.start()
 		end
 		-- Roblox's own buttons in the top bar row (left of TopbarInset, and right of it if
 		-- anything is), which Roblox draws over every game's GUI. The row is above GUI y 0.
+		-- The bubble keeps to the side of them all the way down, rather than be drawn smaller
+		-- to fit under them (on an iPhone SE, a microphone button there cost the longest line
+		-- up to three steps).
 		local inset = GuiService.TopbarInset
 		local drawnOver: { Speech.Area } = {
 			{ left = -10000, top = -10000, right = inset.Min.X, bottom = 0 },
 		}
+		left = math.max(left, inset.Min.X + gap)
 		if inset.Max.X < at.X + size.X - 0.5 then
 			table.insert(drawnOver, { left = inset.Max.X, top = -10000, right = 10000, bottom = 0 })
+			right = math.min(right, inset.Max.X - gap)
 		end
 		speechRoom = {
 			area = { left = left, top = top, right = right, bottom = bottom },

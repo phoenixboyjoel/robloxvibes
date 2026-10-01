@@ -671,6 +671,57 @@ T.test("the player's Text Size setting draws text bigger, except where it's held
 	local _, _, scaledUp = onScreen:execute(source)
 	T.equal(onScreen:drawnTextSize(scaledUp, true), 25, "18 + 14 / 2")
 	T.equal(#onScreen.errors, 0, table.concat(onScreen.errors, "\n"))
+
+	-- If a constraint holds text in its object's own pixels instead, a MaxTextSize of 20
+	-- holds it at 20 of them, under a UIScale or not.
+	local inLabel = Sim.new({
+		root = ".",
+		preferredTextSize = roblox.Enum.PreferredTextSize.Largest,
+		constraintIn = "label",
+	})
+	local heldInLabel, _, underScaleInLabel = inLabel:execute(source)
+	T.equal(inLabel:drawnTextSize(heldInLabel), 20, "held in its own pixels")
+	T.equal(inLabel:drawnTextSize(underScaleInLabel), 20, "and under a UIScale, at as many of its own")
+	T.equal(
+		underScaleInLabel.TextBounds,
+		textBounds(plain, BUILDER_BOLD, 20, "NIGHT 1 / 5"),
+		"which its TextBounds show"
+	)
+	T.equal(#inLabel.errors, 0, table.concat(inLabel.errors, "\n"))
+
+	-- And where TextBounds leave a constraint out, they measure text as if it weren't held,
+	-- though it's drawn held.
+	local unseen = Sim.new({
+		root = ".",
+		preferredTextSize = roblox.Enum.PreferredTextSize.Largest,
+		textBoundsIgnoreConstraints = true,
+	})
+	local heldUnseen = unseen:execute(source)
+	T.equal(heldUnseen.TextBounds, textBounds(plain, BUILDER_BOLD, 32, "NIGHT 1 / 5"), "measured unheld")
+	T.equal(unseen:drawnTextSize(heldUnseen), 20, "drawn held")
+	T.equal(#unseen.errors, 0, table.concat(unseen.errors, "\n"))
+end)
+
+T.test("TextService says how much bigger the Text Size setting draws text, in a moment, or fails", function()
+	local source = [[
+		local answer = {}
+		task.spawn(function()
+			answer.ok, answer.offset = pcall(function()
+				return game:GetService("TextService"):GetTextSizeOffsetAsync(16, Font.fromEnum(Enum.Font.BuilderSans))
+			end)
+		end)
+		return answer
+	]]
+	local sim = Sim.new({ root = ".", preferredTextSize = roblox.Enum.PreferredTextSize.Larger })
+	local answer = sim:execute(source)
+	T.equal(answer.ok, nil, "not at once: it asks over the network")
+	sim:run(0.2)
+	T.equal(answer.ok, true, "then it answers")
+	T.equal(answer.offset, 10, "10 px bigger at Larger")
+	local failing = Sim.new({ root = ".", textSizeOffsetFails = true })
+	local failed = failing:execute(source)
+	failing:run(0.2)
+	T.equal(failed.ok, false, "and it can fail")
 end)
 
 T.test("fonts load late: text measures as a stand-in font's until then, and PreloadAsync waits", function()

@@ -56,11 +56,11 @@ something.
 | `ReplicatedStorage/Controllers/EffectsController.luau` | Blur behind cards, flood tint, lantern-out pulse, client-side lighthouse spin |
 | `ReplicatedStorage/Controllers/HudController.luau` | The whole HUD and its wiring to the remotes: the lobby banner on the pier, the shift HUD (the status up in Roblox's top bar row, `Ui/TopBar`; the desk and the rules panel under it; on the first night, a hint along the bottom, no wider than the room left of the rules panel), passengers' lines as speech bubbles (`Ui/Speech`) kept to the room the HUD leaves them, and chat-log lines, `ContextActionService` shortcuts that give way to Roblox's controls, the Modal button that frees the mouse in first person, and Roblox's player list put away on shift (on a computer it's open over the top right, where the rules panel is) and back on the pier |
 | `ReplicatedStorage/Ui/Theme.luau` | Colours and fonts in Roblox's chunky house style (Fredoka One titles, Builder Sans ExtraBold controls, Special Elite and Oswald only on paper), design canvas and scale limits |
-| `ReplicatedStorage/Ui/Ui.luau` | Typed UI builders: frames, labels, layout, text strokes, hard shadows (`UIShadow`), gloss, drawn icons (check, cross, play, bang, page) and chunky buttons that squash and spring back. The player's Text Size setting (`GuiService.PreferredTextSize`) draws all text 4, 10 or 14 px bigger: a label whose box can't grow the way its text needs (down for wrapped text, across for the rest) is held at its designed size with a `UITextSizeConstraint` (`hold`, `holdAt`, `Ui.holdTextSize`), as are button labels; text that wraps or grows its box is drawn bigger. Roblox applies the constraint on screen, after UIScale, so it holds text at its size times the UIScales above it (`Ui.refreshHeldText` after one changes), and it's there only while the player has asked for bigger text, as in Roblox's own Foundation icons |
+| `ReplicatedStorage/Ui/Ui.luau` | Typed UI builders: frames, labels, layout, text strokes, hard shadows (`UIShadow`), gloss, drawn icons (check, cross, play, bang, page) and chunky buttons that squash and spring back. The player's Text Size setting (`GuiService.PreferredTextSize`) draws all text 4, 10 or 14 px bigger: a label whose box can't grow the way its text needs (down for wrapped text, across for the rest) is held at its designed size with a `UITextSizeConstraint` (`hold`, `holdAt`, `Ui.holdTextSize`), as are button labels; text that wraps or grows its box is drawn bigger. It's there only while the player has asked for bigger text, as in Roblox's own Foundation icons. Roblox doesn't document whether the constraint applies on screen, after UIScale (a DevForum bug report says so), or in the label's own pixels, so when the HUD starts `Ui.findWhereTextIsHeld` asks Roblox: two pairs of labels no one sees, held and not, one pair under a UIScale of 3, compared by their TextBounds (the answer, `screen`, `label` or `unknown`, is the HUD's `TextHeld` attribute). Text is then held at its size times the layout scales above it (`Ui.layoutScale`: the HUD's and the top bar row's, not a button's bounce or the stamp's pop; `Ui.refreshHeldText` after one changes), or at its size |
 | `ReplicatedStorage/Ui/Widgets.luau` | Shared pieces: captions and paragraphs (both wrap, and grow with the player's Text Size), tags (held at their size, as badges), rule rows with number badges, lantern icons, text outlines |
 | `ReplicatedStorage/Ui/Sfx.luau` | Sounds only this player hears (clicks, the stamp, a lantern's gust), made in SoundService on the client |
-| `ReplicatedStorage/Ui/Speech.luau` | What the passenger at the window says, drawn exactly like Roblox's chat bubble (Gotham SSm Medium 16, white, rounded, Roblox's tail) and sized from its measured text as Roblox sizes its own, on its own ScreenGui (`LastFerrySpeech`, DisplayOrder 7) over the HUD. Every frame, once the camera has moved, it goes over their head and then moves to stay in the room the HUD leaves it: along or up as far as it takes, down only until its tail touches the top of their head (`Speech.place`). Where the camera draws their head comes from `WorldToScreenPoint`, which is in the same coordinates as `AbsolutePosition` (so it's right on a notched phone too, where viewport coordinates aren't); the bubble's layer covers the whole screen, so it takes off where the layer starts. The room can have obstacles lower down (the page tab): if the bubble would cover one, it goes beside it, on the tip's side if even the narrowest bubble fits there and the other side if not, or over it if neither side has room (`Speech.placeInRoom`). Its line is measured again once the bubble's font has loaded (`ContentProvider:PreloadAsync`: text measured before then comes out a stand-in font's size, and Roblox doesn't draw wrapped lines that don't fit) and when the player's text size changes, and again (at most every quarter second) whenever it doesn't fit its bubble after all, since preloading isn't always enough. The line is drawn as big as the player's Text Size setting makes it, unless the bubble would then run off the top of the screen or under Roblox's own top bar buttons, which Roblox draws over every game's GUI (the longest lines, on the smallest phones): then it's drawn 2 px smaller at a time, never below its designed size, and bigger again only with 4 px to spare, so it doesn't flicker as the view moves. It stays up for the whole window and works where Roblox's chat doesn't (consoles, with bigger type on a TV, told by `GuiService.ViewportDisplaySize`) |
-| `ReplicatedStorage/Ui/TopBar.luau` | The shift's status in Roblox's own top bar row (`ScreenInsets.TopbarSafeInsets`, beside Roblox's buttons), as pills like Roblox's: night, clock and date; ledger, queue and lanterns; a lost lantern or a found page as a banner across the row. It scales with the row (up on a TV) and fits whatever room Roblox's buttons leave, dropping the date, then the queue, the word LEDGER and the clock. With no row tall enough, or none wide enough for the pills that always show (the night, the ledger's icon and page count, the lanterns), it sits at the top of the HUD instead. The pills are measured from their text, the way Roblox measures its chat bubbles (a label in a ScreenGui that's never shown), not from their own sizes: Roblox doesn't keep what's hidden laid out. They're measured afresh each time they're fitted (a few times a second), and fitted again as soon as their fonts have loaded or the player's text size changes |
+| `ReplicatedStorage/Ui/Speech.luau` | What the passenger at the window says, drawn exactly like Roblox's chat bubble (Gotham SSm Medium 16, white, rounded, Roblox's tail) and sized from its measured text as Roblox sizes its own, on its own ScreenGui (`LastFerrySpeech`, DisplayOrder 7) over the HUD. Every frame, once the camera has moved, it goes over their head and then moves to stay in the room the HUD leaves it: along or up as far as it takes, down only until its tail touches the top of their head (`Speech.place`). Where the camera draws their head comes from `WorldToScreenPoint`, which is in the same coordinates as `AbsolutePosition` (so it's right on a notched phone too, where viewport coordinates aren't); the bubble's layer covers the whole screen, so it takes off where the layer starts. The room can have obstacles lower down (the page tab): if the bubble would cover one, it goes beside it, on the tip's side if even the narrowest bubble fits there and the other side if not, or over it if neither side has room (`Speech.placeInRoom`). Its line is measured again once the bubble's font has loaded (`ContentProvider:PreloadAsync`: text measured before then comes out a stand-in font's size, and Roblox doesn't draw wrapped lines that don't fit) and when the player's text size changes, and again (at most every quarter second) whenever it doesn't fit its bubble after all, since preloading isn't always enough. The line is drawn as big as the player's Text Size setting makes it, unless the bubble would then run off the top of the screen or under Roblox's own top bar buttons, which Roblox draws over every game's GUI (the longest lines, on the smallest phones): then it's drawn 2 px smaller at a time, never below its designed size, and bigger again only with 4 px to spare (at the top of the screen and beside those buttons), so it doesn't flicker as the view moves. A new line starts again as big as the setting makes it. The room HudController gives it keeps to the side of Roblox's buttons all the way down, so it isn't drawn smaller to fit under them. It stays up for the whole window and works where Roblox's chat doesn't (consoles, with bigger type on a TV, told by `GuiService.ViewportDisplaySize`) |
+| `ReplicatedStorage/Ui/TopBar.luau` | The shift's status in Roblox's own top bar row (`ScreenInsets.TopbarSafeInsets`, beside Roblox's buttons), as pills like Roblox's: night, clock and date; ledger, queue and lanterns; a lost lantern or a found page as a banner across the row. It scales with the row (up on a TV) and fits whatever room Roblox's buttons leave, dropping the date, then the queue, the word LEDGER and the clock. With no row tall enough, or none wide enough for the pills that always show (the night, the ledger's icon and page count, the lanterns), it sits at the top of the HUD instead. The pills are measured from their text, the way Roblox measures its chat bubbles (a label in a ScreenGui that's never shown), not from their own sizes: Roblox doesn't keep what's hidden laid out. They're measured afresh each time they're fitted (a few times a second), and fitted again as soon as their fonts have loaded or the player's text size changes. Scaled down (in the HUD on a phone), they're measured as much bigger as the Text Size setting would make them if Roblox adds its pixels on screen (it doesn't say), by the offset `TextService:GetTextSizeOffsetAsync` gives (or, until it answers or if it fails, 4/10/14 as measured in Studio) |
 | `ReplicatedStorage/Ui/Ticket.luau` | The ticket card, its drawn stamps, the torn-page tab, the BOARDED / TURNED AWAY stamp |
 | `ReplicatedStorage/Ui/Overlay.luau` | Intro, summary, tide-came-in and ending cards, with the co-op Continue |
 | `tests/` | Lune test suite (`lune run tests/run.luau`) and the headless simulator in `tests/sim/` |
@@ -219,9 +219,10 @@ contain all of those words (and fails if none does).
   camera draws a point in each of Roblox's coordinate systems, `IgnoreGuiInset`,
   `ViewportDisplaySize`, and text: each font's real widths, wrapping, rich
   text, `TextFits`, fonts that load late (and `PreloadAsync` returning before
-  they have), and the player's Text Size setting, held back on screen by a
-  `UITextSizeConstraint`, whether its offset is added in a label's own pixels
-  or on screen.
+  they have), and the player's Text Size setting: its offset added in a label's
+  own pixels or on screen, held back by a `UITextSizeConstraint` on screen or
+  in the label's own pixels, TextBounds that leave a constraint out, and
+  `TextService:GetTextSizeOffsetAsync` answering after a moment, or failing.
 - `tests/Glide.spec.luau`: glides are eased, sent once and moved by every
   client every frame; late joiners, changes of course, stops and late server
   moves; a walk's legs joining up; the server's end move with nobody watching;
@@ -257,16 +258,32 @@ contain all of those words (and fails if none does).
     on the pier on both phones and a tablet; and with no top bar row;
   - on a TV, only the first night's card and the HUD with the first
     passenger's line;
-  - at the largest Text Size: the same HUD on all three screens, with the
-    longest line (drawn at its full size on the monitor, and over the top bar
-    row but never under Roblox's own buttons on the phones, even when they
-    widen), and everything on screen each second of five nights on an iPhone
-    SE (every card, the ledger, the manifest, a lantern's banner, the ending
-    card), with the text meant for reading as big as the setting asks
-    (`checkGrown`). On the phones the setting is added on screen and on the
-    monitor in the HUD's own pixels, whichever is the more demanding. Also:
-    nothing is held at the usual size, held text keeps its size at the
-    largest, and the line's size doesn't flicker as the view moves.
+  - at every Text Size the setting has (Large, Larger, Largest): the same HUD
+    on all three screens, with the longest line (drawn at its full size on the
+    monitor, and over the top bar row but never under Roblox's own buttons on
+    the phones: at the largest, with them widened, with buttons on the right of
+    the row too, and with a microphone button on the iPhone SE, which costs
+    the line a step at most), with the text meant for reading as big as the
+    setting asks (`checkGrown`) and every held label at its size, the ticket's
+    name at 26 (`checkHeld`); and at the largest, everything on screen each
+    second of five nights on an iPhone SE (every card, the ledger, the
+    manifest, a lantern's banner, the ending card). On the phones the setting
+    is added on screen and on the monitor in the HUD's own pixels, whichever
+    is the more demanding.
+  - where Roblox holds text: the game's answer on a monitor and an iPhone SE
+    with text held on screen, in the label's own pixels, and with TextBounds
+    that don't show it (`unknown`, held as the bug report has it), and held
+    text the right size in each; and as the setting changes mid-line (nothing
+    held at the usual size; every size held right at each other, in a taller
+    top bar row, in a smaller window, and held again while the stamp pops),
+    with text held either way.
+  - the line at a big Text Size: tilting the view from looking up to looking
+    down, it's drawn smaller a step at a time down to its designed size; at
+    each edge, just short of it, it stays its size however long the view is
+    held still, wholly on screen; just past it, a step smaller; rocking across
+    it, its size never changes; and the next line starts at its full size.
+  - with no top bar row: on a monitor, and on phones at the largest Text Size,
+    the pills never run into each other, whether or not TextService answers.
 
 When the game starts using a Roblox class or method the simulator doesn't know:
 
@@ -293,13 +310,19 @@ Largest, as measured in Studio by the Facet UI library. Whether Roblox adds
 them in a label's own pixels or on screen (after UIScale) isn't known, so
 `Sim.new({ textSizeOffsetIn = "label" or "screen" })` picks. `TextScaled` text
 is left alone, and a `UITextSizeConstraint` holds text within its sizes on
-screen, after UIScale, as a DevForum bug report has Roblox doing.
+screen, after UIScale, as a DevForum bug report has Roblox doing, or in its
+object's own pixels: `Sim.new({ constraintIn = "screen" or "label" })`.
+`textBoundsIgnoreConstraints` makes `TextBounds` leave a constraint out (the
+game then can't tell where text is held), and
+`TextService:GetTextSizeOffsetAsync` answers after a moment, or fails with
+`textSizeOffsetFails`.
 `sim:textRoom`, `sim:textRect`, `sim:drawnTextSize` and `sim:scaleOf` say how
 much room an object's text takes and has, where it's drawn, at what size, and
 how much the UIScales above it scale it.
 `TextBounds` here is in the label's own pixels; Roblox is reported to give it on
-screen under a UIScale, but the game only reads it from labels with no UIScale
-above them. `Sim.new({ fontsLoadAt = seconds })`
+screen under a UIScale, but the game reads it under one only to compare two
+labels under the same UIScale (`Ui.findWhereTextIsHeld`), where it doesn't
+matter which. `Sim.new({ fontsLoadAt = seconds })`
 makes the fonts load late, as they can in Roblox: until then text measures as a
 stand-in font's, and `ContentProvider:PreloadAsync` waits. Unlike Roblox, it
 keeps hidden objects laid out and doesn't fire `AbsoluteSize` changes for
@@ -309,7 +332,8 @@ Screens are `Sim.new({ screen, safeArea, topbarInset })`, where the top bar row'
 free part defaults to all but Roblox's buttons (`sim:setTopbarInset` changes it
 and fires `GuiService.TopbarInset`'s change, as when Roblox's chat pill opens);
 consoles are `Sim.new({ tenFoot = true })`. `sim:setScreen` resizes the window
-mid-game (every ScreenGui is told its new size).
+mid-game (every ScreenGui is told its new size; a top bar row the test chose
+keeps Roblox's buttons as wide on each side).
 `GuiService.ViewportDisplaySize` follows from those (Large for a console, Small
 for touch) unless `Sim.new({ displaySize })` says, and `sim:setDisplaySize`
 changes it, as when a window moves to a TV.

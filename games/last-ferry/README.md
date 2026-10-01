@@ -128,7 +128,7 @@ GitHub Actions runs all of these on every pull request
 same pinned versions. It keeps the built place file as a download on each run.
 
 At the time of this build every check comes back clean:
-- 106 tests pass.
+- 108 tests pass.
 - There are 0 selene findings.
 - There are 0 strict type errors.
 
@@ -251,13 +251,12 @@ The fifth review, of those fixes, found, and this build fixes:
   text measurements are (a few percent, not 1%).
 
 The sixth review, of the Text Size work, found, and this build fixes:
-- **Holding text back could have shrunk it for everyone:** Roblox applies a
-  `UITextSizeConstraint` on screen, after UIScale (a DevForum bug report says so,
-  and says it still happens), so holding a label at its designed size would
-  have drawn the HUD's held text a quarter smaller on every monitor, even at
-  the usual Text Size. Text is now held only while the player has asked for
-  bigger text (as Roblox's own Foundation icons do), at its size times the
-  HUD's scale, rounded down.
+- **Holding text back could have shrunk it for everyone:** if Roblox applies a
+  `UITextSizeConstraint` on screen, after UIScale (a DevForum bug report says it
+  does, and still), holding a label at its designed size would have drawn the
+  HUD's held text a quarter smaller on every monitor, even at the usual Text
+  Size. Text is now held only while the player has asked for bigger text (as
+  Roblox's own Foundation icons do).
 - **Bigger than guessed:** the setting adds 4, 10 or 14 px (measured in Studio
   by the Facet UI library), not up to 8. The tests now use those sizes, added
   either in the HUD's own pixels or on screen (Roblox doesn't say which), on
@@ -272,6 +271,37 @@ The sixth review, of the Text Size work, found, and this build fixes:
   text cut short with "…" must still fit its box's height, the room to spare
   is checked on the side a label grows towards, and new tests change the Text
   Size mid-line and check held text keeps its size.
+
+The seventh review, of those fixes, found, and this build fixes:
+- **A bet on undocumented behaviour, with a Studio check looking for the wrong
+  symptoms:** only that bug report says Roblox applies a constraint on screen.
+  If it's in the label's own pixels instead, at a big Text Size every held
+  label (the buttons, the ticket, the tabs) would have been drawn a third
+  smaller on phones and spilled out of its box on monitors. The game now asks
+  Roblox when it starts: two pairs of labels no one sees, one of each pair held
+  back and one pair under a UIScale, compared by width. Then it holds text to
+  match. The tests play both ways, and a third where Roblox's answer can't be
+  read, and the Studio check reads numbers instead of judging by eye.
+- **The status pills on phones:** with no top bar row, at the largest Text
+  Size, if Roblox adds the setting's pixels on screen, the pills in the
+  scaled-down HUD ran into each other (by 63 px on an iPhone SE). They're now
+  measured for that, with the offset `TextService` gives for the setting.
+- **Roblox's own buttons:** a microphone button beside them (voice chat) cost
+  the passenger's longest line up to three sizes on an iPhone SE. The bubble
+  now keeps to the side of them all the way down, and needs room to spare
+  beside them before it grows again.
+- **The stamp's pop:** the hold counted every UIScale above a label, the
+  stamp's own pop included, so a refresh mid-pop held it too big until the
+  next. Only the scales the HUD is laid out at count now.
+- **Test gaps:** 8 of the reviewer's 18 planted bugs got through. The text
+  tests now run at every Text Size and check every held label's exact size
+  (the ticket's name at 26), and the room on the side a label actually grows
+  towards. The bubble test walks every step from full size down to the
+  designed size and checks each edge: held still, just past it, rocking across
+  it, and a new line starting afresh. Five of the eight are now caught; the
+  other three are harmless (a value rewritten unchanged, a refresh another one
+  covers) or now out of reach (the bubble can't get under Roblox's buttons to
+  be drawn smaller there). So are 12 of this round's 13.
 
 Smooth movement came out of the same research: nothing is tweened on the
 server any more. The server sends each move once and every client plays it
@@ -310,7 +340,7 @@ The tests have three layers:
      head from every stand, on three screens, and with the view turned; the
      status fitting however much of the top bar Roblox's buttons leave, with a
      page in the ledger too; every piece of text fitting its box, on the cards
-     and the HUD, at the default and the largest Text Size (ARCHITECTURE.md
+     and the HUD, at the default Text Size and every bigger one (ARCHITECTURE.md
      lists exactly which screens); every stand's view aimed at the passenger,
      respawns included.
    - Passengers walk a steady stride every frame on each client while the

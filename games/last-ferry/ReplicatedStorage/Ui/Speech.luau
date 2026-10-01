@@ -388,16 +388,16 @@ function Speech.new(parent: Instance, room: () -> Room?): Speech
 			table.insert(hidden, onLayer(area))
 		end
 		-- Whether a bubble placed there is on screen (the top of this layer is the top of the
-		-- screen) and clear of what Roblox draws over it, with `spare` pixels at the top.
+		-- screen) and clear of what Roblox draws over it, with `spare` pixels to spare.
 		local function shows(placedSize: Vector2, placedAt: Vector2, spare: number): boolean
-			if placedAt.Y < spare - 0.5 then
-				return false
+			if math.round(placedAt.Y) < spare then
+				return false -- where it's drawn, at a whole pixel
 			end
 			local placed = {
-				left = placedAt.X,
-				top = placedAt.Y,
-				right = placedAt.X + placedSize.X,
-				bottom = placedAt.Y + placedSize.Y + tail,
+				left = placedAt.X - spare,
+				top = placedAt.Y - spare,
+				right = placedAt.X + placedSize.X + spare,
+				bottom = placedAt.Y + placedSize.Y + tail + spare,
 			}
 			for _, area in hidden do
 				if overlap(placed, area) then

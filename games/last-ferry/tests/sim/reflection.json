@@ -7416,6 +7416,39 @@
    "service": false,
    "superclass": "GuiLabel"
   },
+  "TextService": {
+   "creatable": false,
+   "events": {},
+   "functions": {
+    "FilterAndTranslateStringAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "FilterStringAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "GetFamilyInfoAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "GetTextBoundsAsync": {
+     "deprecated": false,
+     "yields": true
+    },
+    "GetTextSize": {
+     "deprecated": false,
+     "yields": false
+    },
+    "GetTextSizeOffsetAsync": {
+     "deprecated": false,
+     "yields": true
+    }
+   },
+   "properties": {},
+   "service": true,
+   "superclass": "Instance"
+  },
   "Tween": {
    "creatable": true,
    "events": {},
